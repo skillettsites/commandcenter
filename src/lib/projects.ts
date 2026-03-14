@@ -1,6 +1,7 @@
 import { Project } from './types';
 
 export const projects: Project[] = [
+  { id: 'personal', name: 'Personal', url: '', color: '#EF4444' },
   { id: 'carcostcheck', name: 'CarCostCheck', url: 'https://carcostcheck.co.uk', color: '#3B82F6' },
   { id: 'postcodecheck', name: 'PostcodeCheck', url: 'https://postcodecheck.co.uk', color: '#10B981' },
   { id: 'tapwaterscore', name: 'TapWaterScore', url: 'https://tapwaterscore.vercel.app', color: '#06B6D4' },
