@@ -112,7 +112,7 @@ export async function getImportantEmails(maxResults = 10): Promise<{ emails: Gma
   try {
     // Fetch important/unread emails
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=is:unread category:primary`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=is:unread is:important`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
