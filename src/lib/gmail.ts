@@ -14,7 +14,7 @@ export function getGoogleAuthUrl(): string {
     client_id: process.env.GOOGLE_CLIENT_ID!,
     redirect_uri: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`,
     response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email',
+    scope: 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/userinfo.email',
     access_type: 'offline',
     prompt: 'consent',
   });
@@ -103,6 +103,35 @@ export interface GmailMessage {
   snippet: string;
   date: string;
   unread: boolean;
+}
+
+export async function modifyEmailLabels(
+  emailId: string,
+  addLabels: string[],
+  removeLabels: string[]
+): Promise<boolean> {
+  const token = await getValidToken();
+  if (!token) return false;
+
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}/modify`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          addLabelIds: addLabels,
+          removeLabelIds: removeLabels,
+        }),
+      }
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function getImportantEmails(maxResults = 10): Promise<{ emails: GmailMessage[]; connected: boolean }> {

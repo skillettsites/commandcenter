@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Email {
   id: string;
@@ -15,6 +15,13 @@ interface SenderGroup {
   sender: string;
   emails: Email[];
   latestDate: string;
+}
+
+interface DismissedItem {
+  type: 'email' | 'group';
+  emailIds: string[];
+  sender?: string;
+  timer: ReturnType<typeof setTimeout>;
 }
 
 function groupBySender(emails: Email[]): SenderGroup[] {
@@ -35,46 +42,95 @@ function groupBySender(emails: Email[]): SenderGroup[] {
     .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
 }
 
-function SenderGroupCard({ group }: { group: SenderGroup }) {
+async function dismissEmail(emailId: string, undo = false): Promise<boolean> {
+  try {
+    const res = await fetch('/api/emails/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailId, undo }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function SenderGroupCard({
+  group,
+  onDismissEmail,
+  onDismissGroup,
+}: {
+  group: SenderGroup;
+  onDismissEmail: (emailId: string) => void;
+  onDismissGroup: (sender: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-gray-800/50 transition-colors"
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <svg
-            className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+      <div className="flex items-center">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex-1 flex items-center justify-between px-3 py-2.5 text-left hover:bg-gray-800/50 transition-colors"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <svg
+              className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+            <p className="text-xs font-medium text-gray-300 truncate">{group.sender}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
+              {group.emails.length}
+            </span>
+            <span className="text-xs text-gray-600">{formatDate(group.latestDate)}</span>
+          </div>
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDismissGroup(group.sender);
+          }}
+          className="px-2 py-2.5 text-gray-600 hover:text-red-400 transition-colors"
+          title="Mark not important"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
-          <p className="text-xs font-medium text-gray-300 truncate">{group.sender}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
-            {group.emails.length}
-          </span>
-          <span className="text-xs text-gray-600">{formatDate(group.latestDate)}</span>
-        </div>
-      </button>
+        </button>
+      </div>
 
       {expanded && (
         <div className="border-t border-gray-800 divide-y divide-gray-800/50">
           {group.emails.map((email) => (
             <div key={email.id}>
-              <button
-                onClick={() => setExpandedEmailId(expandedEmailId === email.id ? null : email.id)}
-                className="w-full text-left px-3 py-2 hover:bg-gray-800/50 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm text-white truncate flex-1">{email.subject || '(no subject)'}</p>
-                  <span className="text-xs text-gray-600 flex-shrink-0">{formatDate(email.date)}</span>
-                </div>
-              </button>
+              <div className="flex items-center">
+                <button
+                  onClick={() => setExpandedEmailId(expandedEmailId === email.id ? null : email.id)}
+                  className="flex-1 text-left px-3 py-2 hover:bg-gray-800/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm text-white truncate flex-1">{email.subject || '(no subject)'}</p>
+                    <span className="text-xs text-gray-600 flex-shrink-0">{formatDate(email.date)}</span>
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDismissEmail(email.id);
+                  }}
+                  className="px-2 py-2 text-gray-700 hover:text-red-400 transition-colors"
+                  title="Mark not important"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
               {expandedEmailId === email.id && (
                 <div className="px-3 pb-3">
@@ -102,6 +158,7 @@ export default function EmailList() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [dismissed, setDismissed] = useState<DismissedItem | null>(null);
 
   useEffect(() => {
     async function fetchEmails() {
@@ -118,6 +175,54 @@ export default function EmailList() {
     }
     fetchEmails();
   }, []);
+
+  const handleDismissEmail = useCallback((emailId: string) => {
+    // Clear any existing undo timer
+    if (dismissed?.timer) clearTimeout(dismissed.timer);
+
+    // Remove from UI immediately
+    setEmails(prev => prev.filter(e => e.id !== emailId));
+
+    // Set up undo with 5s timer
+    const timer = setTimeout(() => {
+      dismissEmail(emailId);
+      setDismissed(null);
+    }, 5000);
+
+    setDismissed({ type: 'email', emailIds: [emailId], timer });
+  }, [dismissed]);
+
+  const handleDismissGroup = useCallback((sender: string) => {
+    if (dismissed?.timer) clearTimeout(dismissed.timer);
+
+    const groupEmailIds = emails.filter(e => e.from === sender).map(e => e.id);
+    setEmails(prev => prev.filter(e => e.from !== sender));
+
+    const timer = setTimeout(() => {
+      groupEmailIds.forEach(id => dismissEmail(id));
+      setDismissed(null);
+    }, 5000);
+
+    setDismissed({ type: 'group', emailIds: groupEmailIds, sender, timer });
+  }, [dismissed, emails]);
+
+  const handleUndo = useCallback(() => {
+    if (!dismissed) return;
+    clearTimeout(dismissed.timer);
+
+    // Re-fetch emails to restore
+    async function refetch() {
+      try {
+        const res = await fetch('/api/emails');
+        if (res.ok) {
+          const data = await res.json();
+          setEmails(data.emails);
+        }
+      } catch { /* ignore */ }
+    }
+    refetch();
+    setDismissed(null);
+  }, [dismissed]);
 
   if (loading) {
     return (
@@ -142,7 +247,7 @@ export default function EmailList() {
     );
   }
 
-  if (emails.length === 0) {
+  if (emails.length === 0 && !dismissed) {
     return (
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-gray-400">Emails</h2>
@@ -161,9 +266,31 @@ export default function EmailList() {
         <h2 className="text-sm font-semibold text-gray-400">Emails</h2>
         <span className="text-xs text-gray-600">{emails.length} unread</span>
       </div>
+
+      {dismissed && (
+        <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+          <p className="text-xs text-gray-300">
+            {dismissed.type === 'group'
+              ? `Dismissed ${dismissed.emailIds.length} emails from ${dismissed.sender}`
+              : 'Email dismissed'}
+          </p>
+          <button
+            onClick={handleUndo}
+            className="text-xs text-blue-400 hover:text-blue-300 font-medium ml-3"
+          >
+            Undo
+          </button>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {visibleGroups.map((group) => (
-          <SenderGroupCard key={group.sender} group={group} />
+          <SenderGroupCard
+            key={group.sender}
+            group={group}
+            onDismissEmail={handleDismissEmail}
+            onDismissGroup={handleDismissGroup}
+          />
         ))}
       </div>
       {hasMore && (
