@@ -11,8 +11,8 @@ export default function Home() {
       <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
         <DashboardHeader />
         <HealthBar />
-        <TaskList />
         <EmailList />
+        <TaskList />
       </div>
     </main>
   );

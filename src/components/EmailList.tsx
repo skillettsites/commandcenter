@@ -11,6 +11,30 @@ interface Email {
   unread: boolean;
 }
 
+interface SenderGroup {
+  sender: string;
+  emails: Email[];
+  latestDate: string;
+}
+
+function groupBySender(emails: Email[]): SenderGroup[] {
+  const groups = new Map<string, Email[]>();
+
+  for (const email of emails) {
+    const sender = email.from;
+    if (!groups.has(sender)) groups.set(sender, []);
+    groups.get(sender)!.push(email);
+  }
+
+  return Array.from(groups.entries())
+    .map(([sender, emails]) => ({
+      sender,
+      emails,
+      latestDate: emails[0].date,
+    }))
+    .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
+}
+
 export default function EmailList() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -64,29 +88,42 @@ export default function EmailList() {
     );
   }
 
+  const groups = groupBySender(emails);
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-400">Emails</h2>
         <span className="text-xs text-gray-600">{emails.length} unread</span>
       </div>
-      <div className="space-y-1.5">
-        {emails.map((email) => (
-          <a
-            key={email.id}
-            href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block bg-gray-900 border border-gray-800 rounded-lg p-3 hover:border-gray-700 transition-colors"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate">{email.subject || '(no subject)'}</p>
-                <p className="text-xs text-gray-400 truncate">{email.from}</p>
+      <div className="space-y-2">
+        {groups.map((group) => (
+          <div key={group.sender} className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
+              <p className="text-xs font-medium text-gray-300 truncate">{group.sender}</p>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {group.emails.length > 1 && (
+                  <span className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full">
+                    {group.emails.length}
+                  </span>
+                )}
+                <span className="text-xs text-gray-600">{formatDate(group.latestDate)}</span>
               </div>
-              <span className="text-xs text-gray-600 flex-shrink-0">{formatDate(email.date)}</span>
             </div>
-          </a>
+            <div className="divide-y divide-gray-800/50">
+              {group.emails.map((email) => (
+                <a
+                  key={email.id}
+                  href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block px-3 py-2 hover:bg-gray-800/50 transition-colors"
+                >
+                  <p className="text-sm text-white truncate">{email.subject || '(no subject)'}</p>
+                </a>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>
