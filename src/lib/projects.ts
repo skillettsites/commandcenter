@@ -8,6 +8,7 @@ export const projects: Project[] = [
   { id: 'findyourstay', name: 'FindYourStay', url: 'https://findyourstay.com', color: '#F59E0B' },
   { id: 'helpafterloss', name: 'HelpAfterLoss', url: 'https://helpafterloss.co.uk', color: '#EC4899' },
   { id: 'davidskillett', name: 'DavidSkillett', url: 'https://davidskillett.com', color: '#6366F1' },
+  { id: 'commandcenter', name: 'CommandCenter', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
 ];
 
