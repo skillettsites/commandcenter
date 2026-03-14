@@ -267,22 +267,6 @@ export default function EmailList() {
         <span className="text-xs text-gray-600">{emails.length} unread</span>
       </div>
 
-      {dismissed && (
-        <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
-          <p className="text-xs text-gray-300">
-            {dismissed.type === 'group'
-              ? `Dismissed ${dismissed.emailIds.length} emails from ${dismissed.sender}`
-              : 'Email dismissed'}
-          </p>
-          <button
-            onClick={handleUndo}
-            className="text-xs text-blue-400 hover:text-blue-300 font-medium ml-3"
-          >
-            Undo
-          </button>
-        </div>
-      )}
-
       <div className="space-y-1.5">
         {visibleGroups.map((group) => (
           <SenderGroupCard
@@ -300,6 +284,22 @@ export default function EmailList() {
         >
           {showAll ? 'Show less' : `+ ${groups.length - 3} more senders`}
         </button>
+      )}
+
+      {dismissed && (
+        <div className="fixed bottom-6 left-4 right-4 z-50 flex items-center justify-between bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 shadow-lg shadow-black/50">
+          <p className="text-sm text-white font-medium">
+            {dismissed.type === 'group'
+              ? `${dismissed.emailIds.length} emails dismissed`
+              : 'Email dismissed'}
+          </p>
+          <button
+            onClick={handleUndo}
+            className="text-sm text-blue-400 hover:text-blue-300 font-semibold ml-4 px-3 py-1 bg-blue-500/20 rounded-lg"
+          >
+            Undo
+          </button>
+        </div>
       )}
     </div>
   );
