@@ -35,6 +35,68 @@ function groupBySender(emails: Email[]): SenderGroup[] {
     .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
 }
 
+function SenderGroupCard({ group }: { group: SenderGroup }) {
+  const [expanded, setExpanded] = useState(false);
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-gray-800/50 transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <svg
+            className={`w-3 h-3 text-gray-500 flex-shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+          <p className="text-xs font-medium text-gray-300 truncate">{group.sender}</p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-medium">
+            {group.emails.length}
+          </span>
+          <span className="text-xs text-gray-600">{formatDate(group.latestDate)}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-gray-800 divide-y divide-gray-800/50">
+          {group.emails.map((email) => (
+            <div key={email.id}>
+              <button
+                onClick={() => setExpandedEmailId(expandedEmailId === email.id ? null : email.id)}
+                className="w-full text-left px-3 py-2 hover:bg-gray-800/50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm text-white truncate flex-1">{email.subject || '(no subject)'}</p>
+                  <span className="text-xs text-gray-600 flex-shrink-0">{formatDate(email.date)}</span>
+                </div>
+              </button>
+
+              {expandedEmailId === email.id && (
+                <div className="px-3 pb-3">
+                  <p className="text-xs text-gray-400 leading-relaxed mb-2">{email.snippet}</p>
+                  <a
+                    href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Open in Gmail
+                  </a>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EmailList() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [connected, setConnected] = useState<boolean | null>(null);
@@ -96,34 +158,9 @@ export default function EmailList() {
         <h2 className="text-sm font-semibold text-gray-400">Emails</h2>
         <span className="text-xs text-gray-600">{emails.length} unread</span>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {groups.map((group) => (
-          <div key={group.sender} className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800">
-              <p className="text-xs font-medium text-gray-300 truncate">{group.sender}</p>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {group.emails.length > 1 && (
-                  <span className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded-full">
-                    {group.emails.length}
-                  </span>
-                )}
-                <span className="text-xs text-gray-600">{formatDate(group.latestDate)}</span>
-              </div>
-            </div>
-            <div className="divide-y divide-gray-800/50">
-              {group.emails.map((email) => (
-                <a
-                  key={email.id}
-                  href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block px-3 py-2 hover:bg-gray-800/50 transition-colors"
-                >
-                  <p className="text-sm text-white truncate">{email.subject || '(no subject)'}</p>
-                </a>
-              ))}
-            </div>
-          </div>
+          <SenderGroupCard key={group.sender} group={group} />
         ))}
       </div>
     </div>
