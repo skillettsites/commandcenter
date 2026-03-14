@@ -50,32 +50,39 @@ export default function TaskList() {
     <div className="space-y-4">
       <TaskInput onTaskAdded={fetchTasks} />
 
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1">
-          {(['pending', 'all', 'done'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                filter === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-800 text-gray-400 hover:text-white'
-              }`}
-            >
-              {f === 'pending' ? 'Pending' : f === 'all' ? 'All' : 'Done'}
-            </button>
-          ))}
-        </div>
-        <span className="text-xs text-gray-500">
-          {loading ? 'Loading...' : `${pendingCount} pending`}
+      <div className="flex items-center justify-between px-1">
+        <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
+          Tasks
+        </h2>
+        <span className="text-[13px] text-[var(--text-tertiary)]">
+          {loading ? '...' : `${pendingCount} pending`}
         </span>
+      </div>
+
+      {/* Status filter */}
+      <div className="flex gap-1 bg-[var(--bg-card)] rounded-xl p-1">
+        {(['pending', 'all', 'done'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all ${
+              filter === f
+                ? 'bg-[var(--bg-elevated)] text-white shadow-sm'
+                : 'text-[var(--text-tertiary)] active:text-white'
+            }`}
+          >
+            {f === 'pending' ? 'Pending' : f === 'all' ? 'All' : 'Done'}
+          </button>
+        ))}
       </div>
 
       <ProjectFilter selected={projectFilter} onChange={setProjectFilter} />
 
       <div className="space-y-2">
         {!loading && tasks.length === 0 && (
-          <p className="text-center text-gray-600 py-8 text-sm">No tasks yet. Add one above.</p>
+          <div className="card px-4 py-8 text-center">
+            <p className="text-[15px] text-[var(--text-tertiary)]">No tasks yet</p>
+          </div>
         )}
         {tasks.map((task) => (
           <TaskCard

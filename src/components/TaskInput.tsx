@@ -33,19 +33,19 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
+    <form onSubmit={handleSubmit} className="card p-4 space-y-3">
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="What needs doing? e.g. &quot;Make the report headings bolder&quot;"
+        placeholder="What needs doing?"
         rows={2}
-        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        className="w-full bg-[var(--bg-elevated)] rounded-xl px-4 py-3 text-white placeholder-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] text-[15px] leading-snug"
       />
       <div className="flex gap-2">
         <select
           value={project}
           onChange={(e) => setProject(e.target.value)}
-          className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 bg-[var(--bg-elevated)] rounded-xl px-4 py-2.5 text-white text-[15px] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] appearance-none"
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>
@@ -56,9 +56,9 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
         <button
           type="submit"
           disabled={submitting || !description.trim()}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium px-5 py-2 rounded-lg text-sm transition-colors"
+          className="bg-[var(--accent)] active:bg-[var(--accent-hover)] disabled:opacity-40 text-white font-semibold px-6 py-2.5 rounded-xl text-[15px] transition-opacity"
         >
-          {submitting ? 'Adding...' : 'Add'}
+          {submitting ? '...' : 'Add'}
         </button>
       </div>
     </form>

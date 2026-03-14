@@ -9,13 +9,13 @@ interface ProjectFilterProps {
 
 export default function ProjectFilter({ selected, onChange }: ProjectFilterProps) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
       <button
         onClick={() => onChange('all')}
-        className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+        className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all ${
           selected === 'all'
             ? 'bg-white text-black'
-            : 'bg-gray-800 text-gray-400 hover:text-white'
+            : 'bg-[var(--bg-card)] text-[var(--text-secondary)] active:text-white'
         }`}
       >
         All
@@ -24,12 +24,12 @@ export default function ProjectFilter({ selected, onChange }: ProjectFilterProps
         <button
           key={p.id}
           onClick={() => onChange(p.id)}
-          className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+          className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all ${
             selected === p.id
               ? 'text-white'
-              : 'text-gray-400 hover:text-white'
+              : 'text-[var(--text-secondary)] active:text-white'
           }`}
-          style={selected === p.id ? { backgroundColor: p.color } : { backgroundColor: '#1f2937' }}
+          style={selected === p.id ? { backgroundColor: p.color } : { backgroundColor: 'var(--bg-card)' }}
         >
           {p.name}
         </button>

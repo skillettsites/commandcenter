@@ -24,9 +24,9 @@ export default function HealthBar() {
 
   if (loading) {
     return (
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-8 w-28 bg-gray-800 rounded-lg animate-pulse flex-shrink-0" />
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-9 w-28 bg-[var(--bg-card)] rounded-full animate-pulse flex-shrink-0" />
         ))}
       </div>
     );
@@ -36,24 +36,20 @@ export default function HealthBar() {
     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
       {results.map((r) => {
         const project = getProject(r.siteId);
-        const colors = {
-          up: 'bg-green-500/10 text-green-400 border-green-500/20',
-          slow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-          down: 'bg-red-500/10 text-red-400 border-red-500/20',
-        };
+        const dotColor = r.status === 'up' ? 'bg-[var(--green)]' :
+                         r.status === 'slow' ? 'bg-[var(--yellow)]' : 'bg-[var(--red)]';
 
         return (
           <div
             key={r.siteId}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium flex-shrink-0 ${colors[r.status]}`}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--bg-card)] flex-shrink-0"
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${
-              r.status === 'up' ? 'bg-green-400' :
-              r.status === 'slow' ? 'bg-yellow-400' : 'bg-red-400'
-            }`} />
-            <span>{project?.name || r.siteId}</span>
+            <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+            <span className="text-[13px] font-medium text-white">
+              {project?.name || r.siteId}
+            </span>
             {r.responseTime !== null && (
-              <span className="opacity-60">{r.responseTime}ms</span>
+              <span className="text-[11px] text-[var(--text-tertiary)]">{r.responseTime}ms</span>
             )}
           </div>
         );
