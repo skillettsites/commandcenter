@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('tasks')
     .select('*')
+    .order('priority', { ascending: true })
     .order('created_at', { ascending: false });
 
   if (status) query = query.eq('status', status);
