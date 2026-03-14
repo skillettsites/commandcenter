@@ -12,3 +12,12 @@ create table if not exists oauth_tokens (
 
 alter table oauth_tokens enable row level security;
 create policy "Allow all" on oauth_tokens for all using (true) with check (true);
+
+-- Dismissed emails table
+create table if not exists dismissed_emails (
+  email_id text primary key,
+  dismissed_at timestamptz default now()
+);
+
+alter table dismissed_emails enable row level security;
+create policy "Allow all" on dismissed_emails for all using (true) with check (true);
