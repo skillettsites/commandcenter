@@ -28,6 +28,9 @@ const projectMap: Record<string, string> = {
   'MedCostCheck': 'medcostcheck',
   'PostcodeCheck': 'postcodecheck',
   'HelpAfterLoss': 'helpafterloss',
+  'FindYourStay': 'findyourstay',
+  'CommandCenter': 'commandcenter',
+  'Personal': 'personal',
   'Cross-Project': 'general',
 };
 
