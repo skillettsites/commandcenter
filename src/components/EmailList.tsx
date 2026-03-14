@@ -273,8 +273,10 @@ export default function EmailList() {
     const email = emails.find(e => e.id === emailId);
     setEmails(prev => prev.filter(e => e.id !== emailId));
 
+    // Dismiss immediately so closing the page won't lose the action
+    dismissEmailApi(emailId);
+
     const timer = setTimeout(() => {
-      dismissEmailApi(emailId);
       setDismissed(null);
     }, 5000);
 
@@ -293,9 +295,11 @@ export default function EmailList() {
     const groupEmailIds = groupEmails.map(e => e.id);
     setEmails(prev => prev.filter(e => e.from !== sender));
 
+    // Dismiss all immediately so closing the page won't lose the action
+    groupEmailIds.forEach(id => dismissEmailApi(id));
+
     const name = sender.replace(/<[^>]+>/g, '').trim();
     const timer = setTimeout(() => {
-      groupEmailIds.forEach(id => dismissEmailApi(id));
       setDismissed(null);
     }, 5000);
 
@@ -310,6 +314,9 @@ export default function EmailList() {
   const handleUndo = useCallback(() => {
     if (!dismissed) return;
     clearTimeout(dismissed.timer);
+
+    // Undo by restoring the IMPORTANT label via API
+    dismissed.emailIds.forEach(id => dismissEmailApi(id, true));
 
     async function refetch() {
       try {
