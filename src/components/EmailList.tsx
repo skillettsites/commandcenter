@@ -101,6 +101,7 @@ export default function EmailList() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     async function fetchEmails() {
@@ -151,6 +152,8 @@ export default function EmailList() {
   }
 
   const groups = groupBySender(emails);
+  const visibleGroups = showAll ? groups : groups.slice(0, 3);
+  const hasMore = groups.length > 3;
 
   return (
     <div className="space-y-2">
@@ -159,10 +162,18 @@ export default function EmailList() {
         <span className="text-xs text-gray-600">{emails.length} unread</span>
       </div>
       <div className="space-y-1.5">
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <SenderGroupCard key={group.sender} group={group} />
         ))}
       </div>
+      {hasMore && (
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className="w-full text-center text-xs text-gray-500 hover:text-gray-300 py-1.5 transition-colors"
+        >
+          {showAll ? 'Show less' : `+ ${groups.length - 3} more senders`}
+        </button>
+      )}
     </div>
   );
 }
