@@ -105,6 +105,101 @@ export interface GmailMessage {
   unread: boolean;
 }
 
+export interface GmailLabel {
+  id: string;
+  name: string;
+  type: 'system' | 'user';
+  messagesTotal?: number;
+  messagesUnread?: number;
+}
+
+export async function getLabels(): Promise<GmailLabel[]> {
+  const token = await getValidToken();
+  if (!token) return [];
+
+  try {
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const labels = (data.labels || []) as GmailLabel[];
+    // Only return user-created labels (not system ones like INBOX, SENT, etc.)
+    return labels.filter((l: GmailLabel) => l.type === 'user');
+  } catch {
+    return [];
+  }
+}
+
+export async function getLabelDetails(labelId: string): Promise<GmailLabel | null> {
+  const token = await getValidToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/labels/${labelId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function getEmailsByLabel(
+  labelId: string,
+  maxResults = 10
+): Promise<{ emails: GmailMessage[]; connected: boolean }> {
+  const token = await getValidToken();
+  if (!token) return { emails: [], connected: false };
+
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&labelIds=${labelId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) return { emails: [], connected: false };
+
+    const data = await res.json();
+    if (!data.messages || data.messages.length === 0) {
+      return { emails: [], connected: true };
+    }
+
+    const emails = await Promise.all(
+      data.messages.map(async (msg: { id: string }) => {
+        const msgRes = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const msgData = await msgRes.json();
+        const headers = msgData.payload?.headers || [];
+        const getHeader = (name: string) =>
+          headers.find((h: { name: string; value: string }) => h.name === name)?.value || '';
+
+        const from = getHeader('From').replace(/<[^>]+>/g, '').trim();
+        const subject = getHeader('Subject');
+        if (!from && !subject) return null;
+
+        return {
+          id: msg.id,
+          subject,
+          from,
+          snippet: msgData.snippet || '',
+          date: getHeader('Date'),
+          unread: msgData.labelIds?.includes('UNREAD') ?? false,
+        };
+      })
+    );
+
+    return {
+      emails: emails.filter((e): e is GmailMessage => e !== null),
+      connected: true,
+    };
+  } catch {
+    return { emails: [], connected: false };
+  }
+}
+
 export async function modifyEmailLabels(
   emailId: string,
   addLabels: string[],

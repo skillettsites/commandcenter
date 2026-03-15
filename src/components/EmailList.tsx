@@ -11,6 +11,13 @@ interface Email {
   unread: boolean;
 }
 
+interface LabelInfo {
+  id: string;
+  name: string;
+  messagesTotal: number;
+  messagesUnread: number;
+}
+
 interface SenderGroup {
   sender: string;
   emails: Email[];
@@ -23,6 +30,23 @@ interface DismissedItem {
   label: string;
   timer: ReturnType<typeof setTimeout>;
 }
+
+// Map label names to colors (matching project colors)
+const LABEL_COLORS: Record<string, string> = {
+  'CarCostCheck': '#3B82F6',
+  'PostcodeCheck': '#10B981',
+  'TapWaterScore': '#06B6D4',
+  'MedCostCheck': '#8B5CF6',
+  'FindYourStay': '#F59E0B',
+  'HelpAfterLoss': '#EC4899',
+  'HelpAfterLife': '#D946EF',
+  'AI Bet Finder': '#F43F5E',
+  'DavidSkillett': '#6366F1',
+  'Dashboard': '#F97316',
+  'Domains': '#14B8A6',
+  'Hosting': '#8B5CF6',
+  'Finance': '#22C55E',
+};
 
 function groupBySender(emails: Email[]): SenderGroup[] {
   const groups = new Map<string, Email[]>();
@@ -58,11 +82,13 @@ function SwipeableEmailRow({
   onDismiss,
   onTap,
   isExpanded,
+  showDismiss = true,
 }: {
   email: Email;
   onDismiss: (emailId: string) => void;
   onTap: () => void;
   isExpanded: boolean;
+  showDismiss?: boolean;
 }) {
   const startXRef = useRef(0);
   const currentXRef = useRef(0);
@@ -76,6 +102,7 @@ function SwipeableEmailRow({
   }
 
   function handleTouchMove(e: React.TouchEvent) {
+    if (!showDismiss) return;
     const diff = e.touches[0].clientX - startXRef.current;
     currentXRef.current = diff;
     if (Math.abs(diff) > 10) setSwiping(true);
@@ -85,7 +112,7 @@ function SwipeableEmailRow({
   }
 
   function handleTouchEnd() {
-    if (currentXRef.current < -60) {
+    if (showDismiss && currentXRef.current < -60) {
       onDismiss(email.id);
     } else if (rowRef.current) {
       rowRef.current.style.transform = 'translateX(0)';
@@ -94,14 +121,14 @@ function SwipeableEmailRow({
 
   return (
     <div className="relative overflow-hidden">
-      {/* Swipe background */}
-      <div className="absolute inset-0 flex items-center justify-end pr-4 bg-[var(--red)]">
-        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </div>
+      {showDismiss && (
+        <div className="absolute inset-0 flex items-center justify-end pr-4 bg-[var(--red)]">
+          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+      )}
 
-      {/* Foreground row */}
       <div
         ref={rowRef}
         onTouchStart={handleTouchStart}
@@ -115,6 +142,9 @@ function SwipeableEmailRow({
           <div className="flex-1 min-w-0">
             <p className="text-[15px] text-white leading-snug truncate">
               {email.subject || '(no subject)'}
+            </p>
+            <p className="text-[13px] text-[var(--text-tertiary)] truncate mt-0.5">
+              {email.from}
             </p>
             {isExpanded && (
               <div className="mt-2 fade-in">
@@ -178,13 +208,11 @@ function SenderGroupCard({
     }
   }
 
-  // Get initials for avatar
   const name = group.sender.replace(/<[^>]+>/g, '').trim();
   const initials = name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   return (
     <div className="card overflow-hidden">
-      {/* Swipeable header */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-end pr-4 bg-[var(--red)]">
           <span className="text-[13px] text-white font-medium">Dismiss</span>
@@ -198,12 +226,9 @@ function SenderGroupCard({
           className="relative flex items-center gap-3 px-4 py-3 bg-[var(--bg-card)] active:bg-[var(--bg-elevated)] transition-colors"
           style={{ transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' }}
         >
-          {/* Avatar */}
           <div className="w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
             <span className="text-[13px] font-semibold text-white">{initials || '?'}</span>
           </div>
-
-          {/* Sender info */}
           <div className="flex-1 min-w-0">
             <p className="text-[15px] font-semibold text-white truncate">{name}</p>
             <p className="text-[13px] text-[var(--text-secondary)] truncate">
@@ -212,8 +237,6 @@ function SenderGroupCard({
                 : `${group.emails.length} emails`}
             </p>
           </div>
-
-          {/* Right side */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <span className="text-[12px] text-[var(--text-tertiary)]">{formatDate(group.latestDate)}</span>
             <svg
@@ -225,8 +248,6 @@ function SenderGroupCard({
           </div>
         </div>
       </div>
-
-      {/* Expanded emails */}
       {expanded && (
         <div className="divide-y divide-[var(--border-light)]">
           {group.emails.map((email) => (
@@ -244,12 +265,71 @@ function SenderGroupCard({
   );
 }
 
+function LabelEmailList({ labelId, labelName }: { labelId: string; labelName: string }) {
+  const [emails, setEmails] = useState<Email[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetch_() {
+      try {
+        const res = await fetch(`/api/emails/labels?labelId=${labelId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setEmails(data.emails || []);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetch_();
+  }, [labelId]);
+
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-16 card animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (emails.length === 0) {
+    return (
+      <div className="card px-4 py-6 text-center">
+        <p className="text-[15px] text-[var(--text-tertiary)]">No emails in {labelName}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="card overflow-hidden divide-y divide-[var(--border-light)]">
+        {emails.map((email) => (
+          <SwipeableEmailRow
+            key={email.id}
+            email={email}
+            onDismiss={() => {}}
+            onTap={() => setExpandedId(expandedId === email.id ? null : email.id)}
+            isExpanded={expandedId === email.id}
+            showDismiss={false}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function EmailList() {
   const [emails, setEmails] = useState<Email[]>([]);
   const [connected, setConnected] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
   const [dismissed, setDismissed] = useState<DismissedItem | null>(null);
+  const [labels, setLabels] = useState<LabelInfo[]>([]);
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
+  const [labelsLoading, setLabelsLoading] = useState(true);
 
   useEffect(() => {
     async function fetchEmails() {
@@ -264,7 +344,19 @@ export default function EmailList() {
         setLoading(false);
       }
     }
+    async function fetchLabels() {
+      try {
+        const res = await fetch('/api/emails/labels');
+        if (res.ok) {
+          const data = await res.json();
+          setLabels(data.labels || []);
+        }
+      } finally {
+        setLabelsLoading(false);
+      }
+    }
     fetchEmails();
+    fetchLabels();
   }, []);
 
   const handleDismissEmail = useCallback((emailId: string) => {
@@ -273,7 +365,6 @@ export default function EmailList() {
     const email = emails.find(e => e.id === emailId);
     setEmails(prev => prev.filter(e => e.id !== emailId));
 
-    // Dismiss immediately so closing the page won't lose the action
     dismissEmailApi(emailId);
 
     const timer = setTimeout(() => {
@@ -295,7 +386,6 @@ export default function EmailList() {
     const groupEmailIds = groupEmails.map(e => e.id);
     setEmails(prev => prev.filter(e => e.from !== sender));
 
-    // Dismiss all immediately so closing the page won't lose the action
     groupEmailIds.forEach(id => dismissEmailApi(id));
 
     const name = sender.replace(/<[^>]+>/g, '').trim();
@@ -315,7 +405,6 @@ export default function EmailList() {
     if (!dismissed) return;
     clearTimeout(dismissed.timer);
 
-    // Undo by restoring the IMPORTANT label via API
     dismissed.emailIds.forEach(id => dismissEmailApi(id, true));
 
     async function refetch() {
@@ -365,22 +454,10 @@ export default function EmailList() {
     );
   }
 
-  if (emails.length === 0 && !dismissed) {
-    return (
-      <div className="space-y-3">
-        <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider px-1">
-          Mail
-        </h2>
-        <div className="card px-4 py-6 text-center">
-          <p className="text-[15px] text-[var(--text-tertiary)]">No unread emails</p>
-        </div>
-      </div>
-    );
-  }
-
   const groups = groupBySender(emails);
   const visibleGroups = showAll ? groups : groups.slice(0, 3);
   const hasMore = groups.length > 3;
+  const activeLabelInfo = labels.find(l => l.id === activeLabel);
 
   return (
     <div className="space-y-3">
@@ -388,27 +465,93 @@ export default function EmailList() {
         <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
           Mail
         </h2>
-        <span className="text-[13px] text-[var(--text-tertiary)]">{emails.length} unread</span>
+        {!activeLabel && (
+          <span className="text-[13px] text-[var(--text-tertiary)]">{emails.length} unread</span>
+        )}
+        {activeLabel && activeLabelInfo && (
+          <span className="text-[13px] text-[var(--text-tertiary)]">{activeLabelInfo.messagesTotal} emails</span>
+        )}
       </div>
 
-      <div className="space-y-2">
-        {visibleGroups.map((group) => (
-          <SenderGroupCard
-            key={group.sender}
-            group={group}
-            onDismissEmail={handleDismissEmail}
-            onDismissGroup={handleDismissGroup}
-          />
-        ))}
-      </div>
+      {/* Label pills */}
+      {!labelsLoading && labels.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+          <button
+            onClick={() => setActiveLabel(null)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+              !activeLabel
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] active:bg-[var(--bg-card)]'
+            }`}
+          >
+            Inbox
+          </button>
+          {labels.map((label) => {
+            const color = LABEL_COLORS[label.name] || '#6B7280';
+            const isActive = activeLabel === label.id;
+            return (
+              <button
+                key={label.id}
+                onClick={() => setActiveLabel(isActive ? null : label.id)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors flex items-center gap-1.5 ${
+                  isActive
+                    ? 'text-white'
+                    : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] active:bg-[var(--bg-card)]'
+                }`}
+                style={isActive ? { backgroundColor: color } : {}}
+              >
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: isActive ? 'white' : color }}
+                />
+                {label.name}
+                {label.messagesUnread > 0 && (
+                  <span className={`text-[11px] ${isActive ? 'text-white/80' : 'text-[var(--text-tertiary)]'}`}>
+                    {label.messagesUnread}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {hasMore && (
-        <button
-          onClick={() => setShowAll(!showAll)}
-          className="w-full text-center text-[13px] text-[var(--accent)] font-medium py-2 active:opacity-60"
-        >
-          {showAll ? 'Show Less' : `Show ${groups.length - 3} More`}
-        </button>
+      {/* Content: either label view or inbox view */}
+      {activeLabel ? (
+        <LabelEmailList
+          labelId={activeLabel}
+          labelName={activeLabelInfo?.name || 'Label'}
+        />
+      ) : (
+        <>
+          {emails.length === 0 && !dismissed ? (
+            <div className="card px-4 py-6 text-center">
+              <p className="text-[15px] text-[var(--text-tertiary)]">No unread emails</p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                {visibleGroups.map((group) => (
+                  <SenderGroupCard
+                    key={group.sender}
+                    group={group}
+                    onDismissEmail={handleDismissEmail}
+                    onDismissGroup={handleDismissGroup}
+                  />
+                ))}
+              </div>
+
+              {hasMore && (
+                <button
+                  onClick={() => setShowAll(!showAll)}
+                  className="w-full text-center text-[13px] text-[var(--accent)] font-medium py-2 active:opacity-60"
+                >
+                  {showAll ? 'Show Less' : `Show ${groups.length - 3} More`}
+                </button>
+              )}
+            </>
+          )}
+        </>
       )}
 
       {/* Fixed bottom toast */}
@@ -416,7 +559,6 @@ export default function EmailList() {
         <div className="fixed bottom-0 left-0 right-0 z-50 p-4 toast-enter">
           <div className="max-w-lg mx-auto flex items-center justify-between bg-[var(--bg-elevated)] backdrop-blur-xl rounded-2xl px-4 py-3.5 shadow-2xl shadow-black/60 border border-[var(--border)]">
             <div className="flex items-center gap-3 min-w-0">
-              {/* Countdown ring */}
               <div className="relative w-7 h-7 flex-shrink-0">
                 <svg className="w-7 h-7 -rotate-90" viewBox="0 0 32 32">
                   <circle cx="16" cy="16" r="14" fill="none" stroke="var(--border)" strokeWidth="2" />
