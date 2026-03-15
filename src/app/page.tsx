@@ -1,5 +1,6 @@
 import DashboardHeader from '@/components/DashboardHeader';
 import SiteGrid from '@/components/SiteGrid';
+import BetPositions from '@/components/BetPositions';
 import EmailList from '@/components/EmailList';
 import TaskList from '@/components/TaskList';
 
@@ -11,6 +12,7 @@ export default function Home() {
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 pb-24">
         <DashboardHeader />
         <SiteGrid />
+        <BetPositions />
         <EmailList />
         <TaskList />
       </div>
