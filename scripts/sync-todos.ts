@@ -4,7 +4,7 @@
  * Usage: npx tsx scripts/sync-todos.ts
  *
  * Requires environment variables:
- *   SYNC_URL - The command center URL (e.g. https://commandcenter-xxx.vercel.app)
+ *   SYNC_URL - The dashboard URL (e.g. https://commandcenter-mocha.vercel.app)
  *   SYNC_SECRET - The secret token matching the deployed app
  *   MEMORY_PATH - Path to MEMORY.md (defaults to ~/.claude/projects/c--Users-daves-claude/memory/MEMORY.md)
  */
@@ -29,7 +29,7 @@ const projectMap: Record<string, string> = {
   'PostcodeCheck': 'postcodecheck',
   'HelpAfterLoss': 'helpafterloss',
   'FindYourStay': 'findyourstay',
-  'CommandCenter': 'commandcenter',
+  'Dashboard': 'dashboard',
   'Personal': 'personal',
   'Cross-Project': 'general',
 };

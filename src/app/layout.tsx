@@ -8,7 +8,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Command Center",
+  title: "Dashboard",
   description: "Personal task dashboard and site monitor",
 };
 

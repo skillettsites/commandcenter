@@ -18,7 +18,7 @@ interface SiteData {
 export default function SiteGrid() {
   const [sites, setSites] = useState<SiteData[]>(
     projects
-      .filter(p => p.url && p.id !== 'commandcenter')
+      .filter(p => p.url && p.id !== 'dashboard')
       .map(p => ({
         ...p,
         status: 'checking' as const,

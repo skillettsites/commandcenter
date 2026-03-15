@@ -9,7 +9,7 @@ export default function DashboardHeader() {
     <div className="pt-2 pb-1">
       <p className="text-sm text-[var(--text-secondary)] font-medium">{greeting}</p>
       <h1 className="text-[28px] font-bold text-white tracking-tight leading-tight">
-        Command Center
+        Dashboard
       </h1>
     </div>
   );
