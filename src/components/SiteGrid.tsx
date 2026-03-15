@@ -1,32 +1,36 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { HealthResult } from '@/lib/types';
+import { HealthResult, AnalyticsResult } from '@/lib/types';
 import { projects } from '@/lib/projects';
 
-interface SiteWithHealth {
+interface SiteData {
   id: string;
   name: string;
   url: string;
   color: string;
   status: 'up' | 'slow' | 'down' | 'checking';
   responseTime: number | null;
+  visitors: number | null;
+  pageViews: number | null;
 }
 
 export default function SiteGrid() {
-  const [sites, setSites] = useState<SiteWithHealth[]>(
+  const [sites, setSites] = useState<SiteData[]>(
     projects
       .filter(p => p.url && p.id !== 'commandcenter')
       .map(p => ({
         ...p,
         status: 'checking' as const,
         responseTime: null,
+        visitors: null,
+        pageViews: null,
       }))
   );
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    async function check() {
+    async function fetchHealth() {
       try {
         const res = await fetch('/api/health');
         if (res.ok) {
@@ -35,11 +39,7 @@ export default function SiteGrid() {
             prev.map(site => {
               const result = results.find(r => r.siteId === site.id);
               if (result) {
-                return {
-                  ...site,
-                  status: result.status,
-                  responseTime: result.responseTime,
-                };
+                return { ...site, status: result.status, responseTime: result.responseTime };
               }
               return { ...site, status: 'down' };
             })
@@ -49,12 +49,36 @@ export default function SiteGrid() {
         setSites(prev => prev.map(s => ({ ...s, status: 'down' })));
       }
     }
-    check();
+
+    async function fetchAnalytics() {
+      try {
+        const res = await fetch('/api/analytics');
+        if (res.ok) {
+          const { data }: { data: AnalyticsResult[] } = await res.json();
+          setSites(prev =>
+            prev.map(site => {
+              const stats = data.find(d => d.siteId === site.id);
+              if (stats) {
+                return { ...site, visitors: stats.activeUsers, pageViews: stats.pageViews };
+              }
+              return site;
+            })
+          );
+        }
+      } catch {
+        // Analytics not configured yet, leave as null
+      }
+    }
+
+    fetchHealth();
+    fetchAnalytics();
   }, []);
 
   const allUp = sites.every(s => s.status === 'up');
   const anyDown = sites.some(s => s.status === 'down');
   const checking = sites.some(s => s.status === 'checking');
+
+  const totalVisitors = sites.reduce((sum, s) => sum + (s.visitors ?? 0), 0);
 
   return (
     <div className="space-y-3">
@@ -62,13 +86,20 @@ export default function SiteGrid() {
         <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
           Sites
         </h2>
-        {checking ? (
-          <span className="text-[13px] text-[var(--text-tertiary)]">Checking...</span>
-        ) : (
-          <span className={`text-[13px] font-medium ${allUp ? 'text-[var(--green)]' : anyDown ? 'text-[var(--red)]' : 'text-[var(--yellow)]'}`}>
-            {allUp ? 'All systems go' : anyDown ? 'Issues detected' : 'Some slow'}
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {totalVisitors > 0 && (
+            <span className="text-[13px] font-medium text-white">
+              {totalVisitors} today
+            </span>
+          )}
+          {checking ? (
+            <span className="text-[13px] text-[var(--text-tertiary)]">Checking...</span>
+          ) : (
+            <span className={`text-[13px] font-medium ${allUp ? 'text-[var(--green)]' : anyDown ? 'text-[var(--red)]' : 'text-[var(--yellow)]'}`}>
+              {allUp ? 'All up' : anyDown ? 'Issues' : 'Slow'}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
@@ -90,7 +121,7 @@ function SiteCard({
   expanded,
   onToggle,
 }: {
-  site: SiteWithHealth;
+  site: SiteData;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -112,9 +143,7 @@ function SiteCard({
     <div
       onClick={onToggle}
       className="card p-3.5 cursor-pointer transition-all active:scale-[0.98]"
-      style={{
-        borderLeft: `3px solid ${site.color}`,
-      }}
+      style={{ borderLeft: `3px solid ${site.color}` }}
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-[14px] font-semibold text-white truncate pr-2">
@@ -126,11 +155,21 @@ function SiteCard({
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-[var(--text-tertiary)]">Visitors</span>
-          <span className="text-[13px] font-medium text-[var(--text-secondary)]">---</span>
+          <span className={`text-[13px] font-medium ${
+            site.visitors === null ? 'text-[var(--text-tertiary)]' :
+            site.visitors > 0 ? 'text-[var(--green)]' : 'text-[var(--text-secondary)]'
+          }`}>
+            {site.visitors === null ? '...' : site.visitors}
+          </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[var(--text-tertiary)]">Revenue</span>
-          <span className="text-[13px] font-medium text-[var(--text-secondary)]">---</span>
+          <span className="text-[11px] text-[var(--text-tertiary)]">Page views</span>
+          <span className={`text-[13px] font-medium ${
+            site.pageViews === null ? 'text-[var(--text-tertiary)]' :
+            site.pageViews > 0 ? 'text-white' : 'text-[var(--text-secondary)]'
+          }`}>
+            {site.pageViews === null ? '...' : site.pageViews}
+          </span>
         </div>
         {site.responseTime !== null && (
           <div className="flex items-center justify-between">

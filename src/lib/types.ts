@@ -14,6 +14,14 @@ export interface Project {
   name: string;
   url: string;
   color: string;
+  gaPropertyId?: string;
+}
+
+export interface AnalyticsResult {
+  siteId: string;
+  activeUsers: number;
+  sessions: number;
+  pageViews: number;
 }
 
 export interface HealthResult {
