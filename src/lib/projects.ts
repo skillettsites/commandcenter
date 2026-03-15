@@ -9,7 +9,7 @@ export const projects: Project[] = [
   { id: 'findyourstay', name: 'FindYourStay', url: 'https://findyourstay.com', color: '#F59E0B', gaPropertyId: '528486093' },
   { id: 'helpafterloss', name: 'HelpAfterLoss', url: 'https://helpafterloss.co.uk', color: '#EC4899', gaPropertyId: '528390174' },
   { id: 'helpafterlife', name: 'HelpAfterLife', url: 'https://helpafterlife.com', color: '#D946EF' },
-  { id: 'predictor', name: 'Predictor', url: 'https://predictor-ashy.vercel.app', color: '#F43F5E' },
+  { id: 'aibetfinder', name: 'AI Bet Finder', url: 'https://predictor-ashy.vercel.app', color: '#F43F5E' },
   { id: 'davidskillett', name: 'DavidSkillett', url: 'https://davidskillett.com', color: '#6366F1', gaPropertyId: '528477374' },
   { id: 'dashboard', name: 'Dashboard', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
