@@ -134,14 +134,109 @@ export async function modifyEmailLabels(
   }
 }
 
-export async function getImportantEmails(maxResults = 10): Promise<{ emails: GmailMessage[]; connected: boolean }> {
+export async function batchModifyEmails(
+  messageIds: string[],
+  addLabels: string[],
+  removeLabels: string[]
+): Promise<boolean> {
+  const token = await getValidToken();
+  if (!token) return false;
+
+  try {
+    // Gmail batch modify supports up to 1000 IDs per request
+    for (let i = 0; i < messageIds.length; i += 1000) {
+      const batch = messageIds.slice(i, i + 1000);
+      const res = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ids: batch,
+            addLabelIds: addLabels,
+            removeLabelIds: removeLabels,
+          }),
+        }
+      );
+      if (!res.ok) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function batchTrashEmails(messageIds: string[]): Promise<boolean> {
+  const token = await getValidToken();
+  if (!token) return false;
+
+  try {
+    for (let i = 0; i < messageIds.length; i += 1000) {
+      const batch = messageIds.slice(i, i + 1000);
+      const res = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ids: batch,
+            addLabelIds: ['TRASH'],
+            removeLabelIds: ['INBOX', 'UNREAD'],
+          }),
+        }
+      );
+      if (!res.ok) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function searchEmails(query: string, maxResults = 500): Promise<string[]> {
+  const token = await getValidToken();
+  if (!token) return [];
+
+  const allIds: string[] = [];
+  let pageToken: string | null = null;
+
+  try {
+    while (true) {
+      let url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${Math.min(maxResults - allIds.length, 500)}&q=${encodeURIComponent(query)}`;
+      if (pageToken) url += `&pageToken=${pageToken}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) break;
+
+      const data = await res.json();
+      const msgs = data.messages || [];
+      allIds.push(...msgs.map((m: { id: string }) => m.id));
+
+      if (!data.nextPageToken || allIds.length >= maxResults) break;
+      pageToken = data.nextPageToken;
+    }
+    return allIds;
+  } catch {
+    return [];
+  }
+}
+
+export async function getImportantEmails(maxResults = 20): Promise<{ emails: GmailMessage[]; connected: boolean }> {
   const token = await getValidToken();
   if (!token) return { emails: [], connected: false };
 
   try {
-    // Fetch important/unread emails
+    // Fetch unread inbox emails, excluding promotions/social/forums categories
     const listRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=is:unread is:important`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}&q=is:unread in:inbox -category:promotions -category:social -category:forums -unsubscribe`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
 
@@ -165,10 +260,16 @@ export async function getImportantEmails(maxResults = 10): Promise<{ emails: Gma
         const getHeader = (name: string) =>
           headers.find((h: { name: string; value: string }) => h.name === name)?.value || '';
 
+        const from = getHeader('From').replace(/<[^>]+>/g, '').trim();
+        const subject = getHeader('Subject');
+
+        // Skip emails with no sender or subject (broken imports)
+        if (!from && !subject) return null;
+
         return {
           id: msg.id,
-          subject: getHeader('Subject'),
-          from: getHeader('From').replace(/<[^>]+>/g, '').trim(),
+          subject,
+          from,
           snippet: msgData.snippet || '',
           date: getHeader('Date'),
           unread: msgData.labelIds?.includes('UNREAD') ?? false,
@@ -176,7 +277,9 @@ export async function getImportantEmails(maxResults = 10): Promise<{ emails: Gma
       })
     );
 
-    return { emails, connected: true };
+    const filtered = emails.filter((e): e is GmailMessage => e !== null);
+
+    return { emails: filtered, connected: true };
   } catch {
     return { emails: [], connected: false };
   }
