@@ -5,7 +5,7 @@ import { getServiceClient } from '@/lib/supabase';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const result = await getImportantEmails(10);
+  const result = await getImportantEmails(25);
 
   if (result.emails.length > 0) {
     const supabase = getServiceClient();

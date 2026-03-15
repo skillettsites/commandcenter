@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export default function Home() {
   return (
     <main className="min-h-screen bg-black">
-      <div className="max-w-2xl mx-auto px-4 py-6 space-y-6 pb-24">
+      <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 pb-24">
         <DashboardHeader />
         <SiteGrid />
         <BetPositions />
