@@ -624,9 +624,9 @@ function SwipeableEmailRow({
                   <div className="mt-3 fade-in">
                     {emailBody.contentType === 'html' ? (
                       <iframe
-                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:-apple-system,system-ui,sans-serif;font-size:14px;line-height:1.6;color:${isDark ? '#e0e0e0' : '#1c1c1e'};background:${isDark ? '#1a1a1a' : '#ffffff'};word-break:break-word}a{color:${isDark ? '#60a5fa' : '#007aff'}}img{max-width:100%;height:auto}table{max-width:100%!important}*{max-width:100%!important;box-sizing:border-box}</style></head><body>${emailBody.body}</body></html>`}
+                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:12px;font-family:-apple-system,system-ui,sans-serif;font-size:14px;line-height:1.6;color:#1c1c1e;background:#ffffff;word-break:break-word}a{color:#007aff}img{max-width:100%;height:auto}table{max-width:100%!important}*{max-width:100%!important;box-sizing:border-box}</style></head><body>${emailBody.body}</body></html>`}
                         className="w-full rounded-lg border border-[var(--border-light)]"
-                        style={{ minHeight: '200px', maxHeight: '500px', background: isDark ? '#1a1a1a' : '#ffffff' }}
+                        style={{ minHeight: '200px', maxHeight: '500px', background: '#ffffff' }}
                         sandbox="allow-same-origin"
                         title="Email content"
                         onLoad={(e) => {
