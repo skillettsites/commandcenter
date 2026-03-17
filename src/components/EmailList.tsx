@@ -29,7 +29,16 @@ interface SenderGroup {
 interface DismissedItem {
   type: 'email' | 'group';
   emailIds: string[];
+  senderEmails: string[];
   label: string;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+interface ClassifiedItem {
+  emailId: string;
+  senderEmail: string;
+  senderName: string;
+  classification: 'important' | 'noise';
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -70,17 +79,41 @@ function groupBySender(emails: Email[]): SenderGroup[] {
     .sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
 }
 
-async function dismissEmailApi(emailId: string, undo = false): Promise<boolean> {
+async function dismissEmailApi(emailId: string, undo = false, senderEmail?: string): Promise<boolean> {
   try {
     const res = await fetch('/api/emails/dismiss', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailId, undo }),
+      body: JSON.stringify({ emailId, undo, senderEmail }),
     });
     return res.ok;
   } catch {
     return false;
   }
+}
+
+async function classifyEmailApi(
+  emailId: string,
+  senderEmail: string,
+  senderName: string,
+  classification: 'important' | 'noise',
+  undo = false,
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/emails/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailId, senderEmail, senderName, classification, undo }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function extractSenderEmail(from: string): string {
+  const match = from.match(/<([^>]+)>/);
+  return (match?.[1] || from).toLowerCase().trim();
 }
 
 type ViewMode = 'inbox' | 'senders' | 'label';
@@ -97,6 +130,7 @@ export default function EmailList() {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedSender, setExpandedSender] = useState<string | null>(null);
   const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
+  const [classified, setClassified] = useState<ClassifiedItem | null>(null);
 
   useEffect(() => {
     async function fetchEmails() {
@@ -129,27 +163,65 @@ export default function EmailList() {
   const handleDismissEmail = useCallback((emailId: string) => {
     if (dismissed?.timer) clearTimeout(dismissed.timer);
     const email = emails.find(e => e.id === emailId);
+    const senderEmail = email ? extractSenderEmail(email.from) : undefined;
     setEmails(prev => prev.filter(e => e.id !== emailId));
-    dismissEmailApi(emailId);
+    dismissEmailApi(emailId, false, senderEmail);
     const timer = setTimeout(() => setDismissed(null), 5000);
-    setDismissed({ type: 'email', emailIds: [emailId], label: email?.subject || 'Email', timer });
+    setDismissed({ type: 'email', emailIds: [emailId], senderEmails: senderEmail ? [senderEmail] : [], label: email?.subject || 'Email', timer });
   }, [dismissed, emails]);
 
   const handleDismissGroup = useCallback((sender: string) => {
     if (dismissed?.timer) clearTimeout(dismissed.timer);
     const groupEmails = emails.filter(e => e.from === sender);
     const groupEmailIds = groupEmails.map(e => e.id);
+    const senderEmail = extractSenderEmail(sender);
     setEmails(prev => prev.filter(e => e.from !== sender));
-    groupEmailIds.forEach(id => dismissEmailApi(id));
+    groupEmailIds.forEach(id => dismissEmailApi(id, false, senderEmail));
     const name = extractName(sender);
     const timer = setTimeout(() => setDismissed(null), 5000);
-    setDismissed({ type: 'group', emailIds: groupEmailIds, label: name, timer });
+    setDismissed({ type: 'group', emailIds: groupEmailIds, senderEmails: [senderEmail], label: name, timer });
   }, [dismissed, emails]);
+
+  const handleClassify = useCallback((emailId: string, from: string, classification: 'important' | 'noise') => {
+    if (classified?.timer) clearTimeout(classified.timer);
+    const senderEmail = extractSenderEmail(from);
+    const senderName = extractName(from);
+    classifyEmailApi(emailId, senderEmail, senderName, classification);
+
+    if (classification === 'noise') {
+      // Remove noise emails from view
+      setEmails(prev => prev.filter(e => e.id !== emailId));
+    }
+
+    const timer = setTimeout(() => setClassified(null), 4000);
+    setClassified({ emailId, senderEmail, senderName, classification, timer });
+  }, [classified]);
+
+  const handleUndoClassify = useCallback(() => {
+    if (!classified) return;
+    clearTimeout(classified.timer);
+    classifyEmailApi(classified.emailId, classified.senderEmail, classified.senderName, classified.classification, true);
+
+    if (classified.classification === 'noise') {
+      // Refetch to restore the removed email
+      async function refetch() {
+        try {
+          const res = await fetch('/api/emails');
+          if (res.ok) {
+            const data = await res.json();
+            setEmails(data.emails);
+          }
+        } catch { /* ignore */ }
+      }
+      refetch();
+    }
+    setClassified(null);
+  }, [classified]);
 
   const handleUndo = useCallback(() => {
     if (!dismissed) return;
     clearTimeout(dismissed.timer);
-    dismissed.emailIds.forEach(id => dismissEmailApi(id, true));
+    dismissed.emailIds.forEach((id, i) => dismissEmailApi(id, true, dismissed.senderEmails[i] || dismissed.senderEmails[0]));
     async function refetch() {
       try {
         const res = await fetch('/api/emails');
@@ -294,6 +366,7 @@ export default function EmailList() {
               onToggleEmail={(id) => setExpandedEmailId(expandedEmailId === id ? null : id)}
               onDismissEmail={handleDismissEmail}
               onDismissGroup={handleDismissGroup}
+              onClassify={handleClassify}
             />
           ) : (
             <InboxView
@@ -301,6 +374,7 @@ export default function EmailList() {
               expandedEmailId={expandedEmailId}
               onToggleEmail={(id) => setExpandedEmailId(expandedEmailId === id ? null : id)}
               onDismissEmail={handleDismissEmail}
+              onClassify={handleClassify}
             />
           )}
         </div>
@@ -327,6 +401,23 @@ export default function EmailList() {
           </div>
         </div>
       )}
+
+      {/* Classify toast */}
+      {classified && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 toast-enter" style={{ bottom: dismissed ? '60px' : '0' }}>
+          <div className="max-w-lg mx-auto flex items-center justify-between bg-[var(--bg-elevated)] backdrop-blur-xl rounded-2xl px-4 py-3 shadow-2xl shadow-black/60 border border-[var(--border)]">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-[16px] flex-shrink-0">{classified.classification === 'important' ? '\u2B50' : '\u{1F6AB}'}</span>
+              <p className="text-[13px] text-[var(--text-primary)] truncate">
+                {classified.senderName} marked as {classified.classification}
+              </p>
+            </div>
+            <button onClick={handleUndoClassify} className="text-[14px] text-[var(--accent)] font-semibold ml-3 px-2 py-1 rounded-lg active:bg-[var(--accent)]/20 flex-shrink-0">
+              Undo
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -337,11 +428,13 @@ function InboxView({
   expandedEmailId,
   onToggleEmail,
   onDismissEmail,
+  onClassify,
 }: {
   emails: Email[];
   expandedEmailId: string | null;
   onToggleEmail: (id: string) => void;
   onDismissEmail: (id: string) => void;
+  onClassify: (emailId: string, from: string, classification: 'important' | 'noise') => void;
 }) {
   if (emails.length === 0) {
     return (
@@ -360,6 +453,7 @@ function InboxView({
           onDismiss={onDismissEmail}
           onTap={() => onToggleEmail(email.id)}
           isExpanded={expandedEmailId === email.id}
+          onClassify={onClassify}
         />
       ))}
     </div>
@@ -375,6 +469,7 @@ function SenderView({
   onToggleEmail,
   onDismissEmail,
   onDismissGroup,
+  onClassify,
 }: {
   groups: SenderGroup[];
   expandedSender: string | null;
@@ -383,6 +478,7 @@ function SenderView({
   onToggleEmail: (id: string) => void;
   onDismissEmail: (id: string) => void;
   onDismissGroup: (sender: string) => void;
+  onClassify: (emailId: string, from: string, classification: 'important' | 'noise') => void;
 }) {
   if (groups.length === 0) {
     return (
@@ -416,6 +512,7 @@ function SenderView({
                     onDismiss={onDismissEmail}
                     onTap={() => onToggleEmail(email.id)}
                     isExpanded={expandedEmailId === email.id}
+                    onClassify={onClassify}
                   />
                 ))}
               </div>
@@ -511,12 +608,14 @@ function SwipeableEmailRow({
   onTap,
   isExpanded,
   showDismiss = true,
+  onClassify,
 }: {
   email: Email;
   onDismiss: (emailId: string) => void;
   onTap: () => void;
   isExpanded: boolean;
   showDismiss?: boolean;
+  onClassify?: (emailId: string, from: string, classification: 'important' | 'noise') => void;
 }) {
   const { theme } = useTheme();
   const isDark = theme !== 'light';
@@ -603,7 +702,7 @@ function SwipeableEmailRow({
             {isExpanded && (
               <div className="mt-2 fade-in">
                 <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">{email.snippet}</p>
-                <div className="flex items-center gap-3 mt-1.5">
+                <div className="flex items-center gap-2 mt-2">
                   <button
                     onClick={handleViewEmail}
                     className="text-[12px] text-[var(--accent)] font-medium"
@@ -619,6 +718,27 @@ function SwipeableEmailRow({
                   >
                     Open in Gmail
                   </a>
+                  <div className="flex-1" />
+                  {onClassify && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onClassify(email.id, email.from, 'important'); }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-[var(--green)]/15 text-[var(--green)] active:bg-[var(--green)]/30 transition-colors"
+                        title="Mark sender as important"
+                      >
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        Important
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onClassify(email.id, email.from, 'noise'); }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-[var(--red)]/15 text-[var(--red)] active:bg-[var(--red)]/30 transition-colors"
+                        title="Mark sender as noise"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                        Noise
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {showBody && emailBody && (
                   <div className="mt-3 fade-in">
