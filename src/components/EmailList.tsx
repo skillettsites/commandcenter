@@ -521,6 +521,9 @@ function SwipeableEmailRow({
   const currentXRef = useRef(0);
   const rowRef = useRef<HTMLDivElement>(null);
   const [swiping, setSwiping] = useState(false);
+  const [emailBody, setEmailBody] = useState<{ body: string; contentType: 'html' | 'text' } | null>(null);
+  const [bodyLoading, setBodyLoading] = useState(false);
+  const [showBody, setShowBody] = useState(false);
 
   function handleTouchStart(e: React.TouchEvent) {
     startXRef.current = e.touches[0].clientX;
@@ -544,6 +547,28 @@ function SwipeableEmailRow({
     } else if (rowRef.current) {
       rowRef.current.style.transform = 'translateX(0)';
     }
+  }
+
+  async function handleViewEmail(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (showBody) {
+      setShowBody(false);
+      return;
+    }
+    if (emailBody) {
+      setShowBody(true);
+      return;
+    }
+    setBodyLoading(true);
+    try {
+      const res = await fetch(`/api/emails/${email.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setEmailBody(data);
+        setShowBody(true);
+      }
+    } catch { /* ignore */ }
+    finally { setBodyLoading(false); }
   }
 
   return (
@@ -575,14 +600,47 @@ function SwipeableEmailRow({
             {isExpanded && (
               <div className="mt-2 fade-in">
                 <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">{email.snippet}</p>
-                <a
-                  href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block mt-1.5 text-[12px] text-[var(--accent)] font-medium"
-                >
-                  Open in Gmail
-                </a>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <button
+                    onClick={handleViewEmail}
+                    className="text-[12px] text-[var(--accent)] font-medium"
+                  >
+                    {bodyLoading ? 'Loading...' : showBody ? 'Hide Email' : 'View Email'}
+                  </button>
+                  <a
+                    href={`https://mail.google.com/mail/u/0/#inbox/${email.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-[12px] text-[var(--text-tertiary)] font-medium"
+                  >
+                    Open in Gmail
+                  </a>
+                </div>
+                {showBody && emailBody && (
+                  <div className="mt-3 fade-in">
+                    {emailBody.contentType === 'html' ? (
+                      <iframe
+                        srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:8px;font-family:-apple-system,system-ui,sans-serif;font-size:13px;line-height:1.5;color:#e0e0e0;background:#1a1a1a;word-break:break-word}a{color:#60a5fa}img{max-width:100%;height:auto}table{max-width:100%!important}*{max-width:100%!important;box-sizing:border-box}</style></head><body>${emailBody.body}</body></html>`}
+                        className="w-full rounded-lg border border-[var(--border-light)]"
+                        style={{ minHeight: '200px', maxHeight: '500px', background: '#1a1a1a' }}
+                        sandbox="allow-same-origin"
+                        title="Email content"
+                        onLoad={(e) => {
+                          const iframe = e.target as HTMLIFrameElement;
+                          if (iframe.contentDocument) {
+                            const height = Math.min(iframe.contentDocument.body.scrollHeight + 20, 500);
+                            iframe.style.height = `${height}px`;
+                          }
+                        }}
+                      />
+                    ) : (
+                      <pre className="text-[12px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap bg-[var(--bg-primary)] rounded-lg p-3 border border-[var(--border-light)] max-h-[500px] overflow-y-auto">
+                        {emailBody.body}
+                      </pre>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

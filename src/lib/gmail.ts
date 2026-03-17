@@ -324,6 +324,60 @@ export async function searchEmails(query: string, maxResults = 500): Promise<str
   }
 }
 
+export async function getEmailBody(emailId: string): Promise<{ body: string; contentType: 'html' | 'text' } | null> {
+  const token = await getValidToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${emailId}?format=full`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) return null;
+
+    const msg = await res.json();
+    const payload = msg.payload;
+    if (!payload) return null;
+
+    // Try to extract body from MIME parts
+    function findBody(part: Record<string, unknown>): { data: string; mimeType: string } | null {
+      const mimeType = part.mimeType as string;
+      const body = part.body as { data?: string; size?: number } | undefined;
+      const parts = part.parts as Record<string, unknown>[] | undefined;
+
+      if (mimeType === 'text/html' && body?.data) {
+        return { data: body.data, mimeType };
+      }
+      if (mimeType === 'text/plain' && body?.data) {
+        return { data: body.data, mimeType };
+      }
+      if (parts) {
+        // Prefer HTML over plain text
+        let plainText: { data: string; mimeType: string } | null = null;
+        for (const p of parts) {
+          const result = findBody(p);
+          if (result?.mimeType === 'text/html') return result;
+          if (result?.mimeType === 'text/plain') plainText = result;
+        }
+        return plainText;
+      }
+      return null;
+    }
+
+    const result = findBody(payload);
+    if (!result) return null;
+
+    // Decode base64url
+    const decoded = Buffer.from(result.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8');
+    return {
+      body: decoded,
+      contentType: result.mimeType === 'text/html' ? 'html' : 'text',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getImportantEmails(maxResults = 20): Promise<{ emails: GmailMessage[]; connected: boolean }> {
   const token = await getValidToken();
   if (!token) return { emails: [], connected: false };
