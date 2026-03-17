@@ -118,9 +118,13 @@ export default function BetPositions() {
             </div>
           </div>
 
-          {/* Bets */}
+          {/* Active Bets */}
           {data.bets.filter(b => b.status === 'active').map(bet => <BetCard key={bet.id} bet={bet} />)}
-          {data.bets.filter(b => b.status !== 'active').map(bet => <BetCard key={bet.id} bet={bet} />)}
+
+          {/* Settled Bets Summary */}
+          {data.bets.some(b => b.status !== 'active') && (
+            <SettledSummary bets={data.bets.filter(b => b.status !== 'active')} />
+          )}
         </div>
       )}
     </div>
@@ -130,10 +134,9 @@ export default function BetPositions() {
 function BetCard({ bet }: { bet: PlacedBet }) {
   const isLay = bet.type === 'lay';
   const edge = Math.round(Math.abs(bet.aiProbability - bet.marketProbability) * 100);
-  const isResolved = bet.status !== 'active';
 
   return (
-    <div className={`card p-3 ${isResolved ? 'opacity-60' : ''}`}>
+    <div className="card p-3">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLay ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
@@ -141,11 +144,6 @@ function BetCard({ bet }: { bet: PlacedBet }) {
           </span>
           <span className="text-[13px] font-semibold text-white">{bet.selectionName}</span>
         </div>
-        {isResolved && (
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${bet.status === 'won' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-            {bet.status === 'won' ? 'WON' : 'LOST'}
-          </span>
-        )}
       </div>
       <div className="text-[11px] text-[var(--text-tertiary)] mb-1.5 truncate">{bet.marketName}</div>
       <div className="flex items-center justify-between">
@@ -159,11 +157,61 @@ function BetCard({ bet }: { bet: PlacedBet }) {
         </div>
         <span className="text-[11px] font-medium text-[var(--accent)]">{edge}pp edge</span>
       </div>
-      {isResolved && bet.pnl !== undefined && (
-        <div className="mt-1.5 pt-1.5 border-t border-[var(--border-light)]">
-          <span className={`text-[12px] font-medium ${(bet.pnl || 0) >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-            {(bet.pnl || 0) >= 0 ? '+' : ''}{bet.pnl?.toFixed(2)}
+    </div>
+  );
+}
+
+function SettledSummary({ bets }: { bets: PlacedBet[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const wins = bets.filter(b => b.status === 'won').length;
+  const losses = bets.filter(b => b.status === 'lost').length;
+  const totalStaked = bets.reduce((sum, b) => sum + (b.type === 'lay' ? b.liability : b.stake), 0);
+  const totalPnl = bets.reduce((sum, b) => sum + (b.pnl || 0), 0);
+
+  return (
+    <div className="card p-3 opacity-70">
+      <div
+        className="flex items-center justify-between cursor-pointer active:opacity-70"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-semibold text-[var(--text-secondary)]">
+            Settled ({bets.length})
           </span>
+          <span className="text-[11px] text-green-400">{wins}W</span>
+          <span className="text-[11px] text-red-400">{losses}L</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-[var(--text-tertiary)]">
+            Staked: <span className="text-white">{totalStaked.toFixed(2)}</span>
+          </span>
+          <span className={`text-[12px] font-medium ${totalPnl >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+            {totalPnl >= 0 ? '+' : ''}{totalPnl.toFixed(2)}
+          </span>
+          <svg
+            className={`w-3 h-3 text-[var(--text-tertiary)] transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+      {expanded && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)] space-y-1.5">
+          {bets.map(bet => (
+            <div key={bet.id} className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`font-bold ${bet.status === 'won' ? 'text-green-400' : 'text-red-400'}`}>
+                  {bet.status === 'won' ? 'W' : 'L'}
+                </span>
+                <span className="text-white truncate">{bet.selectionName}</span>
+                <span className="text-[var(--text-tertiary)] truncate hidden sm:inline">{bet.marketName}</span>
+              </div>
+              <span className={`font-medium shrink-0 ml-2 ${(bet.pnl || 0) >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                {(bet.pnl || 0) >= 0 ? '+' : ''}{bet.pnl?.toFixed(2)}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
