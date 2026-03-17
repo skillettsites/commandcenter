@@ -101,7 +101,7 @@ export default function SiteGrid() {
         </div>
         <div className="flex items-center gap-3">
           {totalVisitors > 0 && (
-            <span className="text-[13px] font-medium text-white">
+            <span className="text-[13px] font-medium text-[var(--text-primary)]">
               {totalVisitors} visitors
             </span>
           )}
@@ -195,7 +195,7 @@ function SiteRow({
         </div>
 
         {/* Name */}
-        <span className="text-[14px] font-medium text-white flex-1 min-w-0 truncate">
+        <span className="text-[14px] font-medium text-[var(--text-primary)] flex-1 min-w-0 truncate">
           {site.name}
         </span>
 
@@ -213,7 +213,7 @@ function SiteRow({
           <div className="text-right">
             <span className={`text-[13px] font-medium ${
               site.pageViews === null ? 'text-[var(--text-tertiary)]' :
-              site.pageViews > 0 ? 'text-white' : 'text-[var(--text-secondary)]'
+              site.pageViews > 0 ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
             }`}>
               {site.pageViews === null ? '-' : site.pageViews}
             </span>

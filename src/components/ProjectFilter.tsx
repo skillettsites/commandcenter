@@ -15,7 +15,7 @@ export default function ProjectFilter({ selected, onChange }: ProjectFilterProps
         className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all ${
           selected === 'all'
             ? 'bg-white text-black'
-            : 'bg-[var(--bg-card)] text-[var(--text-secondary)] active:text-white'
+            : 'bg-[var(--bg-card)] text-[var(--text-secondary)] active:text-[var(--text-primary)]'
         }`}
       >
         All
@@ -26,8 +26,8 @@ export default function ProjectFilter({ selected, onChange }: ProjectFilterProps
           onClick={() => onChange(p.id)}
           className={`px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all ${
             selected === p.id
-              ? 'text-white'
-              : 'text-[var(--text-secondary)] active:text-white'
+              ? 'text-[var(--text-primary)]'
+              : 'text-[var(--text-secondary)] active:text-[var(--text-primary)]'
           }`}
           style={selected === p.id ? { backgroundColor: p.color } : { backgroundColor: 'var(--bg-card)' }}
         >

@@ -64,7 +64,7 @@ export default function BetPositions() {
           P/L: {data.summary.totalPnl >= 0 ? '+' : ''}{data.summary.totalPnl.toFixed(2)}
         </span>
       )}
-      <span className="text-[13px] font-medium text-white">
+      <span className="text-[13px] font-medium text-[var(--text-primary)]">
         {data?.summary.active || 0} active
       </span>
     </div>
@@ -95,7 +95,7 @@ export default function BetPositions() {
           {/* Summary */}
           <div className="card p-3" style={{ borderLeft: '3px solid #F43F5E' }}>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[13px] font-semibold text-white">AI Bet Finder</span>
+              <span className="text-[13px] font-semibold text-[var(--text-primary)]">AI Bet Finder</span>
               <a href="https://aibetfinder.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-[var(--accent)]">Open</a>
             </div>
             <div className="flex items-center gap-4">
@@ -142,14 +142,14 @@ function BetCard({ bet }: { bet: PlacedBet }) {
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLay ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
             {isLay ? 'SELL' : 'BUY'}
           </span>
-          <span className="text-[13px] font-semibold text-white">{bet.selectionName}</span>
+          <span className="text-[13px] font-semibold text-[var(--text-primary)]">{bet.selectionName}</span>
         </div>
       </div>
       <div className="text-[11px] text-[var(--text-tertiary)] mb-1.5 truncate">{bet.marketName}</div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-[11px] text-[var(--text-tertiary)]">
-            {isLay ? 'Risk' : 'Stake'}: <span className="text-white">{bet.liability.toFixed(2)}</span>
+            {isLay ? 'Risk' : 'Stake'}: <span className="text-[var(--text-primary)]">{bet.liability.toFixed(2)}</span>
           </span>
           <span className="text-[11px] text-[var(--text-tertiary)]">
             Profit: <span className="text-[var(--green)]">+{bet.potentialProfit.toFixed(2)}</span>
@@ -183,7 +183,7 @@ function SettledSummary({ bets }: { bets: PlacedBet[] }) {
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[11px] text-[var(--text-tertiary)]">
-            Staked: <span className="text-white">{totalStaked.toFixed(2)}</span>
+            Staked: <span className="text-[var(--text-primary)]">{totalStaked.toFixed(2)}</span>
           </span>
           <span className={`text-[12px] font-medium ${totalPnl >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
             {totalPnl >= 0 ? '+' : ''}{totalPnl.toFixed(2)}
@@ -204,7 +204,7 @@ function SettledSummary({ bets }: { bets: PlacedBet[] }) {
                 <span className={`font-bold ${bet.status === 'won' ? 'text-green-400' : 'text-red-400'}`}>
                   {bet.status === 'won' ? 'W' : 'L'}
                 </span>
-                <span className="text-white truncate">{bet.selectionName}</span>
+                <span className="text-[var(--text-primary)] truncate">{bet.selectionName}</span>
                 <span className="text-[var(--text-tertiary)] truncate hidden sm:inline">{bet.marketName}</span>
               </div>
               <span className={`font-medium shrink-0 ml-2 ${(bet.pnl || 0) >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>

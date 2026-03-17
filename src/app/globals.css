@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* Dark theme (default) */
 :root {
   --bg-primary: #000000;
   --bg-card: #1c1c1e;
@@ -16,6 +17,27 @@
   --red: #ff453a;
   --yellow: #ffd60a;
   --orange: #ff9f0a;
+  color-scheme: dark;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg-primary: #f2f2f7;
+  --bg-card: #ffffff;
+  --bg-elevated: #e5e5ea;
+  --bg-input: #ffffff;
+  --border: #c6c6c8;
+  --border-light: #e5e5ea;
+  --text-primary: #000000;
+  --text-secondary: #636366;
+  --text-tertiary: #8e8e93;
+  --accent: #007aff;
+  --accent-hover: #0056b3;
+  --green: #28a745;
+  --red: #dc3545;
+  --yellow: #e6a800;
+  --orange: #e68a00;
+  color-scheme: light;
 }
 
 body {

@@ -65,13 +65,13 @@ export default function TaskCard({ task, onStatusChange, onDelete }: TaskCardPro
       <div className="absolute inset-y-0 right-0 flex items-stretch">
         <button
           onClick={handleUndo}
-          className="w-15 flex items-center justify-center bg-[var(--bg-elevated)] text-white text-[13px] font-medium px-3"
+          className="w-15 flex items-center justify-center bg-[var(--bg-elevated)] text-[var(--text-primary)] text-[13px] font-medium px-3"
         >
           Undo
         </button>
         <button
           onClick={handleConfirmDelete}
-          className="w-15 flex items-center justify-center bg-[var(--red)] text-white text-[13px] font-medium px-3"
+          className="w-15 flex items-center justify-center bg-[var(--red)] text-[var(--text-primary)] text-[13px] font-medium px-3"
         >
           Delete
         </button>
@@ -98,7 +98,7 @@ export default function TaskCard({ task, onStatusChange, onDelete }: TaskCardPro
           }`}
         >
           {isDone && (
-            <svg className="w-full h-full text-white p-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <svg className="w-full h-full text-[var(--text-primary)] p-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           )}
@@ -106,7 +106,7 @@ export default function TaskCard({ task, onStatusChange, onDelete }: TaskCardPro
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <p className={`text-[15px] leading-snug ${isDone ? 'line-through text-[var(--text-tertiary)]' : 'text-white'}`}>
+          <p className={`text-[15px] leading-snug ${isDone ? 'line-through text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}`}>
             {task.description}
           </p>
           <div className="flex items-center gap-2 mt-1.5">

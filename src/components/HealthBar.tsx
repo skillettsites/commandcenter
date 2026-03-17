@@ -45,7 +45,7 @@ export default function HealthBar() {
             className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[var(--bg-card)] flex-shrink-0"
           >
             <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-            <span className="text-[13px] font-medium text-white">
+            <span className="text-[13px] font-medium text-[var(--text-primary)]">
               {project?.name || r.siteId}
             </span>
             {r.responseTime !== null && (

@@ -233,8 +233,8 @@ export default function EmailList() {
               onClick={() => handleViewChange('inbox')}
               className={`flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
                 viewMode === 'inbox' && !activeLabel
-                  ? 'bg-[var(--bg-elevated)] text-white shadow-sm'
-                  : 'text-[var(--text-tertiary)] active:text-white'
+                  ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] active:text-[var(--text-primary)]'
               }`}
             >
               Latest
@@ -243,8 +243,8 @@ export default function EmailList() {
               onClick={() => handleViewChange('senders')}
               className={`flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
                 viewMode === 'senders'
-                  ? 'bg-[var(--bg-elevated)] text-white shadow-sm'
-                  : 'text-[var(--text-tertiary)] active:text-white'
+                  ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                  : 'text-[var(--text-tertiary)] active:text-[var(--text-primary)]'
               }`}
             >
               By Sender
@@ -263,7 +263,7 @@ export default function EmailList() {
                     onClick={() => handleLabelClick(label.id)}
                     className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[12px] font-medium transition-colors flex items-center gap-1 ${
                       isActive
-                        ? 'text-white'
+                        ? 'text-[var(--text-primary)]'
                         : 'bg-[var(--bg-card)] text-[var(--text-secondary)] active:bg-[var(--bg-elevated)]'
                     }`}
                     style={isActive ? { backgroundColor: color } : {}}
@@ -271,7 +271,7 @@ export default function EmailList() {
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: isActive ? 'white' : color }} />
                     {label.name}
                     {label.messagesUnread > 0 && (
-                      <span className={`text-[10px] ${isActive ? 'text-white/80' : 'text-[var(--accent)]'}`}>
+                      <span className={`text-[10px] ${isActive ? 'text-[var(--text-primary)]/80' : 'text-[var(--accent)]'}`}>
                         {label.messagesUnread}
                       </span>
                     )}
@@ -316,7 +316,7 @@ export default function EmailList() {
                   <circle cx="16" cy="16" r="14" fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="88" strokeDashoffset="0" strokeLinecap="round" className="countdown-ring" />
                 </svg>
               </div>
-              <p className="text-[13px] text-white truncate">
+              <p className="text-[13px] text-[var(--text-primary)] truncate">
                 {dismissed.type === 'group' ? `${dismissed.label} dismissed` : 'Email dismissed'}
               </p>
             </div>
@@ -470,7 +470,7 @@ function SwipeableSenderRow({
   return (
     <div className="relative overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-end pr-4 bg-[var(--red)]">
-        <span className="text-[12px] text-white font-medium">Dismiss</span>
+        <span className="text-[12px] text-[var(--text-primary)] font-medium">Dismiss</span>
       </div>
       <div
         ref={rowRef}
@@ -482,10 +482,10 @@ function SwipeableSenderRow({
         style={{ transition: swiping ? 'none' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)' }}
       >
         <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
-          <span className="text-[11px] font-semibold text-white">{initials || '?'}</span>
+          <span className="text-[11px] font-semibold text-[var(--text-primary)]">{initials || '?'}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[14px] font-medium text-white truncate">{group.senderName}</p>
+          <p className="text-[14px] font-medium text-[var(--text-primary)] truncate">{group.senderName}</p>
           <p className="text-[12px] text-[var(--text-tertiary)] truncate">
             {group.emails.length === 1 ? (group.emails[0].subject || '(no subject)') : `${group.emails.length} emails`}
           </p>
@@ -575,7 +575,7 @@ function SwipeableEmailRow({
     <div className="relative overflow-hidden">
       {showDismiss && (
         <div className="absolute inset-0 flex items-center justify-end pr-4 bg-[var(--red)]">
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="w-4 h-4 text-[var(--text-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </div>
@@ -591,7 +591,7 @@ function SwipeableEmailRow({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-[14px] text-white leading-snug truncate">
+            <p className="text-[14px] text-[var(--text-primary)] leading-snug truncate">
               {email.subject || '(no subject)'}
             </p>
             <p className="text-[12px] text-[var(--text-tertiary)] truncate mt-0.5">

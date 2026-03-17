@@ -67,8 +67,8 @@ export default function TaskList() {
             onClick={() => setFilter(f)}
             className={`flex-1 py-2 rounded-lg text-[13px] font-semibold transition-all ${
               filter === f
-                ? 'bg-[var(--bg-elevated)] text-white shadow-sm'
-                : 'text-[var(--text-tertiary)] active:text-white'
+                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-tertiary)] active:text-[var(--text-primary)]'
             }`}
           >
             {f === 'pending' ? 'Pending' : f === 'all' ? 'All' : 'Done'}
