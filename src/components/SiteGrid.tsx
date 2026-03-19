@@ -323,7 +323,7 @@ function SiteRow({
       {/* Expanded detail panel */}
       {expanded && (
         <div className="px-3.5 pb-3 fade-in">
-          <div className="ml-7 space-y-3">
+          <div className="ml-3 sm:ml-7 space-y-3">
             {/* Domain + visit link */}
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-[var(--text-tertiary)] truncate">{domain}</span>
@@ -354,8 +354,8 @@ function SiteRow({
                 {/* Mini bar chart - last 24h with user counts */}
                 <HourlyChart hourly={detail.hourly} color={site.color} />
 
-                {/* Traffic sources + top pages side by side */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Traffic sources + top pages - stacked on mobile, side by side on wider */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
                       Traffic Sources
@@ -413,7 +413,7 @@ function GscStats({ gsc }: { gsc: GscData }) {
       <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
         Search Console (7d)
       </h4>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div>
           <div className="text-[14px] font-semibold text-[var(--text-primary)]">{gsc.clicks}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Clicks</div>

@@ -68,8 +68,7 @@ export async function GET(
     ]);
 
     let clicks = 0, impressions = 0, ctr = 0, position = 0;
-    let searchError: string | null = null;
-    let sitemapError: string | null = null;
+    let hasSearchData = false;
 
     if (searchRes.ok) {
       const searchData = await searchRes.json();
@@ -79,11 +78,15 @@ export async function GET(
         impressions = row.impressions ?? 0;
         ctr = row.ctr ?? 0;
         position = row.position ?? 0;
+        hasSearchData = true;
       }
     } else {
       const errBody = await searchRes.text();
-      searchError = `${searchRes.status}: ${errBody.slice(0, 200)}`;
-      console.error(`GSC search error for ${siteId}:`, searchError);
+      console.error(`GSC search error for ${siteId}: ${searchRes.status}`, errBody.slice(0, 300));
+      // Return 503 so frontend knows GSC isn't configured yet
+      if (searchRes.status === 403) {
+        return NextResponse.json({ error: 'GSC API not enabled or no access' }, { status: 503 });
+      }
     }
 
     let pagesIndexed: number | null = null;
@@ -100,18 +103,10 @@ export async function GET(
         }
       }
     } else {
-      const errBody = await sitemapRes.text();
-      sitemapError = `${sitemapRes.status}: ${errBody.slice(0, 200)}`;
-      console.error(`GSC sitemap error for ${siteId}:`, sitemapError);
+      console.error(`GSC sitemap error for ${siteId}: ${sitemapRes.status}`);
     }
 
     const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted };
-
-    // Include debug info if there were errors
-    if (searchError || sitemapError) {
-      return NextResponse.json({ ...result, _debug: { searchError, sitemapError } });
-    }
-
     return NextResponse.json(result);
   } catch (err) {
     console.error(`GSC error for ${siteId}:`, err);
