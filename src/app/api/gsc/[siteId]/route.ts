@@ -68,6 +68,9 @@ export async function GET(
     ]);
 
     let clicks = 0, impressions = 0, ctr = 0, position = 0;
+    let searchError: string | null = null;
+    let sitemapError: string | null = null;
+
     if (searchRes.ok) {
       const searchData = await searchRes.json();
       const row = searchData.rows?.[0];
@@ -77,6 +80,10 @@ export async function GET(
         ctr = row.ctr ?? 0;
         position = row.position ?? 0;
       }
+    } else {
+      const errBody = await searchRes.text();
+      searchError = `${searchRes.status}: ${errBody.slice(0, 200)}`;
+      console.error(`GSC search error for ${siteId}:`, searchError);
     }
 
     let pagesIndexed: number | null = null;
@@ -92,9 +99,19 @@ export async function GET(
           pagesIndexed += content.indexed ?? 0;
         }
       }
+    } else {
+      const errBody = await sitemapRes.text();
+      sitemapError = `${sitemapRes.status}: ${errBody.slice(0, 200)}`;
+      console.error(`GSC sitemap error for ${siteId}:`, sitemapError);
     }
 
     const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted };
+
+    // Include debug info if there were errors
+    if (searchError || sitemapError) {
+      return NextResponse.json({ ...result, _debug: { searchError, sitemapError } });
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     console.error(`GSC error for ${siteId}:`, err);
