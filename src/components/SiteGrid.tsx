@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { HealthResult, AnalyticsResult } from '@/lib/types';
+import { HealthResult, AnalyticsResult, GscData } from '@/lib/types';
 import { projects } from '@/lib/projects';
 
 interface SiteData {
@@ -14,6 +14,7 @@ interface SiteData {
   visitors: number | null;
   pageViews: number | null;
   gaPropertyId?: string;
+  gscSiteUrl?: string;
 }
 
 interface HourlyData {
@@ -54,6 +55,7 @@ export default function SiteGrid() {
   );
   const [expanded, setExpanded] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     async function fetchHealth() {
@@ -99,6 +101,18 @@ export default function SiteGrid() {
     fetchHealth();
     fetchAnalytics();
   }, []);
+
+  // Sort by visitors descending (null/0 at bottom)
+  const sortedSites = [...sites].sort((a, b) => {
+    const aVis = a.visitors ?? 0;
+    const bVis = b.visitors ?? 0;
+    if (bVis !== aVis) return bVis - aVis;
+    // Secondary sort by page views
+    return (b.pageViews ?? 0) - (a.pageViews ?? 0);
+  });
+
+  const visibleSites = showAll ? sortedSites : sortedSites.slice(0, 5);
+  const hasMore = sortedSites.length > 5;
 
   const allUp = sites.every(s => s.status === 'up');
   const anyDown = sites.some(s => s.status === 'down');
@@ -148,7 +162,7 @@ export default function SiteGrid() {
       {/* Compact status dots row (always visible) */}
       {collapsed && (
         <div className="flex flex-wrap gap-1.5 px-1 fade-in">
-          {sites.map(site => {
+          {sortedSites.map(site => {
             const dotColor = site.status === 'up' ? 'var(--green)' : site.status === 'slow' ? 'var(--yellow)' : site.status === 'checking' ? 'var(--text-tertiary)' : 'var(--red)';
             return (
               <div
@@ -170,7 +184,7 @@ export default function SiteGrid() {
       {/* Compact list view (default, not collapsed) */}
       {!collapsed && (
         <div className="card overflow-hidden divide-y divide-[var(--border-light)] fade-in">
-          {sites.map(site => (
+          {visibleSites.map(site => (
             <SiteRow
               key={site.id}
               site={site}
@@ -178,6 +192,16 @@ export default function SiteGrid() {
               onToggle={() => setExpanded(expanded === site.id ? null : site.id)}
             />
           ))}
+          {hasMore && (
+            <div
+              onClick={() => setShowAll(!showAll)}
+              className="px-3.5 py-2 cursor-pointer active:bg-[var(--bg-elevated)] transition-colors text-center"
+            >
+              <span className="text-[13px] font-medium text-[var(--accent)]">
+                {showAll ? 'Show Less' : `View All ${sortedSites.length} Sites`}
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -194,24 +218,42 @@ function SiteRow({
   onToggle: () => void;
 }) {
   const [detail, setDetail] = useState<SiteDetail | null>(null);
+  const [gscData, setGscData] = useState<GscData | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (expanded && !detail && site.gaPropertyId) {
+    if (expanded && !detail) {
       setLoading(true);
-      fetch(`/api/analytics/${site.id}`)
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data) setDetail(data);
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
+      const fetches: Promise<void>[] = [];
+
+      if (site.gaPropertyId) {
+        fetches.push(
+          fetch(`/api/analytics/${site.id}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data) setDetail(data); })
+            .catch(() => {})
+        );
+      }
+
+      if (site.gscSiteUrl) {
+        fetches.push(
+          fetch(`/api/gsc/${site.id}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data) setGscData(data); })
+            .catch(() => {})
+        );
+      }
+
+      Promise.all(fetches).finally(() => setLoading(false));
     }
-  }, [expanded, detail, site.id, site.gaPropertyId]);
+  }, [expanded, detail, site.id, site.gaPropertyId, site.gscSiteUrl]);
 
   // Reset detail when collapsed
   useEffect(() => {
-    if (!expanded) setDetail(null);
+    if (!expanded) {
+      setDetail(null);
+      setGscData(null);
+    }
   }, [expanded]);
 
   const statusDot =
@@ -296,17 +338,20 @@ function SiteRow({
               </a>
             </div>
 
-            {!site.gaPropertyId && (
-              <p className="text-[11px] text-[var(--text-tertiary)]">No GA property configured</p>
+            {!site.gaPropertyId && !site.gscSiteUrl && (
+              <p className="text-[11px] text-[var(--text-tertiary)]">No GA or GSC configured</p>
             )}
 
             {loading && (
               <p className="text-[11px] text-[var(--text-tertiary)] animate-pulse">Loading analytics...</p>
             )}
 
+            {/* GSC stats bar */}
+            {gscData && <GscStats gsc={gscData} />}
+
             {detail && (
               <>
-                {/* Mini bar chart - last 24h */}
+                {/* Mini bar chart - last 24h with user counts */}
                 <HourlyChart hourly={detail.hourly} color={site.color} />
 
                 {/* Traffic sources + top pages side by side */}
@@ -356,6 +401,60 @@ function SiteRow({
   );
 }
 
+function GscStats({ gsc }: { gsc: GscData }) {
+  const positionColor = gsc.position <= 10
+    ? 'text-[var(--green)]'
+    : gsc.position <= 30
+    ? 'text-[var(--yellow)]'
+    : 'text-[var(--text-secondary)]';
+
+  return (
+    <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
+      <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+        Search Console (7d)
+      </h4>
+      <div className="grid grid-cols-4 gap-2">
+        <div>
+          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{gsc.clicks}</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">Clicks</div>
+        </div>
+        <div>
+          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{gsc.impressions.toLocaleString()}</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">Impressions</div>
+        </div>
+        <div>
+          <div className={`text-[14px] font-semibold ${positionColor}`}>{gsc.position > 0 ? gsc.position.toFixed(1) : '-'}</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">Avg Position</div>
+        </div>
+        <div>
+          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{(gsc.ctr * 100).toFixed(1)}%</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">CTR</div>
+        </div>
+      </div>
+      {gsc.pagesIndexed !== null && gsc.pagesSubmitted !== null && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-[var(--text-secondary)]">
+              Pages indexed
+            </span>
+            <span className="text-[11px] font-medium text-[var(--text-primary)]">
+              {gsc.pagesIndexed} / {gsc.pagesSubmitted}
+            </span>
+          </div>
+          {gsc.pagesSubmitted > 0 && (
+            <div className="mt-1 h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-[var(--green)]"
+                style={{ width: `${Math.min((gsc.pagesIndexed / gsc.pagesSubmitted) * 100, 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string }) {
   if (hourly.length === 0) {
     return <p className="text-[11px] text-[var(--text-tertiary)]">No hourly data</p>;
@@ -379,22 +478,29 @@ function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string })
           <span className="text-[11px] text-[var(--text-tertiary)]">{totalUsers} users</span>
         </div>
       </div>
-      <div className="flex items-end gap-[2px] h-10">
+      <div className="flex items-end gap-[2px] h-12">
         {last24.map((h, i) => {
           const height = Math.max((h.pageViews / maxViews) * 100, h.pageViews > 0 ? 8 : 0);
           const hour = h.dateHour.slice(-2);
           return (
-            <div
-              key={i}
-              className="flex-1 rounded-sm transition-all"
-              style={{
-                height: `${height}%`,
-                backgroundColor: h.pageViews > 0 ? color : 'var(--border-light)',
-                opacity: h.pageViews > 0 ? 0.8 : 0.3,
-                minHeight: h.pageViews > 0 ? '3px' : '1px',
-              }}
-              title={`${hour}:00 - ${h.pageViews} views, ${h.users} users`}
-            />
+            <div key={i} className="flex-1 flex flex-col items-center gap-0">
+              {/* User count above bar (only show if > 0) */}
+              {h.users > 0 && (
+                <span className="text-[7px] font-medium text-[var(--text-tertiary)] leading-none mb-0.5">
+                  {h.users}
+                </span>
+              )}
+              <div
+                className="w-full rounded-sm transition-all"
+                style={{
+                  height: `${height}%`,
+                  backgroundColor: h.pageViews > 0 ? color : 'var(--border-light)',
+                  opacity: h.pageViews > 0 ? 0.8 : 0.3,
+                  minHeight: h.pageViews > 0 ? '3px' : '1px',
+                }}
+                title={`${hour}:00 - ${h.pageViews} views, ${h.users} users`}
+              />
+            </div>
           );
         })}
       </div>

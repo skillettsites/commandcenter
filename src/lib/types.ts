@@ -15,6 +15,16 @@ export interface Project {
   url: string;
   color: string;
   gaPropertyId?: string;
+  gscSiteUrl?: string;
+}
+
+export interface GscData {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  pagesIndexed: number | null;
+  pagesSubmitted: number | null;
 }
 
 export interface AnalyticsResult {
