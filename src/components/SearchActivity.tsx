@@ -77,7 +77,7 @@ interface LineChartProps {
 }
 
 function LineChart({ data, color, range }: LineChartProps) {
-  const chartHeight = 100;
+  const chartHeight = 120;
   const chartWidth = 300;
   const padding = { top: 8, right: 8, bottom: 22, left: 8 };
 
@@ -154,8 +154,8 @@ function LineChart({ data, color, range }: LineChartProps) {
     >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.3} />
-          <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+          <stop offset="100%" stopColor={color} stopOpacity={0.05} />
         </linearGradient>
       </defs>
 
@@ -170,7 +170,7 @@ function LineChart({ data, color, range }: LineChartProps) {
           d={linePath}
           fill="none"
           stroke={color}
-          strokeWidth={1.5}
+          strokeWidth={3}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -183,7 +183,7 @@ function LineChart({ data, color, range }: LineChartProps) {
             key={i}
             cx={p.x}
             cy={p.y}
-            r={1.5}
+            r={3}
             fill={color}
             opacity={p.count > 0 ? 1 : 0.3}
           />
