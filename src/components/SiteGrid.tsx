@@ -561,12 +561,28 @@ function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string })
     return <p className="text-[11px] text-[var(--text-tertiary)]">No hourly data</p>;
   }
 
-  const maxViews = Math.max(...hourly.map(h => h.pageViews), 1);
   const totalViews = hourly.reduce((sum, h) => sum + h.pageViews, 0);
   const totalUsers = hourly.reduce((sum, h) => sum + h.users, 0);
-
-  // Get last 24 bars, pad if needed
   const last24 = hourly.slice(-24);
+  const maxViews = Math.max(...last24.map(h => h.pageViews), 1);
+
+  const chartWidth = 300;
+  const chartHeight = 120;
+  const pad = { top: 10, right: 8, bottom: 20, left: 8 };
+  const innerW = chartWidth - pad.left - pad.right;
+  const innerH = chartHeight - pad.top - pad.bottom;
+
+  const points = last24.map((h, i) => ({
+    x: pad.left + (last24.length === 1 ? innerW / 2 : (i / (last24.length - 1)) * innerW),
+    y: pad.top + innerH - (h.pageViews / maxViews) * innerH,
+    views: h.pageViews,
+    users: h.users,
+    hour: h.dateHour.slice(-2),
+  }));
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+  const areaPath = `M${points[0].x},${pad.top + innerH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${pad.top + innerH} Z`;
+  const gradId = `hourly-${color.replace('#', '')}`;
 
   return (
     <div>
@@ -579,45 +595,35 @@ function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string })
           <span className="text-[11px] text-[var(--text-tertiary)]">{totalUsers} users</span>
         </div>
       </div>
-      <div className="flex items-end gap-[2px] h-12">
-        {last24.map((h, i) => {
-          const height = Math.max((h.pageViews / maxViews) * 100, h.pageViews > 0 ? 8 : 0);
-          const hour = h.dateHour.slice(-2);
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.5} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.05} />
+          </linearGradient>
+        </defs>
+        <path d={areaPath} fill={`url(#${gradId})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r={p.views > 0 ? 3 : 1.5} fill={color} opacity={p.views > 0 ? 1 : 0.3} />
+            {p.users > 0 && (
+              <text x={p.x} y={p.y - 6} textAnchor="middle" fontSize="7" fill="currentColor" opacity={0.5} fontFamily="system-ui, sans-serif">
+                {p.users}
+              </text>
+            )}
+          </g>
+        ))}
+        {points.map((p, i) => {
+          if (i % 6 !== 0) return null;
           return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-0">
-              {/* User count above bar (only show if > 0) */}
-              {h.users > 0 && (
-                <span className="text-[7px] font-medium text-[var(--text-tertiary)] leading-none mb-0.5">
-                  {h.users}
-                </span>
-              )}
-              <div
-                className="w-full rounded-sm transition-all"
-                style={{
-                  height: `${height}%`,
-                  backgroundColor: h.pageViews > 0 ? color : 'var(--border-light)',
-                  opacity: h.pageViews > 0 ? 0.8 : 0.3,
-                  minHeight: h.pageViews > 0 ? '3px' : '1px',
-                }}
-                title={`${hour}:00 - ${h.pageViews} views, ${h.users} users`}
-              />
-            </div>
+            <text key={`label-${i}`} x={p.x} y={chartHeight - 2} textAnchor="middle" fontSize="7" fill="currentColor" opacity={0.35} fontFamily="system-ui, sans-serif">
+              {p.hour}:00
+            </text>
           );
         })}
-      </div>
-      {/* Hour labels */}
-      <div className="flex gap-[2px] mt-0.5">
-        {last24.map((h, i) => {
-          const hour = h.dateHour.slice(-2);
-          // Only show every 6th label to avoid crowding
-          if (i % 6 !== 0) return <div key={i} className="flex-1" />;
-          return (
-            <div key={i} className="flex-1 text-[8px] text-[var(--text-tertiary)]">
-              {hour}
-            </div>
-          );
-        })}
-      </div>
+        <line x1={pad.left} y1={pad.top + innerH} x2={pad.left + innerW} y2={pad.top + innerH} stroke="currentColor" opacity={0.1} strokeWidth={0.5} />
+      </svg>
     </div>
   );
 }
