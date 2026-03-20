@@ -567,6 +567,8 @@ function GscStats({ gsc }: { gsc: GscData }) {
 const RANGE_LABEL: Record<string, string> = { '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
 
 function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyData[]; color: string; range: '24h' | '1m' | 'all'; onCycleRange: () => void }) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
   if (hourly.length === 0) {
     return (
       <div className="flex items-center justify-between">
@@ -601,7 +603,6 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
   const areaPath = points.length > 0 ? `M${points[0].x},${pad.top + innerH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${pad.top + innerH} Z` : '';
   const gradId = `hourly-${color.replace('#', '')}-${range}`;
 
-  // Label spacing depends on range
   const labelStep = range === '24h' ? 6 : range === '1m' ? 7 : Math.max(1, Math.floor(data.length / 6));
 
   function formatLabel(raw: string): string {
@@ -609,12 +610,41 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
       const hour = raw.slice(-2);
       return `${hour}:00`;
     }
-    // date format: YYYYMMDD or YYYY-MM-DD
     const clean = raw.replace(/-/g, '');
     const day = clean.slice(6, 8);
     const month = clean.slice(4, 6);
     return `${parseInt(day)}/${parseInt(month)}`;
   }
+
+  function formatTooltip(raw: string): string {
+    if (range === '24h') {
+      const hour = raw.slice(-2);
+      return `${hour}:00`;
+    }
+    const clean = raw.replace(/-/g, '');
+    const year = clean.slice(0, 4);
+    const month = clean.slice(4, 6);
+    const day = clean.slice(6, 8);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
+  }
+
+  function handleChartClick(e: React.MouseEvent<SVGSVGElement>) {
+    e.stopPropagation();
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const clickX = ((e.clientX - rect.left) / rect.width) * chartWidth;
+    // Find nearest point
+    let closest = 0;
+    let minDist = Infinity;
+    points.forEach((p, i) => {
+      const dist = Math.abs(p.x - clickX);
+      if (dist < minDist) { minDist = dist; closest = i; }
+    });
+    setSelectedIdx(selectedIdx === closest ? null : closest);
+  }
+
+  const sel = selectedIdx !== null ? points[selectedIdx] : null;
 
   return (
     <div>
@@ -622,12 +652,20 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
         <button onClick={(e) => { e.stopPropagation(); onCycleRange(); }} className="text-[10px] font-semibold text-[var(--accent)] uppercase tracking-wider hover:underline cursor-pointer">
           {RANGE_LABEL[range]} &rarr;
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-[var(--text-primary)]">{totalViews.toLocaleString()} views</span>
-          <span className="text-[11px] text-[var(--text-tertiary)]">{totalUsers.toLocaleString()} users</span>
-        </div>
+        {sel ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium" style={{ color }}>{formatTooltip(sel.label)}</span>
+            <span className="text-[11px] font-medium text-[var(--text-primary)]">{sel.views} views</span>
+            <span className="text-[11px] text-[var(--text-tertiary)]">{sel.users} users</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-medium text-[var(--text-primary)]">{totalViews.toLocaleString()} views</span>
+            <span className="text-[11px] text-[var(--text-tertiary)]">{totalUsers.toLocaleString()} users</span>
+          </div>
+        )}
       </div>
-      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-auto cursor-pointer" preserveAspectRatio="xMidYMid meet" onClick={handleChartClick}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity={0.5} />
@@ -636,14 +674,13 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
         </defs>
         {areaPath && <path d={areaPath} fill={`url(#${gradId})`} />}
         {linePath && <path d={linePath} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />}
+        {/* Selected point vertical line */}
+        {sel && (
+          <line x1={sel.x} y1={pad.top} x2={sel.x} y2={pad.top + innerH} stroke={color} strokeWidth={1} opacity={0.5} strokeDasharray="3,3" />
+        )}
         {data.length <= 31 && points.map((p, i) => (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r={p.views > 0 ? 3 : 1.5} fill={color} opacity={p.views > 0 ? 1 : 0.3} />
-            {p.users > 0 && data.length <= 24 && (
-              <text x={p.x} y={p.y - 6} textAnchor="middle" fontSize="7" fill="currentColor" opacity={0.5} fontFamily="system-ui, sans-serif">
-                {p.users}
-              </text>
-            )}
+            <circle cx={p.x} cy={p.y} r={selectedIdx === i ? 5 : (p.views > 0 ? 3 : 1.5)} fill={selectedIdx === i ? 'white' : color} stroke={selectedIdx === i ? color : 'none'} strokeWidth={selectedIdx === i ? 2 : 0} opacity={p.views > 0 ? 1 : 0.3} />
           </g>
         ))}
         {points.map((p, i) => {
