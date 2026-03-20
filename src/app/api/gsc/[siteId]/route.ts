@@ -98,8 +98,8 @@ export async function GET(
       pagesIndexed = 0;
       for (const sm of sitemaps) {
         for (const content of sm.contents ?? []) {
-          pagesSubmitted += content.submitted ?? 0;
-          pagesIndexed += content.indexed ?? 0;
+          pagesSubmitted += Number(content.submitted) || 0;
+          pagesIndexed += Number(content.indexed) || 0;
         }
       }
     } else {
