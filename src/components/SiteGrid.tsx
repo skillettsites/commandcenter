@@ -413,6 +413,25 @@ function SiteRow({
   );
 }
 
+function CollapsibleSection({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="flex items-center gap-1.5 w-full text-left"
+      >
+        <span className="text-[10px] text-[var(--text-tertiary)]">{open ? '▾' : '▸'}</span>
+        <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+          {title}
+        </h4>
+        <span className="text-[10px] text-[var(--text-tertiary)]">({count})</span>
+      </button>
+      {open && <div className="mt-1.5">{children}</div>}
+    </div>
+  );
+}
+
 function GscStats({ gsc }: { gsc: GscData }) {
   const positionColor = gsc.position <= 10
     ? 'text-[var(--green)]'
@@ -492,10 +511,7 @@ function GscStats({ gsc }: { gsc: GscData }) {
 
       {/* Top search queries */}
       {gsc.topQueries && gsc.topQueries.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
-          <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-            Top Keywords (28d)
-          </h4>
+        <CollapsibleSection title="Top Keywords (28d)" count={gsc.topQueries.length}>
           <div className="space-y-1">
             {gsc.topQueries.map((q, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -514,15 +530,12 @@ function GscStats({ gsc }: { gsc: GscData }) {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
       )}
 
       {/* Top search pages */}
       {gsc.topPages && gsc.topPages.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
-          <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-            Top Pages (28d)
-          </h4>
+        <CollapsibleSection title="Top Pages (28d)" count={gsc.topPages.length}>
           <div className="space-y-1">
             {gsc.topPages.map((p, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -538,7 +551,7 @@ function GscStats({ gsc }: { gsc: GscData }) {
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleSection>
       )}
     </div>
   );
