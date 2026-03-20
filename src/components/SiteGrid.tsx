@@ -338,12 +338,24 @@ function SiteRow({
               </a>
             </div>
 
-            {!site.gaPropertyId && !site.gscSiteUrl && (
-              <p className="text-[11px] text-[var(--text-tertiary)]">No GA or GSC configured</p>
-            )}
-
             {loading && (
               <p className="text-[11px] text-[var(--text-tertiary)] animate-pulse">Loading analytics...</p>
+            )}
+
+            {/* Integration status badges */}
+            {!loading && (!site.gaPropertyId || !site.gscSiteUrl) && (
+              <div className="flex flex-wrap gap-1.5">
+                {!site.gaPropertyId && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">
+                    GA not configured
+                  </span>
+                )}
+                {!site.gscSiteUrl && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">
+                    GSC not configured
+                  </span>
+                )}
+              </div>
             )}
 
             {/* GSC stats bar */}
@@ -408,6 +420,10 @@ function GscStats({ gsc }: { gsc: GscData }) {
     ? 'text-[var(--yellow)]'
     : 'text-[var(--text-secondary)]';
 
+  const totalPages = gsc.pagesSubmitted || 0;
+  const inSearch = gsc.pagesInSearch ?? 0;
+  const indexed = gsc.pagesIndexed ?? 0;
+
   return (
     <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
       <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
@@ -431,30 +447,81 @@ function GscStats({ gsc }: { gsc: GscData }) {
           <div className="text-[9px] text-[var(--text-tertiary)]">CTR</div>
         </div>
       </div>
-      {(gsc.pagesInSearch !== null || (gsc.pagesSubmitted !== null && gsc.pagesSubmitted > 0)) && (
-        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[var(--text-secondary)]">
-              Pages in search (28d)
-            </span>
-            <span className="text-[11px] font-medium text-[var(--text-primary)]">
-              {gsc.pagesInSearch ?? 0}{gsc.pagesSubmitted ? ` / ${gsc.pagesSubmitted.toLocaleString()} submitted` : ''}
-            </span>
+
+      {/* Indexing stats: submitted / indexed / in search */}
+      <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+        <div className="grid grid-cols-3 gap-2 mb-1.5">
+          <div>
+            <div className="text-[13px] font-semibold text-[var(--text-primary)]">{totalPages > 0 ? totalPages.toLocaleString() : '-'}</div>
+            <div className="text-[9px] text-[var(--text-tertiary)]">Submitted</div>
           </div>
-          {gsc.pagesSubmitted && gsc.pagesSubmitted > 0 && (
-            <div className="mt-1 h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[var(--green)]"
-                style={{ width: `${Math.min(((gsc.pagesInSearch ?? 0) / gsc.pagesSubmitted) * 100, 100)}%` }}
-              />
+          <div>
+            <div className="text-[13px] font-semibold text-[var(--text-primary)]">{indexed > 0 ? indexed.toLocaleString() : '-'}</div>
+            <div className="text-[9px] text-[var(--text-tertiary)]">Indexed</div>
+          </div>
+          <div>
+            <div className="text-[13px] font-semibold text-[var(--green)]">{inSearch > 0 ? inSearch.toLocaleString() : '-'}</div>
+            <div className="text-[9px] text-[var(--text-tertiary)]">In Search (28d)</div>
+          </div>
+        </div>
+        {totalPages > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-[var(--text-tertiary)] w-12">Indexed</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)]"
+                  style={{ width: `${Math.min((indexed / totalPages) * 100, 100)}%` }}
+                />
+              </div>
+              <span className="text-[9px] text-[var(--text-tertiary)] w-8 text-right">{Math.round((indexed / totalPages) * 100)}%</span>
             </div>
-          )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-[var(--text-tertiary)] w-12">In search</span>
+              <div className="flex-1 h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[var(--green)]"
+                  style={{ width: `${Math.min((inSearch / totalPages) * 100, 100)}%` }}
+                />
+              </div>
+              <span className="text-[9px] text-[var(--text-tertiary)] w-8 text-right">{Math.round((inSearch / totalPages) * 100)}%</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Top search queries */}
+      {gsc.topQueries && gsc.topQueries.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+          <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+            Top Keywords (28d)
+          </h4>
+          <div className="space-y-1">
+            {gsc.topQueries.map((q, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
+                  {q.query}
+                </span>
+                <span className="text-[11px] font-medium text-[var(--green)] flex-shrink-0">
+                  {q.clicks}c
+                </span>
+                <span className="text-[11px] text-[var(--text-tertiary)] flex-shrink-0">
+                  {q.impressions.toLocaleString()}i
+                </span>
+                <span className={`text-[10px] flex-shrink-0 w-6 text-right ${q.position <= 10 ? 'text-[var(--green)]' : q.position <= 30 ? 'text-[var(--yellow)]' : 'text-[var(--text-tertiary)]'}`}>
+                  #{Math.round(q.position)}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Top search pages */}
       {gsc.topPages && gsc.topPages.length > 0 && (
         <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
           <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-            Top Search Pages (28d)
+            Top Pages (28d)
           </h4>
           <div className="space-y-1">
             {gsc.topPages.map((p, i) => (

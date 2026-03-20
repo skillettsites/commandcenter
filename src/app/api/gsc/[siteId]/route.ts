@@ -47,8 +47,8 @@ export async function GET(
       'Content-Type': 'application/json',
     };
 
-    // Fetch search analytics (7d aggregate + 28d by page) and sitemaps in parallel
-    const [searchRes, pageRes, sitemapRes] = await Promise.all([
+    // Fetch search analytics (7d aggregate + 28d by page + 28d by query) and sitemaps in parallel
+    const [searchRes, pageRes, queryRes, sitemapRes] = await Promise.all([
       fetch(
         `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
         {
@@ -71,6 +71,19 @@ export async function GET(
             endDate: getDateString(-1),
             dimensions: ['page'],
             rowLimit: 1000,
+          }),
+        }
+      ),
+      fetch(
+        `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            startDate: getDateString(-28),
+            endDate: getDateString(-1),
+            dimensions: ['query'],
+            rowLimit: 10,
           }),
         }
       ),
@@ -119,6 +132,22 @@ export async function GET(
         }));
     }
 
+    // Top search queries (28d)
+    let topQueries: { query: string; clicks: number; impressions: number; position: number }[] = [];
+    if (queryRes.ok) {
+      const queryData = await queryRes.json();
+      const rows = queryData.rows ?? [];
+      topQueries = rows
+        .sort((a: { clicks: number }, b: { clicks: number }) => b.clicks - a.clicks)
+        .slice(0, 10)
+        .map((r: { keys: string[]; clicks: number; impressions: number; position: number }) => ({
+          query: r.keys[0],
+          clicks: r.clicks,
+          impressions: r.impressions,
+          position: r.position,
+        }));
+    }
+
     let pagesIndexed: number | null = null;
     let pagesSubmitted: number | null = null;
     if (sitemapRes.ok) {
@@ -136,7 +165,7 @@ export async function GET(
       console.error(`GSC sitemap error for ${siteId}: ${sitemapRes.status}`);
     }
 
-    const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted, pagesInSearch, topPages };
+    const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted, pagesInSearch, topPages, topQueries };
     return NextResponse.json(result);
   } catch (err) {
     console.error(`GSC error for ${siteId}:`, err);
