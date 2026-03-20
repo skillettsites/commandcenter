@@ -379,10 +379,6 @@ function SiteRow({
               </a>
             </div>
 
-            {loading && (
-              <p className="text-[11px] text-[var(--text-tertiary)] animate-pulse">Loading analytics...</p>
-            )}
-
             {/* Integration status badges */}
             {!loading && (!site.gaPropertyId || !site.gscSiteUrl) && (
               <div className="flex flex-wrap gap-1.5">
