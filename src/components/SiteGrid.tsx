@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { HealthResult, AnalyticsResult, GscData } from '@/lib/types';
+import { HealthResult, AnalyticsResult, GscData, BingData } from '@/lib/types';
 import { projects } from '@/lib/projects';
 
 interface SiteData {
@@ -17,6 +17,7 @@ interface SiteData {
   monthVisitors: number | null;
   gaPropertyId?: string;
   gscSiteUrl?: string;
+  bingSiteUrl?: string;
 }
 
 interface HourlyData {
@@ -236,6 +237,7 @@ function SiteRow({
 }) {
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
+  const [bingData, setBingData] = useState<BingData | null>(null);
   const [loading, setLoading] = useState(false);
   const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
 
@@ -268,15 +270,25 @@ function SiteRow({
         );
       }
 
+      if (site.bingSiteUrl) {
+        fetches.push(
+          fetch(`/api/bing/${site.id}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data) setBingData(data); })
+            .catch(() => {})
+        );
+      }
+
       Promise.all(fetches).finally(() => setLoading(false));
     }
-  }, [expanded, chartRange, site.id, site.gaPropertyId, site.gscSiteUrl]);
+  }, [expanded, chartRange, site.id, site.gaPropertyId, site.gscSiteUrl, site.bingSiteUrl]);
 
   // Reset detail when collapsed
   useEffect(() => {
     if (!expanded) {
       setDetail(null);
       setGscData(null);
+      setBingData(null);
       setChartRange('24h');
     }
   }, [expanded]);
@@ -380,7 +392,7 @@ function SiteRow({
             </div>
 
             {/* Integration status badges */}
-            {!loading && (!site.gaPropertyId || !site.gscSiteUrl) && (
+            {!loading && (!site.gaPropertyId || !site.gscSiteUrl || !site.bingSiteUrl) && (
               <div className="flex flex-wrap gap-1.5">
                 {!site.gaPropertyId && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">
@@ -392,11 +404,19 @@ function SiteRow({
                     GSC not configured
                   </span>
                 )}
+                {!site.bingSiteUrl && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">
+                    Bing not configured
+                  </span>
+                )}
               </div>
             )}
 
             {/* GSC stats bar */}
             {gscData && <GscStats gsc={gscData} />}
+
+            {/* Bing stats bar */}
+            {bingData && <BingStats bing={bingData} />}
 
             {detail && (
               <>
@@ -541,6 +561,85 @@ function GscStats({ gsc }: { gsc: GscData }) {
         <CollapsibleSection title="Top Pages (28d)" count={gsc.topPages.length}>
           <div className="space-y-1">
             {gsc.topPages.map((p, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
+                  {p.page}
+                </span>
+                <span className="text-[11px] font-medium text-[var(--green)] flex-shrink-0">
+                  {p.clicks}c
+                </span>
+                <span className="text-[11px] text-[var(--text-tertiary)] flex-shrink-0">
+                  {p.impressions.toLocaleString()}i
+                </span>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+    </div>
+  );
+}
+
+function BingStats({ bing }: { bing: BingData }) {
+  const positionColor = bing.position <= 10
+    ? 'text-[var(--green)]'
+    : bing.position <= 30
+    ? 'text-[var(--yellow)]'
+    : 'text-[var(--text-secondary)]';
+
+  return (
+    <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
+      <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+        Bing Webmaster (7d)
+      </h4>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div>
+          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{bing.clicks}</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">Clicks</div>
+        </div>
+        <div>
+          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{bing.impressions.toLocaleString()}</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">Impressions</div>
+        </div>
+        <div>
+          <div className={`text-[14px] font-semibold ${positionColor}`}>{bing.position > 0 ? bing.position.toFixed(1) : '-'}</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">Avg Position</div>
+        </div>
+        <div>
+          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{(bing.ctr * 100).toFixed(1)}%</div>
+          <div className="text-[9px] text-[var(--text-tertiary)]">CTR</div>
+        </div>
+      </div>
+
+      {/* Top search queries */}
+      {bing.topQueries && bing.topQueries.length > 0 && (
+        <CollapsibleSection title="Bing Keywords" count={bing.topQueries.length}>
+          <div className="space-y-1">
+            {bing.topQueries.map((q, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
+                  {q.query}
+                </span>
+                <span className="text-[11px] font-medium text-[var(--green)] flex-shrink-0">
+                  {q.clicks}c
+                </span>
+                <span className="text-[11px] text-[var(--text-tertiary)] flex-shrink-0">
+                  {q.impressions.toLocaleString()}i
+                </span>
+                <span className={`text-[10px] flex-shrink-0 w-6 text-right ${q.position <= 10 ? 'text-[var(--green)]' : q.position <= 30 ? 'text-[var(--yellow)]' : 'text-[var(--text-tertiary)]'}`}>
+                  #{Math.round(q.position)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </CollapsibleSection>
+      )}
+
+      {/* Top pages */}
+      {bing.topPages && bing.topPages.length > 0 && (
+        <CollapsibleSection title="Bing Pages" count={bing.topPages.length}>
+          <div className="space-y-1">
+            {bing.topPages.map((p, i) => (
               <div key={i} className="flex items-center gap-2">
                 <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
                   {p.page}

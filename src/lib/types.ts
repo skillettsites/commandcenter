@@ -16,6 +16,7 @@ export interface Project {
   color: string;
   gaPropertyId?: string;
   gscSiteUrl?: string;
+  bingSiteUrl?: string;
 }
 
 export interface GscData {
@@ -26,6 +27,15 @@ export interface GscData {
   pagesIndexed: number | null;
   pagesSubmitted: number | null;
   pagesInSearch: number | null;
+  topPages: { page: string; clicks: number; impressions: number }[];
+  topQueries: { query: string; clicks: number; impressions: number; position: number }[];
+}
+
+export interface BingData {
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
   topPages: { page: string; clicks: number; impressions: number }[];
   topQueries: { query: string; clicks: number; impressions: number; position: number }[];
 }
