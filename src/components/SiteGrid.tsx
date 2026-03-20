@@ -237,15 +237,22 @@ function SiteRow({
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
 
+  const cycleRange = () => {
+    const next = chartRange === '24h' ? '1m' : chartRange === '1m' ? 'all' : '24h';
+    setChartRange(next);
+  };
+
+  // Fetch detail data when expanded or range changes
   useEffect(() => {
-    if (expanded && !detail) {
+    if (expanded) {
       setLoading(true);
       const fetches: Promise<void>[] = [];
 
       if (site.gaPropertyId) {
         fetches.push(
-          fetch(`/api/analytics/${site.id}`)
+          fetch(`/api/analytics/${site.id}?range=${chartRange}`)
             .then(res => res.ok ? res.json() : null)
             .then(data => { if (data) setDetail(data); })
             .catch(() => {})
@@ -263,13 +270,14 @@ function SiteRow({
 
       Promise.all(fetches).finally(() => setLoading(false));
     }
-  }, [expanded, detail, site.id, site.gaPropertyId, site.gscSiteUrl]);
+  }, [expanded, chartRange, site.id, site.gaPropertyId, site.gscSiteUrl]);
 
   // Reset detail when collapsed
   useEffect(() => {
     if (!expanded) {
       setDetail(null);
       setGscData(null);
+      setChartRange('24h');
     }
   }, [expanded]);
 
@@ -397,7 +405,7 @@ function SiteRow({
             {detail && (
               <>
                 {/* Mini bar chart - last 24h with user counts */}
-                <HourlyChart hourly={detail.hourly} color={site.color} />
+                <HourlyChart hourly={detail.hourly} color={site.color} range={chartRange} onCycleRange={cycleRange} />
 
                 {/* Traffic sources + top pages - stacked on mobile, side by side on wider */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -556,15 +564,24 @@ function GscStats({ gsc }: { gsc: GscData }) {
   );
 }
 
-function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string }) {
+const RANGE_LABEL: Record<string, string> = { '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
+
+function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyData[]; color: string; range: '24h' | '1m' | 'all'; onCycleRange: () => void }) {
   if (hourly.length === 0) {
-    return <p className="text-[11px] text-[var(--text-tertiary)]">No hourly data</p>;
+    return (
+      <div className="flex items-center justify-between">
+        <button onClick={(e) => { e.stopPropagation(); onCycleRange(); }} className="text-[10px] font-semibold text-[var(--accent)] uppercase tracking-wider hover:underline">
+          {RANGE_LABEL[range]} &rarr;
+        </button>
+        <p className="text-[11px] text-[var(--text-tertiary)]">No data</p>
+      </div>
+    );
   }
 
   const totalViews = hourly.reduce((sum, h) => sum + h.pageViews, 0);
   const totalUsers = hourly.reduce((sum, h) => sum + h.users, 0);
-  const last24 = hourly.slice(-24);
-  const maxViews = Math.max(...last24.map(h => h.pageViews), 1);
+  const data = range === '24h' ? hourly.slice(-24) : hourly;
+  const maxViews = Math.max(...data.map(h => h.pageViews), 1);
 
   const chartWidth = 300;
   const chartHeight = 120;
@@ -572,27 +589,42 @@ function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string })
   const innerW = chartWidth - pad.left - pad.right;
   const innerH = chartHeight - pad.top - pad.bottom;
 
-  const points = last24.map((h, i) => ({
-    x: pad.left + (last24.length === 1 ? innerW / 2 : (i / (last24.length - 1)) * innerW),
+  const points = data.map((h, i) => ({
+    x: pad.left + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW),
     y: pad.top + innerH - (h.pageViews / maxViews) * innerH,
     views: h.pageViews,
     users: h.users,
-    hour: h.dateHour.slice(-2),
+    label: h.dateHour,
   }));
 
   const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  const areaPath = `M${points[0].x},${pad.top + innerH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${pad.top + innerH} Z`;
-  const gradId = `hourly-${color.replace('#', '')}`;
+  const areaPath = points.length > 0 ? `M${points[0].x},${pad.top + innerH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${pad.top + innerH} Z` : '';
+  const gradId = `hourly-${color.replace('#', '')}-${range}`;
+
+  // Label spacing depends on range
+  const labelStep = range === '24h' ? 6 : range === '1m' ? 7 : Math.max(1, Math.floor(data.length / 6));
+
+  function formatLabel(raw: string): string {
+    if (range === '24h') {
+      const hour = raw.slice(-2);
+      return `${hour}:00`;
+    }
+    // date format: YYYYMMDD or YYYY-MM-DD
+    const clean = raw.replace(/-/g, '');
+    const day = clean.slice(6, 8);
+    const month = clean.slice(4, 6);
+    return `${parseInt(day)}/${parseInt(month)}`;
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-          Last 24 Hours
-        </h4>
+        <button onClick={(e) => { e.stopPropagation(); onCycleRange(); }} className="text-[10px] font-semibold text-[var(--accent)] uppercase tracking-wider hover:underline cursor-pointer">
+          {RANGE_LABEL[range]} &rarr;
+        </button>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-[var(--text-primary)]">{totalViews} views</span>
-          <span className="text-[11px] text-[var(--text-tertiary)]">{totalUsers} users</span>
+          <span className="text-[11px] font-medium text-[var(--text-primary)]">{totalViews.toLocaleString()} views</span>
+          <span className="text-[11px] text-[var(--text-tertiary)]">{totalUsers.toLocaleString()} users</span>
         </div>
       </div>
       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
@@ -602,12 +634,12 @@ function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string })
             <stop offset="100%" stopColor={color} stopOpacity={0.05} />
           </linearGradient>
         </defs>
-        <path d={areaPath} fill={`url(#${gradId})`} />
-        <path d={linePath} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((p, i) => (
+        {areaPath && <path d={areaPath} fill={`url(#${gradId})`} />}
+        {linePath && <path d={linePath} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />}
+        {data.length <= 31 && points.map((p, i) => (
           <g key={i}>
             <circle cx={p.x} cy={p.y} r={p.views > 0 ? 3 : 1.5} fill={color} opacity={p.views > 0 ? 1 : 0.3} />
-            {p.users > 0 && (
+            {p.users > 0 && data.length <= 24 && (
               <text x={p.x} y={p.y - 6} textAnchor="middle" fontSize="7" fill="currentColor" opacity={0.5} fontFamily="system-ui, sans-serif">
                 {p.users}
               </text>
@@ -615,10 +647,10 @@ function HourlyChart({ hourly, color }: { hourly: HourlyData[]; color: string })
           </g>
         ))}
         {points.map((p, i) => {
-          if (i % 6 !== 0) return null;
+          if (i % labelStep !== 0) return null;
           return (
             <text key={`label-${i}`} x={p.x} y={chartHeight - 2} textAnchor="middle" fontSize="7" fill="currentColor" opacity={0.35} fontFamily="system-ui, sans-serif">
-              {p.hour}:00
+              {formatLabel(p.label)}
             </text>
           );
         })}

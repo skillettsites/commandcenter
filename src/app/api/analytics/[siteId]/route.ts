@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
 
@@ -21,7 +21,7 @@ function getClient(): BetaAnalyticsDataClient | null {
 }
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ siteId: string }> }
 ) {
   const { siteId } = await params;
@@ -36,24 +36,38 @@ export async function GET(
   }
 
   const propertyId = `properties/${project.gaPropertyId}`;
+  const range = request.nextUrl.searchParams.get('range') || '24h';
+
+  // Determine date range and dimension based on range param
+  let startDate: string;
+  let timeDimension: string;
+  if (range === '1m') {
+    startDate = '30daysAgo';
+    timeDimension = 'date';
+  } else if (range === 'all') {
+    startDate = '2020-01-01';
+    timeDimension = 'date';
+  } else {
+    startDate = 'yesterday';
+    timeDimension = 'dateHour';
+  }
 
   try {
-    // Fetch hourly pageviews + users for last 24h, and top referral sources in parallel
     const [hourlyResponse, referralResponse, topPagesResponse] = await Promise.all([
       client.runReport({
         property: propertyId,
-        dateRanges: [{ startDate: 'yesterday', endDate: 'today' }],
-        dimensions: [{ name: 'dateHour' }],
+        dateRanges: [{ startDate, endDate: 'today' }],
+        dimensions: [{ name: timeDimension }],
         metrics: [
           { name: 'screenPageViews' },
           { name: 'activeUsers' },
           { name: 'sessions' },
         ],
-        orderBys: [{ dimension: { dimensionName: 'dateHour', orderType: 'ALPHANUMERIC' } }],
+        orderBys: [{ dimension: { dimensionName: timeDimension, orderType: 'ALPHANUMERIC' } }],
       }),
       client.runReport({
         property: propertyId,
-        dateRanges: [{ startDate: 'yesterday', endDate: 'today' }],
+        dateRanges: [{ startDate, endDate: 'today' }],
         dimensions: [{ name: 'sessionSource' }],
         metrics: [
           { name: 'sessions' },
@@ -64,7 +78,7 @@ export async function GET(
       }),
       client.runReport({
         property: propertyId,
-        dateRanges: [{ startDate: 'yesterday', endDate: 'today' }],
+        dateRanges: [{ startDate, endDate: 'today' }],
         dimensions: [{ name: 'pagePath' }],
         metrics: [
           { name: 'screenPageViews' },
