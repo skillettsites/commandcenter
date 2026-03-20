@@ -47,8 +47,8 @@ export async function GET(
       'Content-Type': 'application/json',
     };
 
-    // Fetch search analytics (last 7 days) and sitemaps in parallel
-    const [searchRes, sitemapRes] = await Promise.all([
+    // Fetch search analytics (7d aggregate + 28d by page) and sitemaps in parallel
+    const [searchRes, pageRes, sitemapRes] = await Promise.all([
       fetch(
         `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
         {
@@ -58,6 +58,19 @@ export async function GET(
             startDate: getDateString(-7),
             endDate: getDateString(-1),
             dimensions: [],
+          }),
+        }
+      ),
+      fetch(
+        `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            startDate: getDateString(-28),
+            endDate: getDateString(-1),
+            dimensions: ['page'],
+            rowLimit: 1000,
           }),
         }
       ),
@@ -89,6 +102,23 @@ export async function GET(
       }
     }
 
+    // Count pages appearing in search (28d) and get top pages
+    let pagesInSearch: number | null = null;
+    let topPages: { page: string; clicks: number; impressions: number }[] = [];
+    if (pageRes.ok) {
+      const pageData = await pageRes.json();
+      const rows = pageData.rows ?? [];
+      pagesInSearch = rows.length;
+      topPages = rows
+        .sort((a: { clicks: number }, b: { clicks: number }) => b.clicks - a.clicks)
+        .slice(0, 10)
+        .map((r: { keys: string[]; clicks: number; impressions: number }) => ({
+          page: r.keys[0].replace(project.url, '').replace(/^https?:\/\/[^/]+/, '') || '/',
+          clicks: r.clicks,
+          impressions: r.impressions,
+        }));
+    }
+
     let pagesIndexed: number | null = null;
     let pagesSubmitted: number | null = null;
     if (sitemapRes.ok) {
@@ -106,7 +136,7 @@ export async function GET(
       console.error(`GSC sitemap error for ${siteId}: ${sitemapRes.status}`);
     }
 
-    const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted };
+    const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted, pagesInSearch, topPages };
     return NextResponse.json(result);
   } catch (err) {
     console.error(`GSC error for ${siteId}:`, err);

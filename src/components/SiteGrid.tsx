@@ -431,24 +431,46 @@ function GscStats({ gsc }: { gsc: GscData }) {
           <div className="text-[9px] text-[var(--text-tertiary)]">CTR</div>
         </div>
       </div>
-      {gsc.pagesIndexed !== null && gsc.pagesSubmitted !== null && (
+      {(gsc.pagesInSearch !== null || (gsc.pagesSubmitted !== null && gsc.pagesSubmitted > 0)) && (
         <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
           <div className="flex items-center justify-between">
             <span className="text-[11px] text-[var(--text-secondary)]">
-              Pages indexed
+              Pages in search (28d)
             </span>
             <span className="text-[11px] font-medium text-[var(--text-primary)]">
-              {gsc.pagesIndexed} / {gsc.pagesSubmitted}
+              {gsc.pagesInSearch ?? 0}{gsc.pagesSubmitted ? ` / ${gsc.pagesSubmitted.toLocaleString()} submitted` : ''}
             </span>
           </div>
-          {gsc.pagesSubmitted > 0 && (
+          {gsc.pagesSubmitted && gsc.pagesSubmitted > 0 && (
             <div className="mt-1 h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
               <div
                 className="h-full rounded-full bg-[var(--green)]"
-                style={{ width: `${Math.min((gsc.pagesIndexed / gsc.pagesSubmitted) * 100, 100)}%` }}
+                style={{ width: `${Math.min(((gsc.pagesInSearch ?? 0) / gsc.pagesSubmitted) * 100, 100)}%` }}
               />
             </div>
           )}
+        </div>
+      )}
+      {gsc.topPages && gsc.topPages.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+          <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+            Top Search Pages (28d)
+          </h4>
+          <div className="space-y-1">
+            {gsc.topPages.map((p, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-[11px] text-[var(--text-secondary)] truncate flex-1 min-w-0">
+                  {p.page}
+                </span>
+                <span className="text-[11px] font-medium text-[var(--green)] flex-shrink-0">
+                  {p.clicks}c
+                </span>
+                <span className="text-[11px] text-[var(--text-tertiary)] flex-shrink-0">
+                  {p.impressions.toLocaleString()}i
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
