@@ -13,6 +13,8 @@ interface SiteData {
   responseTime: number | null;
   visitors: number | null;
   pageViews: number | null;
+  totalVisitors: number | null;
+  monthVisitors: number | null;
   gaPropertyId?: string;
   gscSiteUrl?: string;
 }
@@ -51,6 +53,8 @@ export default function SiteGrid() {
         responseTime: null,
         visitors: null,
         pageViews: null,
+        totalVisitors: null,
+        monthVisitors: null,
       }))
   );
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -87,7 +91,13 @@ export default function SiteGrid() {
             prev.map(site => {
               const stats = data.find(d => d.siteId === site.id);
               if (stats) {
-                return { ...site, visitors: stats.activeUsers, pageViews: stats.pageViews };
+                return {
+                  ...site,
+                  visitors: stats.activeUsers,
+                  pageViews: stats.pageViews,
+                  totalVisitors: stats.totalVisitors,
+                  monthVisitors: stats.monthVisitors,
+                };
               }
               return site;
             })
@@ -119,6 +129,8 @@ export default function SiteGrid() {
   const checking = sites.some(s => s.status === 'checking');
   const totalVisitors = sites.reduce((sum, s) => sum + (s.visitors ?? 0), 0);
   const totalPageViews = sites.reduce((sum, s) => sum + (s.pageViews ?? 0), 0);
+  const allTimeVisitors = sites.reduce((sum, s) => sum + (s.totalVisitors ?? 0), 0);
+  const monthlyVisitors = sites.reduce((sum, s) => sum + (s.monthVisitors ?? 0), 0);
 
   return (
     <div className="space-y-2">
@@ -139,14 +151,19 @@ export default function SiteGrid() {
           </svg>
         </div>
         <div className="flex items-center gap-3">
-          {totalVisitors > 0 && (
+          {allTimeVisitors > 0 && (
             <span className="text-[13px] font-medium text-[var(--text-primary)]">
-              {totalVisitors} visitors
+              {allTimeVisitors.toLocaleString()} total
             </span>
           )}
-          {totalPageViews > 0 && (
+          {monthlyVisitors > 0 && (
+            <span className="text-[13px] text-[var(--text-secondary)]">
+              {monthlyVisitors.toLocaleString()} month
+            </span>
+          )}
+          {totalVisitors > 0 && (
             <span className="text-[13px] text-[var(--text-tertiary)]">
-              {totalPageViews} views
+              {totalVisitors} today
             </span>
           )}
           {checking ? (
@@ -290,6 +307,22 @@ function SiteRow({
 
           {/* Stats */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            {site.totalVisitors !== null && site.totalVisitors > 0 && (
+              <div className="text-right">
+                <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                  {site.totalVisitors.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">total</span>
+              </div>
+            )}
+            {site.monthVisitors !== null && site.monthVisitors > 0 && (
+              <div className="text-right">
+                <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+                  {site.monthVisitors.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">month</span>
+              </div>
+            )}
             <div className="text-right">
               <span className={`text-[13px] font-medium ${
                 site.visitors === null ? 'text-[var(--text-tertiary)]' :
@@ -297,7 +330,7 @@ function SiteRow({
               }`}>
                 {site.visitors === null ? '-' : site.visitors}
               </span>
-              <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">vis</span>
+              <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">today</span>
             </div>
             <div className="text-right">
               <span className={`text-[13px] font-medium ${

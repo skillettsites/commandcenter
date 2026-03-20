@@ -35,6 +35,8 @@ export interface AnalyticsResult {
   activeUsers: number;
   sessions: number;
   pageViews: number;
+  totalVisitors: number;
+  monthVisitors: number;
 }
 
 export interface HealthResult {
