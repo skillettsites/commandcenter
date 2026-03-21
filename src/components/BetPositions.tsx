@@ -60,6 +60,8 @@ export default function BetPositions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchBets() {
@@ -97,6 +99,27 @@ export default function BetPositions() {
     const interval = setInterval(fetchLiveScores, 30000);
     return () => clearInterval(interval);
   }, [collapsed, fetchLiveScores]);
+
+  const syncFromSmarkets = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch('https://aibetfinder.com/api/sync-positions');
+      const json = await res.json();
+      if (res.ok) {
+        setSyncMsg(json.message);
+        // Refetch bets after sync
+        const betsRes = await fetch('https://aibetfinder.com/api/bets');
+        if (betsRes.ok) setData(await betsRes.json());
+      } else {
+        setSyncMsg(json.error || 'Sync failed');
+      }
+    } catch {
+      setSyncMsg('Could not reach Smarkets sync');
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(null), 5000);
+  };
 
   const hasLive = liveScores.some(s => s.state === 'live');
 
@@ -146,7 +169,16 @@ export default function BetPositions() {
           <div className="card p-3" style={{ borderLeft: '3px solid #F43F5E' }}>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[13px] font-semibold text-[var(--text-primary)]">AI Bet Finder</span>
-              <a href="https://aibetfinder.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-[var(--accent)]">Open</a>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={syncFromSmarkets}
+                  disabled={syncing}
+                  className="text-[11px] text-[var(--accent)] hover:underline cursor-pointer disabled:opacity-50"
+                >
+                  {syncing ? 'Syncing...' : 'Sync'}
+                </button>
+                <a href="https://aibetfinder.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-[var(--accent)]">Open</a>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <div>
@@ -167,6 +199,13 @@ export default function BetPositions() {
               )}
             </div>
           </div>
+
+          {/* Sync message */}
+          {syncMsg && (
+            <div className="px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] text-[11px] text-[var(--text-secondary)]">
+              {syncMsg}
+            </div>
+          )}
 
           {/* Live Scores */}
           {liveScores.length > 0 && (
