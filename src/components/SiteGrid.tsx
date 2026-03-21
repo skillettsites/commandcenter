@@ -284,7 +284,7 @@ function SiteRow({
       setGscData(null);
       setBingData(null);
       setSearchStats(null);
-      setChartRange('24h');
+      setChartRange('today');
     }
   }, [expanded]);
 
