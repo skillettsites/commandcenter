@@ -61,6 +61,18 @@ export default function SiteGrid() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [sortMode, setSortMode] = useState<'most-viewed' | 'last-viewed'>('most-viewed');
+  const [lastViewed, setLastViewed] = useState<Record<string, number>>({});
+
+  // Load last-viewed timestamps from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('ays_last_viewed');
+      if (stored) setLastViewed(JSON.parse(stored));
+    } catch {
+      // Ignore
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchHealth() {
@@ -113,12 +125,19 @@ export default function SiteGrid() {
     fetchAnalytics();
   }, []);
 
-  // Sort by visitors descending (null/0 at bottom)
+  // Sort sites based on selected mode
   const sortedSites = [...sites].sort((a, b) => {
+    if (sortMode === 'last-viewed') {
+      const aTime = lastViewed[a.id] ?? 0;
+      const bTime = lastViewed[b.id] ?? 0;
+      if (bTime !== aTime) return bTime - aTime;
+      // Fallback to visitors
+      return (b.visitors ?? 0) - (a.visitors ?? 0);
+    }
+    // Most viewed: by visitors descending
     const aVis = a.visitors ?? 0;
     const bVis = b.visitors ?? 0;
     if (bVis !== aVis) return bVis - aVis;
-    // Secondary sort by page views
     return (b.pageViews ?? 0) - (a.pageViews ?? 0);
   });
 
@@ -177,6 +196,32 @@ export default function SiteGrid() {
         </div>
       </div>
 
+      {/* Sort toggle */}
+      {!collapsed && (
+        <div className="flex gap-1 px-1">
+          <button
+            onClick={() => setSortMode('most-viewed')}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+              sortMode === 'most-viewed'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] active:opacity-70'
+            }`}
+          >
+            Most Viewed
+          </button>
+          <button
+            onClick={() => setSortMode('last-viewed')}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+              sortMode === 'last-viewed'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] active:opacity-70'
+            }`}
+          >
+            Last Viewed
+          </button>
+        </div>
+      )}
+
       {/* Compact list view (expanded) */}
       {!collapsed && (
         <div className="card overflow-hidden divide-y divide-[var(--border-light)] fade-in">
@@ -185,7 +230,15 @@ export default function SiteGrid() {
               key={site.id}
               site={site}
               expanded={expanded === site.id}
-              onToggle={() => setExpanded(expanded === site.id ? null : site.id)}
+              onToggle={() => {
+                const isExpanding = expanded !== site.id;
+                setExpanded(isExpanding ? site.id : null);
+                if (isExpanding) {
+                  const updated = { ...lastViewed, [site.id]: Date.now() };
+                  setLastViewed(updated);
+                  try { localStorage.setItem('ays_last_viewed', JSON.stringify(updated)); } catch {}
+                }
+              }}
             />
           ))}
           {hasMore && (

@@ -14,6 +14,8 @@ export const projects: Project[] = [
   { id: 'davidskillett', name: 'DavidSkillett', url: 'https://davidskillett.com', color: '#6366F1', gaPropertyId: '528477374', gscSiteUrl: 'sc-domain:davidskillett.com' },
   { id: 'thebesttours', name: 'TheBestTours', url: 'https://the-best-tours.com', color: '#14B8A6' },
   { id: 'daveknowsai', name: 'DaveKnowsAI', url: 'https://daveknowsai.com', color: '#A855F7' },
+  { id: 'askyourstay', name: 'AskYourStay', url: 'https://askyourstay.com', color: '#0EA5E9', gscSiteUrl: 'sc-domain:askyourstay.com' },
+  { id: 'aicareerswap', name: 'AICareerSwap', url: 'https://aicareerswap.com', color: '#F472B6', gscSiteUrl: 'sc-domain:aicareerswap.com' },
   { id: 'dashboard', name: 'Dashboard', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
 ];
