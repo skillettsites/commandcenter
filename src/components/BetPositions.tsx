@@ -92,6 +92,24 @@ function describeBet(bet: PlacedBet): string {
   return `${match ? match + ' - ' : ''}${sel}`;
 }
 
+function formatMatchTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today.getTime() + 86400000);
+  const matchDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  if (matchDay.getTime() === today.getTime()) return `Today ${time}`;
+  if (matchDay.getTime() === tomorrow.getTime()) return `Tomorrow ${time}`;
+
+  const yesterday = new Date(today.getTime() - 86400000);
+  if (matchDay.getTime() === yesterday.getTime()) return `Yesterday ${time}`;
+
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ` ${time}`;
+}
+
 function getBetOutlook(bet: PlacedBet, liveScores: LiveScore[]): { outlook: BetOutlook; score: LiveScore | null; projectedPnl: number } {
   const score = liveScores.find(s => s.linkedBetIds.includes(bet.id));
 
@@ -288,9 +306,12 @@ export default function BetPositions() {
                 <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">
                   {describeBet(bet)}
                 </span>
-                <span className={`text-[11px] font-bold shrink-0 ml-2 ${outlookColor(outlook)}`}>
-                  {outlookLabel(outlook)}
-                </span>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                  <span className="text-[10px] text-[var(--text-tertiary)]">{formatMatchTime(bet.placedAt)}</span>
+                  <span className={`text-[11px] font-bold ${outlookColor(outlook)}`}>
+                    {outlookLabel(outlook)}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
