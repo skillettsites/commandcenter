@@ -124,7 +124,7 @@ export const dividendSchedules: DividendSchedule[] = [
     holdingId: 'fidelity-enhanced',
     holdingName: 'Fidelity Enhanced Income',
     holdingType: 'fund',
-    annualYieldPercent: 5.5,
+    annualYieldPercent: 7.54, // Trustnet verified 21 Mar 2026
     frequency: 'monthly',
     paysDividend: true,
     paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
@@ -133,7 +133,7 @@ export const dividendSchedules: DividendSchedule[] = [
     holdingId: 'ubs-global',
     holdingName: 'UBS Global Enhanced Eq Income',
     holdingType: 'fund',
-    annualYieldPercent: 7.5,
+    annualYieldPercent: 7.2, // HL factsheet verified 21 Mar 2026
     frequency: 'quarterly',
     paysDividend: true,
     paymentMonths: [3, 6, 9, 12], // Mar, Jun, Sep, Dec
@@ -142,10 +142,10 @@ export const dividendSchedules: DividendSchedule[] = [
     holdingId: 'aegon-high-yield',
     holdingName: 'Aegon High Yield Bond',
     holdingType: 'fund',
-    annualYieldPercent: 5.0,
-    frequency: 'quarterly',
+    annualYieldPercent: 7.27, // AI scraped from Trustnet, verified 21 Mar 2026
+    frequency: 'monthly', // actually pays monthly per Trustnet data
     paysDividend: true,
-    paymentMonths: [3, 6, 9, 12], // Mar, Jun, Sep, Dec
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
   },
   {
     holdingId: 'NVDA',
