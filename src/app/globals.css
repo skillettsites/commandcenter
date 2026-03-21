@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Dark theme (default) */
 :root {
   --bg-primary: #000000;

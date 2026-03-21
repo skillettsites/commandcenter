@@ -13,6 +13,7 @@ export interface StockHolding {
 export interface FundHolding {
   id: string;
   name: string;
+  sedol: string; // SEDOL identifier for HL lookups
   yahooSymbol: string; // Yahoo Finance ticker for live price lookup
   units: number; // estimated units held
   currentValue: number; // GBP fallback if live price unavailable
@@ -47,6 +48,7 @@ export interface DividendSchedule {
 export const stockHoldings: StockHolding[] = [
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281, account: 'ISA', currency: 'USD' },
   { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 108, costBasis: 8150, account: 'ISA', currency: 'USD' },
+  { symbol: 'JEPQ', name: 'JEPQ', shares: 41, costBasis: 813, account: 'ISA', currency: 'USD' },
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4463, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15089, account: 'F&S', currency: 'USD' },
 ];
@@ -55,35 +57,48 @@ export const fundHoldings: FundHolding[] = [
   {
     id: 'fidelity-enhanced',
     name: 'Fidelity Enhanced Income',
+    sedol: 'BD1NLK5',
     yahooSymbol: '0P0000XMHQ.L',
-    units: 50031, // estimated from ~£55,034 value / ~£1.10 unit price
+    units: 61871.64,
     currentValue: 55034,
-    costBasis: 50000,
+    costBasis: 48076,
     account: 'ISA',
   },
   {
     id: 'ubs-global',
     name: 'UBS Global Enhanced Eq Income',
+    sedol: 'B3LBSQ4',
     yahooSymbol: '0P00012V5G.L',
-    units: 4750, // estimated from ~£42,114 value / ~£8.87 unit price
+    units: 118798.032,
     currentValue: 42114,
-    costBasis: 40000,
+    costBasis: 38221,
     account: 'ISA',
   },
   {
     id: 'aegon-high-yield',
     name: 'Aegon High Yield Bond',
+    sedol: 'B1FQYP9',
     yahooSymbol: '0P0000HDPV.L',
-    units: 19810, // estimated from ~£9,905 value / ~£0.50 unit price
+    units: 10848.34,
     currentValue: 9905,
-    costBasis: 10000,
+    costBasis: 9961,
+    account: 'ISA',
+  },
+  {
+    id: 'schroder-high-yield',
+    name: 'Schroder High Yield Opps',
+    sedol: '',
+    yahooSymbol: '',
+    units: 2596.55,
+    currentValue: 1222,
+    costBasis: 1222,
     account: 'ISA',
   },
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
   { account: 'ISA Cash', balance: 73240 },
-  { account: 'F&S Cash', balance: 134 },
+  { account: 'F&S Cash', balance: 132 },
 ];
 
 export const etradeValue = 148433; // RSUs, manually updated
@@ -149,6 +164,15 @@ export const dividendSchedules: DividendSchedule[] = [
     frequency: 'none',
     paysDividend: false,
     paymentMonths: [],
+  },
+  {
+    holdingId: 'JEPQ',
+    holdingName: 'JEPQ',
+    holdingType: 'stock',
+    annualYieldPercent: 10.0,
+    frequency: 'monthly',
+    paysDividend: true,
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
   },
   {
     holdingId: 'PLTR',

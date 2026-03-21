@@ -9,8 +9,49 @@ import {
   dividendSchedules,
   jepqTarget,
 } from '@/lib/portfolio';
+import { getServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+
+// Cached HL dividend data from Supabase
+interface HLDistribution {
+  date: string;
+  amount: number;
+  type: string;
+}
+
+interface HLFundDividendCache {
+  fund_id: string;
+  fund_name: string;
+  yield_percent: number | null;
+  unit_price: number | null;
+  distributions: HLDistribution[];
+}
+
+async function fetchHLDividendCache(): Promise<Map<string, HLFundDividendCache>> {
+  const map = new Map<string, HLFundDividendCache>();
+  try {
+    const supabase = getServiceClient();
+    const { data, error } = await supabase
+      .from('fund_dividends')
+      .select('fund_id, fund_name, yield_percent, unit_price, distributions');
+
+    if (error || !data) return map;
+
+    for (const row of data) {
+      map.set(row.fund_id, {
+        fund_id: row.fund_id,
+        fund_name: row.fund_name,
+        yield_percent: row.yield_percent ? Number(row.yield_percent) : null,
+        unit_price: row.unit_price ? Number(row.unit_price) : null,
+        distributions: (row.distributions as HLDistribution[]) || [],
+      });
+    }
+  } catch {
+    // If Supabase is unavailable, return empty map; Yahoo/schedule fallback will be used
+  }
+  return map;
+}
 
 interface YahooChartResult {
   chart?: {
