@@ -159,13 +159,52 @@ async function generateDividendData(
     source: string;
     amount: number;
     status: 'received' | 'forecast';
+    dataSource: 'hl_scraped' | 'yahoo' | 'estimated';
   }
 
   const payments: DividendPayment[] = [];
 
-  // Fetch real dividend history for stocks from Yahoo Finance
+  // Step 1: Fetch real HL dividend data from Supabase cache
+  const hlCache = await fetchHLDividendCache();
+
+  // Step 2: Process fund dividends from HL scraped data first (preferred source)
+  const fundsWithHLData = new Set<string>();
+
+  for (const fund of fundHoldings) {
+    const hlData = hlCache.get(fund.id);
+    if (!hlData || hlData.distributions.length === 0) continue;
+
+    fundsWithHLData.add(fund.id);
+
+    for (const dist of hlData.distributions) {
+      const d = new Date(dist.date);
+      if (isNaN(d.getTime())) continue;
+
+      const month = d.getMonth() + 1;
+      const year = d.getFullYear();
+      const dateStr = `${year}-${String(month).padStart(2, '0')}`;
+      const isPast = year < currentYear || (year === currentYear && month <= currentMonth);
+
+      // Calculate actual payment: distribution amount per unit * units held
+      const totalGBP = dist.amount * fund.units;
+
+      payments.push({
+        date: dateStr,
+        month,
+        year,
+        source: fund.name,
+        amount: Math.round(totalGBP * 100) / 100,
+        status: isPast ? 'received' : 'forecast',
+        dataSource: 'hl_scraped',
+      });
+    }
+  }
+
+  // Step 3: Fetch Yahoo Finance dividend history for stocks (and funds without HL data)
   const stockSymbols = stockHoldings.filter(s => s.shares > 0).map(s => s.symbol);
-  const fundSymbolMap = fundHoldings.filter(f => f.yahooSymbol).map(f => ({ id: f.id, name: f.name, symbol: f.yahooSymbol, units: f.units }));
+  const fundSymbolMap = fundHoldings
+    .filter(f => f.yahooSymbol && !fundsWithHLData.has(f.id))
+    .map(f => ({ id: f.id, name: f.name, symbol: f.yahooSymbol, units: f.units }));
 
   const allSymbols = [
     ...stockSymbols.map(s => ({ symbol: s, type: 'stock' as const })),
@@ -197,11 +236,12 @@ async function generateDividendData(
         source: holding.name,
         amount: Math.round(totalGBP * 100) / 100,
         status: 'received',
+        dataSource: 'yahoo',
       });
     }
   }
 
-  // Process fund dividends (reported per unit, multiply by units held)
+  // Process fund dividends from Yahoo (only for funds without HL data)
   for (let i = 0; i < fundSymbolMap.length; i++) {
     const fund = fundSymbolMap[i];
     const divs = divHistories[stockSymbols.length + i];
@@ -213,7 +253,6 @@ async function generateDividendData(
       const dateStr = `${year}-${String(month).padStart(2, '0')}`;
 
       // Fund divs are already in GBP (pence per unit from Yahoo for .L funds)
-      // Yahoo returns in the fund's currency, for GBP funds it's already GBP
       const totalGBP = div.amount * fund.units;
 
       payments.push({
@@ -223,11 +262,12 @@ async function generateDividendData(
         source: fund.name,
         amount: Math.round(totalGBP * 100) / 100,
         status: 'received',
+        dataSource: 'yahoo',
       });
     }
   }
 
-  // For future months, use the most recent dividend per holding as forecast
+  // Step 4: Build forecast data from most recent real distribution amounts
   const latestBySource: Record<string, number> = {};
   const freqBySource: Record<string, number[]> = {};
   for (const p of payments) {
@@ -236,7 +276,7 @@ async function generateDividendData(
     if (!freqBySource[p.source].includes(p.month)) freqBySource[p.source].push(p.month);
   }
 
-  // Also add schedule-based forecasts for holdings with no Yahoo dividend data
+  // Step 5: Schedule-based forecasts for holdings with no real data at all
   for (const schedule of dividendSchedules) {
     if (!schedule.paysDividend) continue;
     if (latestBySource[schedule.holdingName]) continue; // already have real data
@@ -265,11 +305,12 @@ async function generateDividendData(
         source: schedule.holdingName,
         amount: Math.round(paymentAmount * 100) / 100,
         status: isPast ? 'received' : 'forecast',
+        dataSource: 'estimated',
       });
     }
   }
 
-  // Add forecasts for the next 9 months based on latest known dividend
+  // Step 6: Add forecasts for the next 9 months based on latest known dividend
   for (const [source, lastAmount] of Object.entries(latestBySource)) {
     const months = freqBySource[source] || [];
     if (months.length === 0) continue;
@@ -293,6 +334,7 @@ async function generateDividendData(
         source,
         amount: lastAmount,
         status: 'forecast',
+        dataSource: 'estimated',
       });
     }
   }
@@ -317,6 +359,15 @@ async function generateDividendData(
     .filter(p => p.status === 'received' && new Date(p.date + '-15') >= oneYearAgo)
     .reduce((sum, p) => sum + p.amount, 0);
 
+  // Include HL yield data in the response for transparency
+  const hlYields: Record<string, { yield_percent: number | null; unit_price: number | null }> = {};
+  for (const [fundId, hlData] of hlCache) {
+    hlYields[fundId] = {
+      yield_percent: hlData.yield_percent,
+      unit_price: hlData.unit_price,
+    };
+  }
+
   return {
     payments,
     monthlyTotals,
@@ -324,6 +375,7 @@ async function generateDividendData(
     thisMonthExpected: Math.round(thisMonth.forecast * 100) / 100,
     annualReceived: Math.round(annualReceived),
     monthlyAverage: Math.round(annualReceived / 12),
+    hlYields,
     jepqTarget: {
       name: jepqTarget.name,
       capital: jepqTarget.estimatedDeployableCapital,
