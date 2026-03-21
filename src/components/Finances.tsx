@@ -354,6 +354,7 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
         })}
       </svg>
     </div>
+    </div>
   );
 }
 
