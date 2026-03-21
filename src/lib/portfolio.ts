@@ -27,6 +27,11 @@ export interface PropertyHolding {
   value: number;
   mortgage: number;
   type: 'keeping' | 'selling';
+  autoValue?: boolean;
+  address?: string;
+  postcode?: string;
+  premium?: 'upper' | 'mid' | 'lower';
+  premiumNotes?: string;
 }
 
 export interface CashHolding {
@@ -120,8 +125,30 @@ export const etradeHoldings = {
 export const etradeValue = 134202; // vested only, as at 21 Mar 2026
 
 export const propertyHoldings: PropertyHolding[] = [
-  { id: 'binnacle', name: '604 Binnacle House', value: 470000, mortgage: 270000, type: 'keeping' },
-  { id: 'cordage', name: '505 Cordage', value: 350000, mortgage: 255000, type: 'keeping' },
+  {
+    id: 'binnacle',
+    name: '604 Binnacle House',
+    value: 470000,
+    mortgage: 270000,
+    type: 'keeping',
+    autoValue: true,
+    address: '604 Binnacle House, 10 Cobblestone Square, London E1W 3AR',
+    postcode: 'E1W 3AR',
+    premium: 'upper',
+    premiumNotes: 'Studio with massive terrace, south-facing, top floor, premium building',
+  },
+  {
+    id: 'cordage',
+    name: '505 Cordage',
+    value: 350000,
+    mortgage: 255000,
+    type: 'keeping',
+    autoValue: true,
+    address: '505 Cordage House, 21 Cobblestone Square, London E1W 3AQ',
+    postcode: 'E1W 3AQ',
+    premium: 'upper',
+    premiumNotes: 'Studio, high floor, nice view',
+  },
   { id: 'didcot', name: '9 Fen Violet, Didcot', value: 430000, mortgage: 268270, type: 'selling' },
   { id: 'newbury', name: '6 Hennessey, Newbury', value: 530000, mortgage: 342248, type: 'selling' },
   { id: 'shoeburyness', name: 'Flat 5 Sandpipers, Shoeburyness', value: 350000, mortgage: 213503, type: 'selling' },

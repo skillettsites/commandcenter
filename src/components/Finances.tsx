@@ -42,6 +42,24 @@ interface PropertyData {
   type: 'keeping' | 'selling';
 }
 
+interface PropertyValuationData {
+  property_id: string;
+  name: string;
+  address: string;
+  user_value: number;
+  zoopla_estimate: number | null;
+  zoopla_low: number | null;
+  zoopla_high: number | null;
+  land_registry_comparables: Array<{
+    address: string;
+    price: number;
+    date: string;
+    propertyType: string;
+  }>;
+  fetched_at: string | null;
+  source: 'fresh' | 'cached' | 'unavailable';
+}
+
 interface DividendPayment {
   date: string;
   month: number;
@@ -521,6 +539,23 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
   const [expandedSection, setExpandedSection] = useState<Section | null>(null);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [valuations, setValuations] = useState<PropertyValuationData[]>([]);
+  const [valuationsLoading, setValuationsLoading] = useState(false);
+
+  const fetchValuations = useCallback(async () => {
+    setValuationsLoading(true);
+    try {
+      const res = await fetch('/api/finances/property-valuations');
+      if (res.ok) {
+        const json = await res.json();
+        setValuations(json.valuations || []);
+      }
+    } catch {
+      // Silently fail; valuations are supplementary
+    } finally {
+      setValuationsLoading(false);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -540,9 +575,10 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
 
   useEffect(() => {
     fetchData();
+    fetchValuations();
     const interval = setInterval(fetchData, 300000); // 5 minutes
     return () => clearInterval(interval);
-  }, [fetchData]);
+  }, [fetchData, fetchValuations]);
 
   const toggleSection = (section: Section) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -833,6 +869,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                     {keepingProperties.map((p) => {
                       const equity = p.value - p.mortgage;
                       const ltv = p.mortgage > 0 ? (p.mortgage / p.value) * 100 : 0;
+                      const valuation = valuations.find((v) => v.property_id === p.id);
                       return (
                         <div key={p.id} className="p-2 rounded-lg bg-[var(--bg-elevated)]">
                           <div className="flex items-center justify-between mb-1">
@@ -844,6 +881,61 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                             <span className="text-[10px] text-[var(--text-tertiary)]">Mortgage: {formatGBP(p.mortgage)}</span>
                             <span className="text-[10px] text-[var(--text-tertiary)]">LTV: {ltv.toFixed(0)}%</span>
                           </div>
+                          {/* Zoopla estimate */}
+                          {valuation && valuation.zoopla_estimate && (
+                            <div className="mt-1.5 pt-1.5 border-t border-[var(--border-light)]">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-[var(--text-tertiary)]">Zoopla estimate</span>
+                                <span className="text-[11px] font-medium text-[var(--accent)]">
+                                  {formatGBP(valuation.zoopla_estimate)}
+                                </span>
+                              </div>
+                              {valuation.zoopla_low && valuation.zoopla_high && (
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[9px] text-[var(--text-tertiary)]">Range</span>
+                                  <span className="text-[9px] text-[var(--text-tertiary)]">
+                                    {formatGBP(valuation.zoopla_low)} - {formatGBP(valuation.zoopla_high)}
+                                  </span>
+                                </div>
+                              )}
+                              {valuation.fetched_at && (
+                                <div className="text-[8px] text-[var(--text-tertiary)] mt-0.5">
+                                  Zoopla estimate, updated {new Date(valuation.fetched_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {/* Land Registry comparables */}
+                          {valuation && valuation.land_registry_comparables.length > 0 && (
+                            <div className="mt-1.5 pt-1.5 border-t border-[var(--border-light)]">
+                              <div className="text-[9px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+                                Recent sales nearby
+                              </div>
+                              <div className="space-y-0.5">
+                                {valuation.land_registry_comparables.slice(0, 5).map((comp, i) => (
+                                  <div key={i} className="flex items-center justify-between">
+                                    <span className="text-[9px] text-[var(--text-tertiary)] truncate max-w-[60%]">
+                                      {comp.address}
+                                    </span>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <span className="text-[9px] text-[var(--text-tertiary)]">
+                                        {new Date(comp.date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}
+                                      </span>
+                                      <span className="text-[10px] font-medium text-[var(--text-secondary)]">
+                                        {formatGBP(comp.price)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* Loading state */}
+                          {valuationsLoading && !valuation && (
+                            <div className="mt-1.5 pt-1.5 border-t border-[var(--border-light)]">
+                              <span className="text-[9px] text-[var(--text-tertiary)]">Loading estimates...</span>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
