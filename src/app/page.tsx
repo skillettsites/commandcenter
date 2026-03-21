@@ -1,7 +1,7 @@
 import DashboardHeader from '@/components/DashboardHeader';
 import AllSitesStats from '@/components/AllSitesStats';
 import SiteGrid from '@/components/SiteGrid';
-// import SearchActivity from '@/components/SearchActivity';
+import SearchActivity from '@/components/SearchActivity';
 import BetPositions from '@/components/BetPositions';
 import EmailList from '@/components/EmailList';
 import TaskList from '@/components/TaskList';
@@ -15,7 +15,7 @@ export default function Home() {
         <DashboardHeader />
         <AllSitesStats />
         <SiteGrid />
-        {/* <SearchActivity /> */}
+        <SearchActivity />
         <BetPositions />
         <EmailList />
         <TaskList />

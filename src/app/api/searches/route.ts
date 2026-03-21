@@ -156,8 +156,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(chartResults);
   }
 
-  // Default: return summary counts
-  const results: Record<string, { today: number; month: number }> = {};
+  // Default: return summary counts + recent searches
+  const results: Record<string, {
+    today: number;
+    month: number;
+    recent: Array<{ search_query: string; result_found: boolean; created_at: string }>;
+  }> = {};
 
   for (const siteId of sites) {
     const { count: todayCount } = await supabase
@@ -172,9 +176,17 @@ export async function GET(request: NextRequest) {
       .eq('site_id', siteId)
       .gte('created_at', monthStart);
 
+    const { data: recentRows } = await supabase
+      .from('searches')
+      .select('search_query, result_found, created_at')
+      .eq('site_id', siteId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
     results[siteId] = {
       today: todayCount ?? 0,
       month: monthCount ?? 0,
+      recent: recentRows ?? [],
     };
   }
 
