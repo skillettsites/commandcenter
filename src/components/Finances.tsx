@@ -21,8 +21,11 @@ interface FundData {
   currentValue: number;
   costBasis: number;
   account: string;
+  liveUnitPrice: number | null;
+  units: number;
   gainLoss: number;
   gainLossPercent: number;
+  isLive: boolean;
 }
 
 interface CashAccount {
@@ -38,6 +41,30 @@ interface PropertyData {
   type: 'keeping' | 'selling';
 }
 
+interface DividendPayment {
+  date: string;
+  month: number;
+  year: number;
+  source: string;
+  amount: number;
+  status: 'received' | 'forecast';
+}
+
+interface DividendData {
+  payments: DividendPayment[];
+  monthlyTotals: Record<string, { received: number; forecast: number }>;
+  thisMonthReceived: number;
+  thisMonthExpected: number;
+  annualEstimate: number;
+  monthlyEstimate: number;
+  jepqTarget: {
+    name: string;
+    capital: number;
+    yield: number;
+    monthlyIncome: number;
+  };
+}
+
 interface FinancesData {
   stocks: StockData[];
   funds: FundData[];
@@ -46,6 +73,7 @@ interface FinancesData {
   properties: PropertyData[];
   cash: CashAccount[];
   forexRate: number;
+  dividends: DividendData;
   totals: {
     stocks: number;
     funds: number;
@@ -59,7 +87,8 @@ interface FinancesData {
   timestamp: string;
 }
 
-type Section = 'investments' | 'properties' | 'cash' | 'breakdown';
+type Section = 'investments' | 'properties' | 'cash' | 'dividends';
+type DividendRange = 'month' | 'year' | 'all';
 
 function formatGBP(amount: number, compact = false): string {
   if (compact && Math.abs(amount) >= 1000) {
@@ -131,6 +160,284 @@ function BreakdownBar({ data }: { data: { label: string; value: number; color: s
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function DividendChart({ dividends, range }: { dividends: DividendData; range: DividendRange }) {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+
+  // Filter monthly totals based on range
+  const sortedDates = Object.keys(dividends.monthlyTotals).sort();
+  let filteredDates: string[];
+
+  if (range === 'month') {
+    const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    filteredDates = sortedDates.filter(d => d === currentDateStr);
+    // Show current month even if empty
+    if (filteredDates.length === 0) filteredDates = [currentDateStr];
+  } else if (range === 'year') {
+    filteredDates = sortedDates.filter(d => d.startsWith(String(currentYear)));
+  } else {
+    filteredDates = sortedDates;
+  }
+
+  if (filteredDates.length === 0) return null;
+
+  // Build bar data
+  const bars = filteredDates.map(date => {
+    const totals = dividends.monthlyTotals[date] || { received: 0, forecast: 0 };
+    const month = parseInt(date.split('-')[1]);
+    const year = parseInt(date.split('-')[0]);
+    return {
+      date,
+      label: MONTH_LABELS[month - 1] + (range === 'all' ? ` '${String(year).slice(2)}` : ''),
+      received: totals.received,
+      forecast: totals.forecast,
+      total: totals.received + totals.forecast,
+    };
+  });
+
+  const maxValue = Math.max(...bars.map(b => b.total), 1);
+  const chartWidth = 100; // percentage-based
+  const chartHeight = 120;
+  const barGap = 2;
+
+  // SVG chart
+  const svgWidth = 500;
+  const svgHeight = chartHeight;
+  const barWidth = Math.max(8, (svgWidth - 40) / bars.length - barGap);
+  const startX = 20;
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${svgWidth} ${svgHeight + 24}`}
+        className="w-full"
+        style={{ minWidth: bars.length > 6 ? `${bars.length * 50}px` : '100%' }}
+        preserveAspectRatio="xMinYMid meet"
+      >
+        {/* Y-axis guide lines */}
+        {[0.25, 0.5, 0.75, 1].map((frac) => {
+          const y = svgHeight - (frac * svgHeight);
+          return (
+            <g key={frac}>
+              <line x1={startX} y1={y} x2={svgWidth - 10} y2={y} stroke="var(--border-light)" strokeWidth={0.5} strokeDasharray="3,3" />
+              <text x={startX - 4} y={y + 3} textAnchor="end" fontSize={8} fill="var(--text-tertiary)">
+                £{Math.round(maxValue * frac).toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Bars */}
+        {bars.map((bar, i) => {
+          const x = startX + i * (barWidth + barGap);
+          const receivedH = (bar.received / maxValue) * svgHeight;
+          const forecastH = (bar.forecast / maxValue) * svgHeight;
+          const totalH = receivedH + forecastH;
+
+          return (
+            <g key={bar.date}>
+              {/* Forecast portion (lighter, on top) */}
+              {forecastH > 0 && (
+                <rect
+                  x={x}
+                  y={svgHeight - totalH}
+                  width={barWidth}
+                  height={forecastH}
+                  rx={2}
+                  fill="#30d158"
+                  opacity={0.3}
+                />
+              )}
+              {/* Received portion (solid, bottom) */}
+              {receivedH > 0 && (
+                <rect
+                  x={x}
+                  y={svgHeight - receivedH}
+                  width={barWidth}
+                  height={receivedH}
+                  rx={forecastH > 0 ? 0 : 2}
+                  fill="#30d158"
+                  opacity={0.85}
+                />
+              )}
+              {/* Amount label on top */}
+              {bar.total > 0 && (
+                <text
+                  x={x + barWidth / 2}
+                  y={svgHeight - totalH - 3}
+                  textAnchor="middle"
+                  fontSize={7}
+                  fill="var(--text-secondary)"
+                  fontWeight={500}
+                >
+                  £{Math.round(bar.total).toLocaleString()}
+                </text>
+              )}
+              {/* Month label */}
+              <text
+                x={x + barWidth / 2}
+                y={svgHeight + 14}
+                textAnchor="middle"
+                fontSize={8}
+                fill="var(--text-tertiary)"
+              >
+                {bar.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function DividendSection({ dividends }: { dividends: DividendData }) {
+  const [range, setRange] = useState<DividendRange>('year');
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+  // Filter payments for breakdown based on range
+  let filteredPayments = dividends.payments;
+  if (range === 'month') {
+    filteredPayments = dividends.payments.filter(p => p.date === currentDateStr);
+  } else if (range === 'year') {
+    filteredPayments = dividends.payments.filter(p => p.year === currentYear);
+  }
+
+  return (
+    <div className="px-3.5 pb-3 fade-in">
+      {/* Monthly income summary */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">This month</div>
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-medium text-[var(--green)]">
+              £{dividends.thisMonthReceived.toFixed(0)} received
+            </span>
+            {dividends.thisMonthExpected > 0 && (
+              <span className="text-[12px] text-[var(--text-tertiary)]">
+                + £{dividends.thisMonthExpected.toFixed(0)} expected
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">Est. annual</div>
+          <div className="text-[13px] font-medium text-[var(--text-primary)]">
+            £{dividends.annualEstimate.toLocaleString()}/yr
+          </div>
+          <div className="text-[10px] text-[var(--text-tertiary)]">
+            ~£{dividends.monthlyEstimate.toLocaleString()}/mo
+          </div>
+        </div>
+      </div>
+
+      {/* Range toggle */}
+      <div className="flex gap-1 mb-3">
+        {([['month', 'This Month'], ['year', 'Year'], ['all', 'All Time']] as [DividendRange, string][]).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setRange(key)}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+              range === key
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Chart */}
+      <DividendChart dividends={dividends} range={range} />
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-2 mb-3">
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-2 rounded-sm" style={{ backgroundColor: '#30d158', opacity: 0.85 }} />
+          <span className="text-[10px] text-[var(--text-tertiary)]">Received</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-3 h-2 rounded-sm" style={{ backgroundColor: '#30d158', opacity: 0.3 }} />
+          <span className="text-[10px] text-[var(--text-tertiary)]">Forecast</span>
+        </div>
+      </div>
+
+      {/* JEPQ target note */}
+      <div className="p-2 rounded-lg bg-[var(--bg-elevated)] mb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-medium text-[var(--orange)]">Target: {dividends.jepqTarget.name}</span>
+            <span className="text-[10px] text-[var(--text-tertiary)] ml-2">
+              {dividends.jepqTarget.yield}% yield, monthly
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="text-[12px] font-medium text-[var(--orange)]">
+              ~£{dividends.jepqTarget.monthlyIncome.toLocaleString()}/mo
+            </span>
+          </div>
+        </div>
+        <div className="text-[9px] text-[var(--text-tertiary)] mt-0.5">
+          Deploying ~£{(dividends.jepqTarget.capital / 1000).toFixed(0)}k after property sales + stock consolidation
+        </div>
+      </div>
+
+      {/* Expandable breakdown */}
+      <div>
+        <button
+          onClick={() => setShowBreakdown(!showBreakdown)}
+          className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+        >
+          <svg
+            className={`w-3 h-3 transition-transform duration-200 ${showBreakdown ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+          Payment breakdown ({filteredPayments.length} payments)
+        </button>
+
+        {showBreakdown && (
+          <div className="mt-2 space-y-0.5 max-h-[300px] overflow-y-auto fade-in">
+            {filteredPayments.map((p, i) => (
+              <div key={`${p.date}-${p.source}-${i}`} className="flex items-center justify-between py-1 px-2 rounded hover:bg-[var(--bg-elevated)]">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    p.status === 'received' ? 'bg-[var(--green)]' : 'bg-[var(--green)]/30'
+                  }`} />
+                  <span className="text-[10px] text-[var(--text-tertiary)] w-[52px] flex-shrink-0">
+                    {MONTH_LABELS[p.month - 1]} {p.year}
+                  </span>
+                  <span className="text-[11px] text-[var(--text-secondary)] truncate">{p.source}</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  <span className="text-[11px] font-medium text-[var(--text-primary)]">£{p.amount.toFixed(2)}</span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                    p.status === 'received'
+                      ? 'bg-[var(--green)]/10 text-[var(--green)]'
+                      : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)]'
+                  }`}>
+                    {p.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -323,7 +630,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                   {/* Funds */}
                   <div className="mb-3">
                     <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2 ml-3">
-                      Funds (manual values)
+                      Funds {data.funds.some(f => f.isLive) ? '(live prices)' : '(manual values)'}
                     </h4>
                     <div className="space-y-1.5 ml-3">
                       {data.funds.map((fund) => (
@@ -332,8 +639,15 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                             <div className="flex items-center gap-2">
                               <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">{fund.name}</span>
                               <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">{fund.account}</span>
+                              {fund.isLive && (
+                                <span className="text-[8px] px-1 py-0.5 rounded bg-[var(--green)]/10 text-[var(--green)]">LIVE</span>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-[var(--text-tertiary)]">{fund.units.toLocaleString()} units</span>
+                              {fund.liveUnitPrice !== null && (
+                                <span className="text-[10px] text-[var(--text-tertiary)]">@ £{fund.liveUnitPrice.toFixed(4)}</span>
+                              )}
                               <span className="text-[10px] text-[var(--text-tertiary)]">cost £{fund.costBasis.toLocaleString()}</span>
                             </div>
                           </div>
@@ -363,6 +677,36 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                     ))}
                   </div>
                 </div>
+              )}
+            </div>
+
+            {/* DIVIDENDS & INCOME SECTION */}
+            <div>
+              <div
+                onClick={() => toggleSection('dividends')}
+                className="px-3.5 py-2.5 cursor-pointer active:bg-[var(--bg-elevated)] transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-6 rounded-full flex-shrink-0 bg-[#30d158]" />
+                    <span className="text-[14px] font-medium text-[var(--text-primary)]">Dividends &amp; Income</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-medium text-[var(--text-primary)]">
+                      ~£{data.dividends.monthlyEstimate.toLocaleString()}/mo
+                    </span>
+                    <svg
+                      className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ${expandedSection === 'dividends' ? 'rotate-90' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {expandedSection === 'dividends' && data.dividends && (
+                <DividendSection dividends={data.dividends} />
               )}
             </div>
 
