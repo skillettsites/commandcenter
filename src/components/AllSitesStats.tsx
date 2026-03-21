@@ -41,11 +41,11 @@ interface AggregatedStats {
   sitesToday: SiteTodayData[];
 }
 
-const RANGE_LABEL: Record<string, string> = { '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
+const RANGE_LABEL: Record<string, string> = { 'today': 'Today', '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
 
 export default function AllSitesStats() {
   const [expanded, setExpanded] = useState(true);
-  const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
+  const [chartRange, setChartRange] = useState<'today' | '24h' | '1m' | 'all'>('today');
   const [data, setData] = useState<CombinedData | null>(null);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
@@ -104,7 +104,7 @@ export default function AllSitesStats() {
   }, [expanded, chartRange]);
 
   const cycleRange = () => {
-    setChartRange(prev => prev === '24h' ? '1m' : prev === '1m' ? 'all' : '24h');
+    setChartRange(prev => prev === 'today' ? '24h' : prev === '24h' ? '1m' : prev === '1m' ? 'all' : 'today');
   };
 
   return (
@@ -219,7 +219,7 @@ function StatBox({ label, value, sub }: { label: string; value: number; sub?: st
   );
 }
 
-function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; range: '24h' | '1m' | 'all'; onCycleRange: () => void }) {
+function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; range: 'today' | '24h' | '1m' | 'all'; onCycleRange: () => void }) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   // Reset selection when range changes
@@ -238,7 +238,7 @@ function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; 
 
   const totalViews = hourly.reduce((sum, h) => sum + h.pageViews, 0);
   const totalUsers = hourly.reduce((sum, h) => sum + h.users, 0);
-  const displayData = range === '24h' ? hourly.slice(-24) : hourly;
+  const displayData = (range === '24h' || range === 'today') ? hourly.slice(-24) : hourly;
   const maxViews = Math.max(...displayData.map(h => h.pageViews), 1);
 
   const chartWidth = 300;
@@ -260,10 +260,10 @@ function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; 
     ? `M${points[0].x},${pad.top + innerH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${pad.top + innerH} Z`
     : '';
 
-  const labelStep = range === '24h' ? 6 : range === '1m' ? 7 : Math.max(1, Math.floor(displayData.length / 6));
+  const labelStep = (range === '24h' || range === 'today') ? 6 : range === '1m' ? 7 : Math.max(1, Math.floor(displayData.length / 6));
 
   function formatLabel(raw: string): string {
-    if (range === '24h') {
+    if (range === '24h' || range === 'today') {
       const hour = raw.slice(-2);
       return `${hour}:00`;
     }
@@ -274,7 +274,7 @@ function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; 
   }
 
   function formatTooltip(raw: string): string {
-    if (range === '24h') {
+    if (range === '24h' || range === 'today') {
       const hour = raw.slice(-2);
       return `${hour}:00`;
     }
