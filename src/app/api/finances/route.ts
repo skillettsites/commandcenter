@@ -352,12 +352,14 @@ async function generateDividendData(
   const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
   const thisMonth = monthlyTotals[currentDateStr] || { received: 0, forecast: 0 };
 
-  // Annual total from actual received payments in last 12 months
-  const oneYearAgo = new Date(now);
-  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-  const annualReceived = payments
-    .filter(p => p.status === 'received' && new Date(p.date + '-15') >= oneYearAgo)
-    .reduce((sum, p) => sum + p.amount, 0);
+  // Annual estimate based on all holding yields (more accurate than summing sparse received data)
+  let annualReceived = 0;
+  for (const schedule of dividendSchedules) {
+    if (!schedule.paysDividend) continue;
+    const holdingValue = holdingValues[schedule.holdingId] || 0;
+    annualReceived += holdingValue * (schedule.annualYieldPercent / 100);
+  }
+  annualReceived = Math.round(annualReceived);
 
   // Include HL yield data in the response for transparency
   const hlYields: Record<string, { yield_percent: number | null; unit_price: number | null }> = {};
