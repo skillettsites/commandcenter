@@ -177,29 +177,7 @@ export default function SiteGrid() {
         </div>
       </div>
 
-      {/* Compact status dots row (always visible) */}
-      {collapsed && (
-        <div className="flex flex-wrap gap-1.5 px-1 fade-in">
-          {sortedSites.map(site => {
-            const dotColor = site.status === 'up' ? 'var(--green)' : site.status === 'slow' ? 'var(--yellow)' : site.status === 'checking' ? 'var(--text-tertiary)' : 'var(--red)';
-            return (
-              <div
-                key={site.id}
-                className="flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--bg-card)]"
-                title={site.name}
-              >
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-                <span className="text-[11px] text-[var(--text-secondary)]">{site.name.replace('Check', '').replace('Score', '')}</span>
-                {(site.visitors ?? 0) > 0 && (
-                  <span className="text-[10px] font-medium text-[var(--green)]">{site.visitors}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Compact list view (default, not collapsed) */}
+      {/* Compact list view (expanded) */}
       {!collapsed && (
         <div className="card overflow-hidden divide-y divide-[var(--border-light)] fade-in">
           {visibleSites.map(site => (
