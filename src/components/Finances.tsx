@@ -173,16 +173,76 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  // Filter monthly totals based on range
+  // For "This Month" view, show individual payments on exact dates
+  // For Year/All, show monthly totals as before
+  if (range === 'month') {
+    const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    const monthPayments = dividends.payments.filter(p => p.date === currentDateStr);
+
+    if (monthPayments.length === 0) return (
+      <div className="py-6 text-center text-[11px] text-[var(--text-tertiary)]">No payments this month</div>
+    );
+
+    // Group by source for individual bars
+    const bars = monthPayments.map((p, i) => ({
+      date: p.date,
+      label: p.source.split(' ').slice(0, 2).join(' '),
+      received: p.status === 'received' ? p.amount : 0,
+      forecast: p.status === 'forecast' ? p.amount : 0,
+      total: p.amount,
+      fullLabel: `${p.source}: £${p.amount.toFixed(2)}`,
+    }));
+
+    const maxValue = Math.max(...bars.map(b => b.total), 1);
+    const svgWidth = 500;
+    const svgHeight = 120;
+    const barGap = 6;
+    const barWidth = Math.max(20, (svgWidth - 40) / bars.length - barGap);
+    const startX = 20;
+
+    return (
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${svgWidth} ${svgHeight + 24}`}
+          className="w-full"
+          preserveAspectRatio="xMinYMid meet"
+        >
+          {[0.5, 1].map((frac) => {
+            const y = svgHeight - (frac * svgHeight);
+            return (
+              <g key={frac}>
+                <line x1={startX} y1={y} x2={svgWidth - 10} y2={y} stroke="var(--border-light)" strokeWidth={0.5} strokeDasharray="3,3" />
+                <text x={startX - 4} y={y + 3} textAnchor="end" fontSize={8} fill="var(--text-tertiary)">
+                  £{Math.round(maxValue * frac).toLocaleString()}
+                </text>
+              </g>
+            );
+          })}
+          {bars.map((bar, i) => {
+            const x = startX + i * (barWidth + barGap);
+            const h = (bar.total / maxValue) * svgHeight;
+            const isReceived = bar.received > 0;
+            return (
+              <g key={i}>
+                <rect x={x} y={svgHeight - h} width={barWidth} height={h} rx={3} fill="#30d158" opacity={isReceived ? 0.85 : 0.3} />
+                <text x={x + barWidth / 2} y={svgHeight - h - 4} textAnchor="middle" fontSize={8} fill="var(--text-secondary)" fontWeight={600}>
+                  £{bar.total.toFixed(2)}
+                </text>
+                <text x={x + barWidth / 2} y={svgHeight + 12} textAnchor="middle" fontSize={7} fill="var(--text-tertiary)">
+                  {bar.label}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  }
+
   const sortedDates = Object.keys(dividends.monthlyTotals).sort();
   let filteredDates: string[];
 
-  if (range === 'month') {
-    const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-    filteredDates = sortedDates.filter(d => d === currentDateStr);
-    // Show current month even if empty
-    if (filteredDates.length === 0) filteredDates = [currentDateStr];
-  } else if (range === 'year') {
+  if (range === 'year') {
     filteredDates = sortedDates.filter(d => d.startsWith(String(currentYear)));
   } else {
     filteredDates = sortedDates;
@@ -190,7 +250,7 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
 
   if (filteredDates.length === 0) return null;
 
-  // Build bar data
+  // Build bar data for year/all views
   const bars = filteredDates.map(date => {
     const totals = dividends.monthlyTotals[date] || { received: 0, forecast: 0 };
     const month = parseInt(date.split('-')[1]);
