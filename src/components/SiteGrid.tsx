@@ -216,14 +216,14 @@ function SiteRow({
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
   const [bingData, setBingData] = useState<BingData | null>(null);
-  const [searchStats, setSearchStats] = useState<{ today: number; month: number; recent: Array<{ search_query: string; result_found: boolean; created_at: string }> } | null>(null);
+  const [searchStats, setSearchStats] = useState<{ today: number; month: number } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
+  const [chartRange, setChartRange] = useState<'today' | '24h' | '1m' | 'all'>('today');
 
   const hasSearchTracking = site.id === 'carcostcheck' || site.id === 'postcodecheck';
 
   const cycleRange = () => {
-    const next = chartRange === '24h' ? '1m' : chartRange === '1m' ? 'all' : '24h';
+    const next = chartRange === 'today' ? '24h' : chartRange === '24h' ? '1m' : chartRange === '1m' ? 'all' : 'today';
     setChartRange(next);
   };
 
@@ -266,7 +266,7 @@ function SiteRow({
             .then(res => res.ok ? res.json() : null)
             .then(data => {
               if (data?.[site.id]) {
-                setSearchStats({ today: data[site.id].today, month: data[site.id].month, recent: data[site.id].recent || [] });
+                setSearchStats({ today: data[site.id].today, month: data[site.id].month });
               }
             })
             .catch(() => {})
@@ -410,10 +410,10 @@ function SiteRow({
             {/* Search/check stats */}
             {searchStats && (searchStats.today > 0 || searchStats.month > 0) && (
               <SearchStatsPanel
+                siteId={site.id}
                 label={site.id === 'carcostcheck' ? 'Plates Checked' : 'Postcodes Checked'}
                 today={searchStats.today}
                 month={searchStats.month}
-                recent={searchStats.recent}
               />
             )}
 
@@ -664,9 +664,9 @@ function BingStats({ bing }: { bing: BingData }) {
   );
 }
 
-const RANGE_LABEL: Record<string, string> = { '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
+const RANGE_LABEL: Record<string, string> = { 'today': 'Today', '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
 
-function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyData[]; color: string; range: '24h' | '1m' | 'all'; onCycleRange: () => void }) {
+function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyData[]; color: string; range: 'today' | '24h' | '1m' | 'all'; onCycleRange: () => void }) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   if (hourly.length === 0) {
@@ -682,7 +682,7 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
 
   const totalViews = hourly.reduce((sum, h) => sum + h.pageViews, 0);
   const totalUsers = hourly.reduce((sum, h) => sum + h.users, 0);
-  const data = range === '24h' ? hourly.slice(-24) : hourly;
+  const data = (range === '24h' || range === 'today') ? hourly.slice(-24) : hourly;
   const maxViews = Math.max(...data.map(h => h.pageViews), 1);
 
   const chartWidth = 300;
@@ -703,10 +703,10 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
   const areaPath = points.length > 0 ? `M${points[0].x},${pad.top + innerH} ${points.map(p => `L${p.x},${p.y}`).join(' ')} L${points[points.length - 1].x},${pad.top + innerH} Z` : '';
   const gradId = `hourly-${color.replace('#', '')}-${range}`;
 
-  const labelStep = range === '24h' ? 6 : range === '1m' ? 7 : Math.max(1, Math.floor(data.length / 6));
+  const labelStep = (range === '24h' || range === 'today') ? 6 : range === '1m' ? 7 : Math.max(1, Math.floor(data.length / 6));
 
   function formatLabel(raw: string): string {
-    if (range === '24h') {
+    if (range === '24h' || range === 'today') {
       const hour = raw.slice(-2);
       return `${hour}:00`;
     }
@@ -717,7 +717,7 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
   }
 
   function formatTooltip(raw: string): string {
-    if (range === '24h') {
+    if (range === '24h' || range === 'today') {
       const hour = raw.slice(-2);
       return `${hour}:00`;
     }
@@ -797,13 +797,40 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
   );
 }
 
-function SearchStatsPanel({ label, today, month, recent }: {
+const SEARCH_RANGE_LABELS: Record<string, string> = { today: 'Today', '24h': 'Last 24h', '1m': 'This Month', all: 'All Time' };
+
+function SearchStatsPanel({ siteId, label, today, month }: {
+  siteId: string;
   label: string;
   today: number;
   month: number;
-  recent: Array<{ search_query: string; result_found: boolean; created_at: string }>;
 }) {
   const [showRecent, setShowRecent] = useState(false);
+  const [searchRange, setSearchRange] = useState<'today' | '24h' | '1m' | 'all'>('today');
+  const [topSearches, setTopSearches] = useState<Array<{ query: string; count: number; resultFound: boolean; lastSearched: string }>>([]);
+  const [totalInRange, setTotalInRange] = useState(0);
+  const [showAll, setShowAll] = useState(false);
+  const [loadingTop, setLoadingTop] = useState(false);
+
+  const cycleSearchRange = () => {
+    setSearchRange(prev => prev === 'today' ? '24h' : prev === '24h' ? '1m' : prev === '1m' ? 'all' : 'today');
+  };
+
+  useEffect(() => {
+    if (!showRecent) return;
+    setLoadingTop(true);
+    setShowAll(false);
+    fetch(`/api/searches?site_id=${siteId}&view=top&range=${searchRange}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.[siteId]) {
+          setTopSearches(data[siteId].top || []);
+          setTotalInRange(data[siteId].total || 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTop(false));
+  }, [showRecent, searchRange, siteId]);
 
   function timeAgo(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
@@ -815,6 +842,9 @@ function SearchStatsPanel({ label, today, month, recent }: {
     const days = Math.floor(hrs / 24);
     return `${days}d ago`;
   }
+
+  const visible = showAll ? topSearches : topSearches.slice(0, 5);
+  const hasMore = topSearches.length > 5;
 
   return (
     <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
@@ -836,23 +866,47 @@ function SearchStatsPanel({ label, today, month, recent }: {
           </svg>
         </div>
       </div>
-      {showRecent && recent.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-[var(--border-light)] space-y-1">
-          {recent.map((r, i) => (
-            <div key={i} className="flex items-center justify-between text-[11px]">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className={`font-bold ${r.result_found ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-                  {r.result_found ? '+' : '-'}
-                </span>
-                <span className={`font-mono truncate ${r.result_found ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>{r.search_query}</span>
-              </div>
-              <span className="text-[var(--text-tertiary)] shrink-0 ml-2">{timeAgo(r.created_at)}</span>
+      {showRecent && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); cycleSearchRange(); }}
+              className="text-[10px] font-semibold text-[var(--accent)] uppercase tracking-wider hover:underline cursor-pointer"
+            >
+              {SEARCH_RANGE_LABELS[searchRange]} &rarr;
+            </button>
+            <span className="text-[10px] text-[var(--text-tertiary)]">{totalInRange} total</span>
+          </div>
+          {loadingTop ? (
+            <p className="text-[11px] text-[var(--text-tertiary)]">Loading...</p>
+          ) : visible.length > 0 ? (
+            <div className="space-y-1">
+              {visible.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`font-mono truncate ${r.resultFound ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>{r.query}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {r.count > 1 && (
+                      <span className="text-[10px] font-medium text-[var(--text-secondary)]">x{r.count}</span>
+                    )}
+                    <span className="text-[var(--text-tertiary)] text-[10px]">{timeAgo(r.lastSearched)}</span>
+                  </div>
+                </div>
+              ))}
+              {hasMore && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowAll(!showAll); }}
+                  className="text-[11px] text-[var(--accent)] hover:underline cursor-pointer mt-1"
+                >
+                  {showAll ? 'Show less' : `Show all ${topSearches.length}`}
+                </button>
+              )}
             </div>
-          ))}
+          ) : (
+            <p className="text-[11px] text-[var(--text-tertiary)]">No searches in this period</p>
+          )}
         </div>
-      )}
-      {showRecent && recent.length === 0 && (
-        <p className="mt-2 pt-2 border-t border-[var(--border-light)] text-[11px] text-[var(--text-tertiary)]">No recent searches</p>
       )}
     </div>
   );

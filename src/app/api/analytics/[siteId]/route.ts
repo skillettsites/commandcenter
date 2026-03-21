@@ -47,6 +47,9 @@ export async function GET(
   } else if (range === 'all') {
     startDate = '2020-01-01';
     timeDimension = 'date';
+  } else if (range === 'today') {
+    startDate = 'today';
+    timeDimension = 'dateHour';
   } else {
     startDate = 'yesterday';
     timeDimension = 'dateHour';

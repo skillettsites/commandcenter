@@ -3,11 +3,12 @@ import { getServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/searches?site_id=carcostcheck&range=24h|1m|all
+// GET /api/searches?site_id=carcostcheck&range=today|24h|1m|all&view=top
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const siteFilter = searchParams.get('site_id');
   const range = searchParams.get('range');
+  const view = searchParams.get('view');
 
   const supabase = getServiceClient();
 
@@ -17,18 +18,73 @@ export async function GET(request: NextRequest) {
 
   const sites = siteFilter ? [siteFilter] : ['carcostcheck', 'postcodecheck'];
 
-  // If range is specified, return time-series chart data
+  // Top searched queries grouped by count
+  if (view === 'top') {
+    const period = range || 'today';
+    let fromDate: string;
+    if (period === 'today') {
+      fromDate = todayStart;
+    } else if (period === '24h') {
+      fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    } else if (period === '1m') {
+      fromDate = monthStart;
+    } else {
+      fromDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString();
+    }
+
+    const results: Record<string, {
+      total: number;
+      top: Array<{ query: string; count: number; resultFound: boolean; lastSearched: string }>;
+    }> = {};
+
+    for (const siteId of sites) {
+      const { data: rows } = await supabase
+        .from('searches')
+        .select('search_query, result_found, created_at')
+        .eq('site_id', siteId)
+        .gte('created_at', fromDate)
+        .order('created_at', { ascending: false });
+
+      const grouped = new Map<string, { count: number; resultFound: boolean; lastSearched: string }>();
+      for (const row of rows ?? []) {
+        const existing = grouped.get(row.search_query);
+        if (existing) {
+          existing.count++;
+        } else {
+          grouped.set(row.search_query, {
+            count: 1,
+            resultFound: row.result_found,
+            lastSearched: row.created_at,
+          });
+        }
+      }
+
+      const sorted = Array.from(grouped.entries())
+        .map(([query, data]) => ({ query, ...data }))
+        .sort((a, b) => b.count - a.count);
+
+      results[siteId] = {
+        total: rows?.length ?? 0,
+        top: sorted,
+      };
+    }
+
+    return NextResponse.json(results);
+  }
+
+  // Time-series chart data
   if (range) {
     const chartResults: Record<string, Array<{ period: string; count: number }>> = {};
 
     for (const siteId of sites) {
       let fromDate: Date;
-      if (range === '24h') {
+      if (range === 'today') {
+        fromDate = new Date(todayStart);
+      } else if (range === '24h') {
         fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       } else if (range === '1m') {
         fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       } else {
-        // all time: go back 1 year max for performance
         fromDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
       }
 
@@ -41,10 +97,13 @@ export async function GET(request: NextRequest) {
 
       const buckets = new Map<string, number>();
 
-      if (range === '24h') {
-        // Hourly buckets for last 24 hours
-        for (let h = 23; h >= 0; h--) {
-          const bucketTime = new Date(now.getTime() - h * 60 * 60 * 1000);
+      if (range === 'today' || range === '24h') {
+        const hours = range === 'today'
+          ? now.getUTCHours() + 1
+          : 24;
+        const start = range === 'today' ? new Date(todayStart) : fromDate;
+        for (let h = 0; h < hours; h++) {
+          const bucketTime = new Date(start.getTime() + h * 60 * 60 * 1000);
           const key = `${bucketTime.getUTCFullYear()}-${String(bucketTime.getUTCMonth() + 1).padStart(2, '0')}-${String(bucketTime.getUTCDate()).padStart(2, '0')}T${String(bucketTime.getUTCHours()).padStart(2, '0')}`;
           buckets.set(key, 0);
         }
@@ -56,7 +115,6 @@ export async function GET(request: NextRequest) {
           }
         }
       } else if (range === '1m') {
-        // Daily buckets for last 30 days
         for (let d = 29; d >= 0; d--) {
           const bucketTime = new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
           const key = `${bucketTime.getUTCFullYear()}-${String(bucketTime.getUTCMonth() + 1).padStart(2, '0')}-${String(bucketTime.getUTCDate()).padStart(2, '0')}`;
@@ -70,8 +128,6 @@ export async function GET(request: NextRequest) {
           }
         }
       } else {
-        // Weekly buckets for all time
-        // Start from the Monday of the fromDate week
         const startOfWeek = new Date(fromDate);
         startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 1);
         const cursor = new Date(startOfWeek);
@@ -82,7 +138,6 @@ export async function GET(request: NextRequest) {
         }
         for (const row of rows ?? []) {
           const d = new Date(row.created_at);
-          // Find the Monday of this row's week
           const monday = new Date(d);
           monday.setUTCDate(monday.getUTCDate() - monday.getUTCDay() + 1);
           const key = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
@@ -101,12 +156,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(chartResults);
   }
 
-  // Default: return summary data (today, month, recent)
-  const results: Record<string, {
-    today: number;
-    month: number;
-    recent: Array<{ search_query: string; result_found: boolean; created_at: string }>;
-  }> = {};
+  // Default: return summary counts
+  const results: Record<string, { today: number; month: number }> = {};
 
   for (const siteId of sites) {
     const { count: todayCount } = await supabase
@@ -121,17 +172,9 @@ export async function GET(request: NextRequest) {
       .eq('site_id', siteId)
       .gte('created_at', monthStart);
 
-    const { data: recent } = await supabase
-      .from('searches')
-      .select('search_query, result_found, created_at')
-      .eq('site_id', siteId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
     results[siteId] = {
       today: todayCount ?? 0,
       month: monthCount ?? 0,
-      recent: recent ?? [],
     };
   }
 
