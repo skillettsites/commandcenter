@@ -216,7 +216,7 @@ function SiteRow({
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
   const [bingData, setBingData] = useState<BingData | null>(null);
-  const [searchStats, setSearchStats] = useState<{ today: number; month: number } | null>(null);
+  const [searchStats, setSearchStats] = useState<{ today: number; month: number; recent: Array<{ search_query: string; result_found: boolean; created_at: string }> } | null>(null);
   const [loading, setLoading] = useState(false);
   const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
 
@@ -266,7 +266,7 @@ function SiteRow({
             .then(res => res.ok ? res.json() : null)
             .then(data => {
               if (data?.[site.id]) {
-                setSearchStats({ today: data[site.id].today, month: data[site.id].month });
+                setSearchStats({ today: data[site.id].today, month: data[site.id].month, recent: data[site.id].recent || [] });
               }
             })
             .catch(() => {})
@@ -409,21 +409,12 @@ function SiteRow({
 
             {/* Search/check stats */}
             {searchStats && (searchStats.today > 0 || searchStats.month > 0) && (
-              <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
-                <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                  {site.id === 'carcostcheck' ? 'Plates Checked' : 'Postcodes Checked'}
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-[14px] font-semibold text-[var(--green)]">{searchStats.today}</div>
-                    <div className="text-[9px] text-[var(--text-tertiary)]">Today</div>
-                  </div>
-                  <div>
-                    <div className="text-[14px] font-semibold text-[var(--text-primary)]">{searchStats.month.toLocaleString()}</div>
-                    <div className="text-[9px] text-[var(--text-tertiary)]">This Month</div>
-                  </div>
-                </div>
-              </div>
+              <SearchStatsPanel
+                label={site.id === 'carcostcheck' ? 'Plates Checked' : 'Postcodes Checked'}
+                today={searchStats.today}
+                month={searchStats.month}
+                recent={searchStats.recent}
+              />
             )}
 
             {/* GSC stats bar */}
@@ -802,6 +793,67 @@ function HourlyChart({ hourly, color, range, onCycleRange }: { hourly: HourlyDat
         })}
         <line x1={pad.left} y1={pad.top + innerH} x2={pad.left + innerW} y2={pad.top + innerH} stroke="currentColor" opacity={0.1} strokeWidth={0.5} />
       </svg>
+    </div>
+  );
+}
+
+function SearchStatsPanel({ label, today, month, recent }: {
+  label: string;
+  today: number;
+  month: number;
+  recent: Array<{ search_query: string; result_found: boolean; created_at: string }>;
+}) {
+  const [showRecent, setShowRecent] = useState(false);
+
+  function timeAgo(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ago`;
+  }
+
+  return (
+    <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={(e) => { e.stopPropagation(); setShowRecent(!showRecent); }}
+      >
+        <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+          {label}
+        </h4>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] font-medium text-[var(--green)]">{today} today</span>
+          <span className="text-[11px] text-[var(--text-secondary)]">{month.toLocaleString()} month</span>
+          <svg
+            className={`w-3 h-3 text-[var(--text-tertiary)] transition-transform duration-200 ${showRecent ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+      {showRecent && recent.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)] space-y-1">
+          {recent.map((r, i) => (
+            <div key={i} className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className={`font-bold ${r.result_found ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                  {r.result_found ? '+' : '-'}
+                </span>
+                <span className="text-[var(--text-primary)] font-mono truncate">{r.search_query}</span>
+              </div>
+              <span className="text-[var(--text-tertiary)] shrink-0 ml-2">{timeAgo(r.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {showRecent && recent.length === 0 && (
+        <p className="mt-2 pt-2 border-t border-[var(--border-light)] text-[11px] text-[var(--text-tertiary)]">No recent searches</p>
+      )}
     </div>
   );
 }
