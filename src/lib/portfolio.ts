@@ -145,7 +145,7 @@ export const propertyHoldings: PropertyHolding[] = [
     type: 'keeping',
     autoValue: true,
     address: '505 Cordage House, 21 Cobblestone Square, London E1W 3AQ',
-    postcode: 'E1W 3AQ',
+    postcode: 'E1W 3AS',
     premium: 'upper',
     premiumNotes: 'Studio, high floor, nice view',
   },
