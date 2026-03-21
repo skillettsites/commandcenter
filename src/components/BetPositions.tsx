@@ -56,8 +56,43 @@ interface LiveScore {
 
 type BetOutlook = 'winning' | 'losing' | 'draw' | 'pending';
 
+// Describe what the bet actually is in plain English
+function describeBet(bet: PlacedBet): string {
+  const mn = bet.marketName.toLowerCase();
+  const sel = bet.selectionName;
+  const isLay = bet.type === 'lay';
+
+  // Extract match from marketName "Competition: Team A vs Team B - Market"
+  const matchPart = bet.marketName.match(/:\s*(.+?)\s*-/);
+  const match = matchPart ? matchPart[1].trim() : '';
+
+  if (mn.includes('full-time result')) {
+    return isLay ? `${match} - ${sel} to lose` : `${match} - ${sel} to win`;
+  }
+  if (mn.includes('draw no bet')) {
+    return isLay ? `${match} - ${sel} not to win` : `${match} - ${sel} to win (DNB)`;
+  }
+  if (mn.includes('over/under 2.5')) {
+    if (sel.toLowerCase().includes('over')) {
+      return isLay ? `${match} - Under 2.5 goals` : `${match} - Over 2.5 goals`;
+    }
+    return isLay ? `${match} - Over 2.5 goals` : `${match} - Under 2.5 goals`;
+  }
+  if (mn.includes('both teams to score')) {
+    const bttsYes = sel.toLowerCase().includes('yes');
+    if (bttsYes) {
+      return isLay ? `${match} - BTTS No` : `${match} - Both teams to score`;
+    }
+    return isLay ? `${match} - BTTS Yes` : `${match} - BTTS No`;
+  }
+  if (mn.includes('double chance')) {
+    return `${match} - ${sel}`;
+  }
+
+  return `${match ? match + ' - ' : ''}${sel}`;
+}
+
 function getBetOutlook(bet: PlacedBet, liveScores: LiveScore[]): { outlook: BetOutlook; score: LiveScore | null; projectedPnl: number } {
-  // Find matching live score
   const score = liveScores.find(s => s.linkedBetIds.includes(bet.id));
 
   if (!score || score.state === 'upcoming' || !score.score) {
@@ -68,12 +103,10 @@ function getBetOutlook(bet: PlacedBet, liveScores: LiveScore[]): { outlook: BetO
   const mn = bet.marketName.toLowerCase();
   const isLay = bet.type === 'lay';
 
-  // Extract team names from match
   const teams = score.matchName.split(' vs ').map(t => t.trim());
   const homeName = teams[0] || '';
   const awayName = teams[1] || '';
 
-  // Determine if the selection is home or away
   const selLower = bet.selectionName.toLowerCase();
   const isHome = homeName.toLowerCase().includes(selLower) || selLower.includes(homeName.toLowerCase());
   const isAway = awayName.toLowerCase().includes(selLower) || selLower.includes(awayName.toLowerCase());
@@ -98,8 +131,7 @@ function getBetOutlook(bet: PlacedBet, liveScores: LiveScore[]): { outlook: BetO
     const isUnder = selLower.includes('under');
     if (isOver) {
       betWinning = totalGoals > 2;
-      betLosing = totalGoals <= 2; // Could still change
-      // If 2 goals and match ongoing, it's close
+      betLosing = totalGoals <= 2;
       if (totalGoals === 2 && score.state === 'live') { betLosing = false; isDraw = true; }
     } else if (isUnder) {
       betWinning = totalGoals < 3 && score.state !== 'live';
@@ -119,7 +151,6 @@ function getBetOutlook(bet: PlacedBet, liveScores: LiveScore[]): { outlook: BetO
     }
   }
 
-  // For lay bets, invert the outcome
   if (isLay) {
     const tmp = betWinning;
     betWinning = betLosing;
@@ -138,8 +169,6 @@ export default function BetPositions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchBets() {
@@ -170,7 +199,7 @@ export default function BetPositions() {
     }
   }, []);
 
-  // Fetch live scores on mount and refresh every 60s (always, not just when expanded)
+  // Fetch live scores on mount and refresh every 60s
   useEffect(() => {
     fetchLiveScores();
     const interval = setInterval(fetchLiveScores, 60000);
@@ -184,27 +213,6 @@ export default function BetPositions() {
     return () => clearInterval(interval);
   }, [collapsed, fetchLiveScores]);
 
-  const syncFromSmarkets = async () => {
-    setSyncing(true);
-    setSyncMsg(null);
-    try {
-      const res = await fetch('https://aibetfinder.com/api/sync-positions');
-      const json = await res.json();
-      if (res.ok) {
-        setSyncMsg(json.message);
-        const betsRes = await fetch('https://aibetfinder.com/api/bets');
-        if (betsRes.ok) setData(await betsRes.json());
-      } else {
-        setSyncMsg(json.error || 'Sync failed');
-      }
-    } catch {
-      setSyncMsg('Could not reach Smarkets sync');
-    }
-    setSyncing(false);
-    setTimeout(() => setSyncMsg(null), 5000);
-  };
-
-  // Compute active bet outlooks
   const activeBets = useMemo(() => data?.bets.filter(b => b.status === 'active') || [], [data]);
   const betOutlooks = useMemo(() =>
     activeBets.map(bet => ({ bet, ...getBetOutlook(bet, liveScores) })),
@@ -213,13 +221,8 @@ export default function BetPositions() {
 
   const hasLive = liveScores.some(s => s.state === 'live');
   const projectedPnl = betOutlooks.reduce((sum, b) => sum + b.projectedPnl, 0);
-  const totalPnlWithProjected = (data?.summary.totalPnl ?? 0) + projectedPnl;
-
-  // Extract short match name from marketName (e.g. "Scottish Premiership: Kilmarnock vs Livingston - Full-time result" -> "Kilmarnock vs Livingston")
-  function shortMatch(marketName: string): string {
-    const match = marketName.match(/:\s*(.+?)\s*-/);
-    return match ? match[1].trim() : marketName;
-  }
+  const realisedPnl = data?.summary.totalPnl ?? 0;
+  const totalIfSettledNow = realisedPnl + projectedPnl;
 
   function outlookColor(outlook: BetOutlook): string {
     switch (outlook) {
@@ -232,10 +235,10 @@ export default function BetPositions() {
 
   function outlookLabel(outlook: BetOutlook): string {
     switch (outlook) {
-      case 'winning': return 'W';
-      case 'losing': return 'L';
-      case 'draw': return 'D';
-      default: return '-';
+      case 'winning': return 'WIN';
+      case 'losing': return 'LOSE';
+      case 'draw': return 'DRAW';
+      default: return 'TBD';
     }
   }
 
@@ -266,42 +269,56 @@ export default function BetPositions() {
           <span className="text-[13px] text-[var(--text-tertiary)]">{error ? 'Unavailable' : 'No bets'}</span>
         ) : (
           <div className="flex items-center gap-3">
-            <span className={`text-[13px] font-medium ${totalPnlWithProjected >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-              {totalPnlWithProjected >= 0 ? '+' : ''}{totalPnlWithProjected.toFixed(2)}
+            <span className={`text-[13px] font-medium ${totalIfSettledNow >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+              {totalIfSettledNow >= 0 ? '+' : ''}£{totalIfSettledNow.toFixed(2)}
             </span>
-            <span className="text-[13px] font-medium text-[var(--text-primary)]">
+            <span className="text-[13px] text-[var(--text-tertiary)]">
               {activeBets.length} active
             </span>
           </div>
         )}
       </div>
 
-      {/* Collapsed: show active bet summaries */}
+      {/* Collapsed: active bet cards */}
       {collapsed && data && activeBets.length > 0 && (
         <div className="card overflow-hidden divide-y divide-[var(--border-light)] fade-in">
           {betOutlooks.map(({ bet, outlook, score, projectedPnl: pnl }) => (
-            <div key={bet.id} className="px-3 py-2 flex items-center justify-between">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`text-[11px] font-bold w-4 ${outlookColor(outlook)}`}>
+            <div key={bet.id} className="px-3 py-2.5">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[12px] font-medium text-[var(--text-primary)] truncate">
+                  {describeBet(bet)}
+                </span>
+                <span className={`text-[11px] font-bold shrink-0 ml-2 ${outlookColor(outlook)}`}>
                   {outlookLabel(outlook)}
                 </span>
-                <span className="text-[12px] text-[var(--text-primary)] truncate">
-                  {bet.selectionName}
-                </span>
-                <span className="text-[10px] text-[var(--text-tertiary)] truncate hidden sm:inline">
-                  {shortMatch(bet.marketName)}
-                </span>
-                {score?.state === 'live' && score.score && (
-                  <span className="text-[10px] font-medium text-[var(--text-secondary)] tabular-nums">
-                    ({score.score[0]}-{score.score[1]})
-                  </span>
-                )}
               </div>
-              <span className={`text-[11px] font-medium shrink-0 ml-2 tabular-nums ${pnl > 0 ? 'text-[var(--green)]' : pnl < 0 ? 'text-[var(--red)]' : 'text-[var(--text-tertiary)]'}`}>
-                {pnl > 0 ? '+' : ''}{pnl !== 0 ? `£${pnl.toFixed(2)}` : `£${bet.stake.toFixed(2)}`}
-              </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {score?.state === 'live' && score.score && (
+                    <span className="text-[11px] font-medium text-[var(--text-secondary)] tabular-nums">
+                      {score.matchName.split(' vs ')[0]?.trim()} {score.score[0]} - {score.score[1]} {score.matchName.split(' vs ')[1]?.trim()}
+                      {score.matchMinute && <span className="text-[var(--text-tertiary)]"> ({score.matchMinute})</span>}
+                    </span>
+                  )}
+                  {score?.state !== 'live' && (
+                    <span className="text-[10px] text-[var(--text-tertiary)]">
+                      Stake: £{bet.stake.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                <span className={`text-[11px] font-medium shrink-0 ml-2 tabular-nums ${pnl > 0 ? 'text-[var(--green)]' : pnl < 0 ? 'text-[var(--red)]' : 'text-[var(--text-tertiary)]'}`}>
+                  {pnl > 0 ? '+' : ''}{pnl !== 0 ? `£${pnl.toFixed(2)}` : `£${bet.stake.toFixed(2)} at risk`}
+                </span>
+              </div>
             </div>
           ))}
+          {/* Projected total row */}
+          <div className="px-3 py-2 flex items-center justify-between bg-[var(--bg-elevated)]">
+            <span className="text-[11px] text-[var(--text-tertiary)]">If settled now</span>
+            <span className={`text-[12px] font-bold ${totalIfSettledNow >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+              Total P/L: {totalIfSettledNow >= 0 ? '+' : ''}£{totalIfSettledNow.toFixed(2)}
+            </span>
+          </div>
         </div>
       )}
 
@@ -312,16 +329,7 @@ export default function BetPositions() {
           <div className="card p-3" style={{ borderLeft: '3px solid #F43F5E' }}>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[13px] font-semibold text-[var(--text-primary)]">AI Bet Finder</span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={(e) => { e.stopPropagation(); syncFromSmarkets(); }}
-                  disabled={syncing}
-                  className="text-[11px] text-[var(--accent)] hover:underline cursor-pointer disabled:opacity-50"
-                >
-                  {syncing ? 'Syncing...' : 'Sync'}
-                </button>
-                <a href="https://aibetfinder.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-[var(--accent)]">Open</a>
-              </div>
+              <a href="https://aibetfinder.com" target="_blank" rel="noopener noreferrer" className="text-[11px] text-[var(--accent)]">Open</a>
             </div>
             <div className="flex items-center gap-4">
               <div>
@@ -332,31 +340,22 @@ export default function BetPositions() {
                 <span className="text-[10px] text-[var(--text-tertiary)] block">Potential</span>
                 <span className="text-[13px] font-medium text-[var(--green)]">+£{data.summary.totalPotential.toFixed(2)}</span>
               </div>
-              {data.bets.some(b => b.status !== 'active') && (
-                <div>
-                  <span className="text-[10px] text-[var(--text-tertiary)] block">Realised</span>
-                  <span className={`text-[13px] font-medium ${data.summary.totalPnl >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-                    {data.summary.totalPnl >= 0 ? '+' : ''}£{data.summary.totalPnl.toFixed(2)}
-                  </span>
-                </div>
-              )}
+              <div>
+                <span className="text-[10px] text-[var(--text-tertiary)] block">Realised</span>
+                <span className={`text-[13px] font-medium ${realisedPnl >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                  {realisedPnl >= 0 ? '+' : ''}£{realisedPnl.toFixed(2)}
+                </span>
+              </div>
               {projectedPnl !== 0 && (
                 <div>
-                  <span className="text-[10px] text-[var(--text-tertiary)] block">Projected</span>
-                  <span className={`text-[13px] font-medium ${projectedPnl >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-                    {projectedPnl >= 0 ? '+' : ''}£{projectedPnl.toFixed(2)}
+                  <span className="text-[10px] text-[var(--text-tertiary)] block">If settled now</span>
+                  <span className={`text-[13px] font-medium ${totalIfSettledNow >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                    {totalIfSettledNow >= 0 ? '+' : ''}£{totalIfSettledNow.toFixed(2)}
                   </span>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Sync message */}
-          {syncMsg && (
-            <div className="px-3 py-1.5 rounded-lg bg-[var(--bg-elevated)] text-[11px] text-[var(--text-secondary)]">
-              {syncMsg}
-            </div>
-          )}
 
           {/* Live Scores */}
           {liveScores.length > 0 && (
@@ -370,7 +369,10 @@ export default function BetPositions() {
           {/* Active Bets */}
           {activeBets
             .filter(b => !liveScores.some(s => s.linkedBetIds.includes(b.id) && s.state === 'live'))
-            .map(bet => <BetCard key={bet.id} bet={bet} />)
+            .map(bet => {
+              const { outlook } = getBetOutlook(bet, liveScores);
+              return <BetCard key={bet.id} bet={bet} outlook={outlook} />;
+            })
           }
 
           {/* Settled Bets Summary */}
@@ -451,13 +453,11 @@ function LiveScoreCard({ score }: { score: LiveScore }) {
                 <span>Corners: {score.stats.home.corners ?? 0} - {score.stats.away.corners ?? 0}</span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {((score.stats.home.red_cards ?? 0) > 0 || (score.stats.away.red_cards ?? 0) > 0) && (
-                <span className="text-[var(--red)] font-bold">
-                  Red: {score.stats.home.red_cards ?? 0} - {score.stats.away.red_cards ?? 0}
-                </span>
-              )}
-            </div>
+            {((score.stats.home.red_cards ?? 0) > 0 || (score.stats.away.red_cards ?? 0) > 0) && (
+              <span className="text-[var(--red)] font-bold">
+                Red: {score.stats.home.red_cards ?? 0} - {score.stats.away.red_cards ?? 0}
+              </span>
+            )}
           </div>
           {score.stats.timeline.length > 0 && (
             <div className="mt-1.5 space-y-0.5">
@@ -473,9 +473,7 @@ function LiveScoreCard({ score }: { score: LiveScore }) {
                       <span className="text-[var(--text-tertiary)]">{evt.type}</span>
                     )}
                   </span>
-                  <span className="text-[var(--text-secondary)]">
-                    {evt.player || evt.side}
-                  </span>
+                  <span className="text-[var(--text-secondary)]">{evt.player || evt.side}</span>
                 </div>
               ))}
             </div>
@@ -486,21 +484,22 @@ function LiveScoreCard({ score }: { score: LiveScore }) {
   );
 }
 
-function BetCard({ bet }: { bet: PlacedBet }) {
+function BetCard({ bet, outlook }: { bet: PlacedBet; outlook: BetOutlook }) {
   const isLay = bet.type === 'lay';
-  const edge = Math.round(Math.abs(bet.aiProbability - bet.marketProbability) * 100);
 
   return (
     <div className="card p-3">
       <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isLay ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
-            {isLay ? 'SELL' : 'BUY'}
-          </span>
-          <span className="text-[13px] font-semibold text-[var(--text-primary)]">{bet.selectionName}</span>
-        </div>
+        <span className="text-[13px] font-semibold text-[var(--text-primary)]">{describeBet(bet)}</span>
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+          outlook === 'winning' ? 'bg-green-500/20 text-green-400' :
+          outlook === 'losing' ? 'bg-red-500/20 text-red-400' :
+          outlook === 'draw' ? 'bg-yellow-500/20 text-yellow-400' :
+          'bg-gray-500/20 text-gray-400'
+        }`}>
+          {outlook === 'pending' ? 'TBD' : outlook.toUpperCase()}
+        </span>
       </div>
-      <div className="text-[11px] text-[var(--text-tertiary)] mb-1.5 truncate">{bet.marketName}</div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="text-[11px] text-[var(--text-tertiary)]">
@@ -510,7 +509,6 @@ function BetCard({ bet }: { bet: PlacedBet }) {
             Profit: <span className="text-[var(--green)]">+£{bet.potentialProfit.toFixed(2)}</span>
           </span>
         </div>
-        <span className="text-[11px] font-medium text-[var(--accent)]">{edge}pp edge</span>
       </div>
     </div>
   );
@@ -559,8 +557,7 @@ function SettledSummary({ bets }: { bets: PlacedBet[] }) {
                 <span className={`font-bold ${bet.status === 'won' ? 'text-green-400' : 'text-red-400'}`}>
                   {bet.status === 'won' ? 'W' : 'L'}
                 </span>
-                <span className="text-[var(--text-primary)] truncate">{bet.selectionName}</span>
-                <span className="text-[var(--text-tertiary)] truncate hidden sm:inline">{bet.marketName}</span>
+                <span className="text-[var(--text-primary)] truncate">{describeBet(bet)}</span>
               </div>
               <span className={`font-medium shrink-0 ml-2 ${(bet.pnl || 0) >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
                 {(bet.pnl || 0) >= 0 ? '+' : ''}£{bet.pnl?.toFixed(2)}
