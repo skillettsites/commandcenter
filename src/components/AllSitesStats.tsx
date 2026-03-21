@@ -148,6 +148,13 @@ export default function AllSitesStats() {
       {expanded && (
         <div className="card overflow-hidden fade-in">
           <div className="p-3.5">
+            {/* Stats grid */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <StatBox label="Today" value={stats?.todayVisitors ?? 0} sub={`${stats?.todayPageViews ?? 0} views`} />
+              <StatBox label="This Month" value={stats?.monthVisitors ?? 0} />
+              <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} />
+            </div>
+
             {/* Chart */}
             {loading && !data ? (
               <div className="flex items-center justify-center py-8">
