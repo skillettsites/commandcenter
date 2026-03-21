@@ -148,34 +148,6 @@ export default function AllSitesStats() {
       {expanded && (
         <div className="card overflow-hidden fade-in">
           <div className="p-3.5">
-            {/* Stats grid */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <StatBox label="Today" value={stats?.todayVisitors ?? 0} sub={`${stats?.todayPageViews ?? 0} views`} />
-              <StatBox label="This Month" value={stats?.monthVisitors ?? 0} />
-              <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} />
-            </div>
-
-            {/* Sites with visitors today */}
-            {stats?.sitesToday && stats.sitesToday.length > 0 && (
-              <div className="mb-4 space-y-1">
-                <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-                  Active Today
-                </p>
-                {stats.sitesToday.map(site => (
-                  <div key={site.siteId} className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: site.color }} />
-                      <span className="text-[11px] text-[var(--text-secondary)]">{site.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-medium text-[var(--text-primary)]">{site.visitors} visitors</span>
-                      <span className="text-[10px] text-[var(--text-tertiary)]">{site.pageViews} views</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
             {/* Chart */}
             {loading && !data ? (
               <div className="flex items-center justify-center py-8">
