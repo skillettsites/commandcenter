@@ -72,11 +72,13 @@ function describeBet(bet: PlacedBet): string {
   if (mn.includes('draw no bet')) {
     return isLay ? `${match} - ${sel} not to win` : `${match} - ${sel} to win (DNB)`;
   }
-  if (mn.includes('over/under 2.5')) {
+  if (mn.includes('over/under')) {
+    const thresholdMatch = mn.match(/over\/under\s+([\d.]+)/i);
+    const threshold = thresholdMatch ? thresholdMatch[1] : '2.5';
     if (sel.toLowerCase().includes('over')) {
-      return isLay ? `${match} - Under 2.5 goals` : `${match} - Over 2.5 goals`;
+      return isLay ? `${match} - Under ${threshold} goals` : `${match} - Over ${threshold} goals`;
     }
-    return isLay ? `${match} - Over 2.5 goals` : `${match} - Under 2.5 goals`;
+    return isLay ? `${match} - Over ${threshold} goals` : `${match} - Under ${threshold} goals`;
   }
   if (mn.includes('both teams to score')) {
     const bttsYes = sel.toLowerCase().includes('yes');
@@ -143,18 +145,22 @@ function getBetOutlook(bet: PlacedBet, liveScores: LiveScore[]): { outlook: BetO
       betLosing = awayGoals < homeGoals;
       isDraw = homeGoals === awayGoals;
     }
-  } else if (mn.includes('over/under 2.5') || mn.includes('over/under')) {
+  } else if (mn.includes('over/under')) {
     const totalGoals = homeGoals + awayGoals;
     const isOver = selLower.includes('over');
     const isUnder = selLower.includes('under');
+    // Extract the threshold (2.5, 3.5, etc.)
+    const thresholdMatch = mn.match(/over\/under\s+([\d.]+)/);
+    const threshold = thresholdMatch ? parseFloat(thresholdMatch[1]) : 2.5;
+    const goalLine = Math.floor(threshold); // 2.5 -> 2, 3.5 -> 3
     if (isOver) {
-      betWinning = totalGoals > 2;
-      betLosing = totalGoals <= 2;
-      if (totalGoals === 2 && score.state === 'live') { betLosing = false; isDraw = true; }
+      betWinning = totalGoals > goalLine;
+      betLosing = totalGoals <= goalLine;
+      if (totalGoals === goalLine && score.state === 'live') { betLosing = false; isDraw = true; }
     } else if (isUnder) {
-      betWinning = totalGoals < 3 && score.state !== 'live';
-      betLosing = totalGoals > 2;
-      if (totalGoals <= 2 && score.state === 'live') { betWinning = false; isDraw = true; }
+      betWinning = totalGoals <= goalLine && score.state !== 'live';
+      betLosing = totalGoals > goalLine;
+      if (totalGoals <= goalLine && score.state === 'live') { betWinning = false; isDraw = true; }
     }
   } else if (mn.includes('both teams to score')) {
     const bttsYes = selLower.includes('yes') || selLower === 'btts yes';
