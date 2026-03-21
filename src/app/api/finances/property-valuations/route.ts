@@ -146,7 +146,7 @@ async function fetchLandRegistryData(postcode: string): Promise<LandRegistryTran
 // Simpler Land Registry API fallback using the JSON-LD endpoint
 async function fetchLandRegistrySimple(postcode: string): Promise<LandRegistryTransaction[]> {
   try {
-    const encoded = encodeURIComponent(postcode.replace(/\s+/g, '+'));
+    const encoded = encodeURIComponent(postcode.trim());
     const url = `https://landregistry.data.gov.uk/data/ppi/transaction-record.json?propertyAddress.postcode=${encoded}&_pageSize=20&_sort=-transactionDate`;
 
     const res = await fetch(url, {
@@ -398,7 +398,7 @@ export async function GET(request: Request) {
         // Fetch Zoopla page and Land Registry data in parallel
         const [zooplaContent, landRegistryData] = await Promise.all([
           fetchZooplaPage(property.address!),
-          fetchLandRegistryData(property.postcode || 'E1W'),
+          fetchLandRegistrySimple(property.postcode || 'E1W 3AR'),
         ]);
 
         // Parse Zoopla estimate with Claude, or estimate from Land Registry if Zoopla blocked
