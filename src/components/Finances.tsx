@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import NetWorthChart from './NetWorthChart';
 
 interface StockData {
   symbol: string;
@@ -553,6 +554,9 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
               <div className="text-[24px] font-bold text-[var(--text-primary)]">{formatGBP(data.totals.netWorth)}</div>
             </div>
           </div>
+
+          {/* Net worth history chart */}
+          <NetWorthChart />
 
           {/* Breakdown bar */}
           <div className="px-3.5 pb-3">
