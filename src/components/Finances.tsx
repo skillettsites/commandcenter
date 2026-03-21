@@ -70,7 +70,19 @@ interface FinancesData {
   stocks: StockData[];
   funds: FundData[];
   cashInvestmentAccounts: CashAccount[];
-  etradeValue: number;
+  etrade: {
+    symbol: string;
+    name: string;
+    vestedShares: number;
+    unvestedShares: number;
+    totalShares: number;
+    livePrice: number | null;
+    livePriceGBP: number | null;
+    vestedValue: number;
+    unvestedValue: number;
+    totalValue: number;
+    isLive: boolean;
+  };
   properties: PropertyData[];
   cash: CashAccount[];
   forexRate: number;
@@ -80,6 +92,7 @@ interface FinancesData {
     funds: number;
     investmentCash: number;
     etrade: number;
+    etradeUnvested: number;
     investments: number;
     propertyEquity: number;
     cash: number;
@@ -725,11 +738,26 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                     </div>
                   </div>
 
-                  {/* E*Trade + Investment Cash */}
+                  {/* E*Trade ICE Holdings */}
                   <div className="ml-3 space-y-1">
-                    <div className="flex items-center justify-between py-1">
-                      <span className="text-[12px] text-[var(--text-secondary)]">E*Trade RSUs</span>
-                      <span className="text-[13px] font-medium text-[var(--text-primary)]">{formatGBP(data.etradeValue)}</span>
+                    <div className="flex items-center justify-between py-1.5">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[12px] font-medium text-[var(--text-primary)]">{data.etrade.name}</span>
+                          {data.etrade.isLive && <span className="text-[8px] px-1 py-0.5 rounded bg-[var(--green)] text-black font-bold">LIVE</span>}
+                        </div>
+                        <div className="flex gap-2 text-[10px] text-[var(--text-tertiary)]">
+                          {data.etrade.livePriceGBP && <span>£{data.etrade.livePriceGBP.toFixed(2)}/share</span>}
+                          <span>{data.etrade.vestedShares} vested</span>
+                          <span>{data.etrade.unvestedShares} unvested</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <div className="text-[13px] font-medium text-[var(--text-primary)]">{formatGBP(data.etrade.vestedValue)}</div>
+                        {data.etrade.unvestedValue > 0 && (
+                          <div className="text-[10px] text-[var(--text-tertiary)]">+{formatGBP(data.etrade.unvestedValue)} unvested</div>
+                        )}
+                      </div>
                     </div>
                     {data.cashInvestmentAccounts.map((c) => (
                       <div key={c.account} className="flex items-center justify-between py-1">

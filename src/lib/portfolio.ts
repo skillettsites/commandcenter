@@ -101,7 +101,19 @@ export const cashInvestmentAccounts: CashHolding[] = [
   { account: 'F&S Cash', balance: 132 },
 ];
 
-export const etradeValue = 148433; // RSUs, manually updated
+// E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
+export const etradeHoldings = {
+  symbol: 'ICE',
+  name: 'ICE (Intercontinental Exchange)',
+  vestedShares: 1049, // ESPP shares (vested, sellable)
+  unvestedShares: 451, // Restricted Stock (unvested, vesting over time)
+  totalShares: 1500,
+  costBasis: 0, // RSUs/ESPP - cost basis varies, not tracked here
+  account: 'E*Trade' as const,
+  currency: 'USD' as const,
+};
+// Fallback value if Yahoo Finance unavailable
+export const etradeValue = 134202; // vested only, as at 21 Mar 2026
 
 export const propertyHoldings: PropertyHolding[] = [
   { id: 'binnacle', name: '604 Binnacle House', value: 500000, mortgage: 270000, type: 'keeping' },

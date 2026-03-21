@@ -4,6 +4,7 @@ import {
   fundHoldings,
   cashInvestmentAccounts,
   etradeValue,
+  etradeHoldings,
   propertyHoldings,
   cashHoldings,
   dividendSchedules,
@@ -454,11 +455,18 @@ export async function GET() {
   // Generate dividend data from real Yahoo Finance dividend history
   const dividends = await generateDividendData(holdingValues, forexRate);
 
+  // Fetch ICE live price for E*Trade holdings
+  const icePrice = await fetchPrice(etradeHoldings.symbol);
+  const icePriceGBP = icePrice ? icePrice.price * forexRate : null;
+  const etradeVestedValue = icePriceGBP ? Math.round(icePriceGBP * etradeHoldings.vestedShares) : etradeValue;
+  const etradeUnvestedValue = icePriceGBP ? Math.round(icePriceGBP * etradeHoldings.unvestedShares) : 0;
+  const etradeTotalValue = etradeVestedValue + etradeUnvestedValue;
+
   // Totals
   const stocksTotal = stocks.reduce((sum, s) => sum + (s.currentValue ?? 0), 0);
   const fundsTotal = funds.reduce((sum, f) => sum + f.currentValue, 0);
   const investmentCashTotal = cashInvestmentAccounts.reduce((sum, c) => sum + c.balance, 0);
-  const investmentsTotal = stocksTotal + fundsTotal + investmentCashTotal + etradeValue;
+  const investmentsTotal = stocksTotal + fundsTotal + investmentCashTotal + etradeVestedValue;
 
   const propertyEquity = propertyHoldings.reduce((sum, p) => sum + (p.value - p.mortgage), 0);
 
@@ -470,7 +478,19 @@ export async function GET() {
     stocks,
     funds,
     cashInvestmentAccounts,
-    etradeValue,
+    etrade: {
+      symbol: etradeHoldings.symbol,
+      name: etradeHoldings.name,
+      vestedShares: etradeHoldings.vestedShares,
+      unvestedShares: etradeHoldings.unvestedShares,
+      totalShares: etradeHoldings.totalShares,
+      livePrice: icePrice?.price ?? null,
+      livePriceGBP: icePriceGBP,
+      vestedValue: etradeVestedValue,
+      unvestedValue: etradeUnvestedValue,
+      totalValue: etradeTotalValue,
+      isLive: icePrice !== null,
+    },
     properties: propertyHoldings,
     cash: cashHoldings,
     forexRate,
@@ -479,7 +499,8 @@ export async function GET() {
       stocks: stocksTotal,
       funds: fundsTotal,
       investmentCash: investmentCashTotal,
-      etrade: etradeValue,
+      etrade: etradeVestedValue,
+      etradeUnvested: etradeUnvestedValue,
       investments: investmentsTotal,
       propertyEquity,
       cash: cashTotal,
