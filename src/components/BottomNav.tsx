@@ -20,7 +20,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-secondary)] border-t border-[var(--border-light)] safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] border-t border-[var(--border-light)] safe-area-bottom" style={{ backdropFilter: 'none' }}>
       <div className="max-w-2xl mx-auto flex">
         {tabs.map(tab => {
           const isActive = tab.href === '/' ? pathname === '/' : pathname.startsWith(tab.href);
