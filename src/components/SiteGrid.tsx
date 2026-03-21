@@ -844,7 +844,7 @@ function SearchStatsPanel({ label, today, month, recent }: {
                 <span className={`font-bold ${r.result_found ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
                   {r.result_found ? '+' : '-'}
                 </span>
-                <span className="text-[var(--text-primary)] font-mono truncate">{r.search_query}</span>
+                <span className={`font-mono truncate ${r.result_found ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>{r.search_query}</span>
               </div>
               <span className="text-[var(--text-tertiary)] shrink-0 ml-2">{timeAgo(r.created_at)}</span>
             </div>
