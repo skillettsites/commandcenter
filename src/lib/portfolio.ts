@@ -102,17 +102,21 @@ export const cashInvestmentAccounts: CashHolding[] = [
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
+// Share counts derived from E*Trade USD values / ICE price as at 21 Mar 2026
 export const etradeHoldings = {
   symbol: 'ICE',
   name: 'ICE (Intercontinental Exchange)',
-  vestedShares: 1049, // ESPP shares (vested, sellable)
-  unvestedShares: 451, // Restricted Stock (unvested, vesting over time)
+  esppValueUSD: 166193, // Employee Stock Purchase Plan (vested)
+  rsValueUSD: 71457, // Restricted Stock (unvested)
+  totalValueUSD: 237650,
+  // Share counts for live price tracking
+  vestedShares: 1049, // ESPP
+  unvestedShares: 451, // RS
   totalShares: 1500,
-  costBasis: 0, // RSUs/ESPP - cost basis varies, not tracked here
   account: 'E*Trade' as const,
   currency: 'USD' as const,
 };
-// Fallback value if Yahoo Finance unavailable
+// Fallback GBP value if Yahoo Finance unavailable
 export const etradeValue = 134202; // vested only, as at 21 Mar 2026
 
 export const propertyHoldings: PropertyHolding[] = [

@@ -456,10 +456,12 @@ export async function GET() {
   const dividends = await generateDividendData(holdingValues, forexRate);
 
   // Fetch ICE live price for E*Trade holdings
+  // Use USD values from E*Trade converted at live forex, with live ICE price for % change tracking
   const icePrice = await fetchPrice(etradeHoldings.symbol);
   const icePriceGBP = icePrice ? icePrice.price * forexRate : null;
-  const etradeVestedValue = icePriceGBP ? Math.round(icePriceGBP * etradeHoldings.vestedShares) : etradeValue;
-  const etradeUnvestedValue = icePriceGBP ? Math.round(icePriceGBP * etradeHoldings.unvestedShares) : 0;
+  // Convert E*Trade USD values to GBP at live rate (matches E*Trade's own conversion)
+  const etradeVestedValue = Math.round(etradeHoldings.esppValueUSD * forexRate);
+  const etradeUnvestedValue = Math.round(etradeHoldings.rsValueUSD * forexRate);
   const etradeTotalValue = etradeVestedValue + etradeUnvestedValue;
 
   // Totals
