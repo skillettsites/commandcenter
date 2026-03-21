@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface PlacedBet {
   id: string;
@@ -30,8 +30,33 @@ interface BetsResponse {
   };
 }
 
+interface TimelineEvent {
+  type: string;
+  minute: number;
+  side: string;
+  player?: string;
+}
+
+interface LiveScore {
+  eventId: string;
+  matchName: string;
+  competition: string;
+  kickoff: string;
+  state: 'upcoming' | 'live' | 'ended';
+  score: [number, number] | null;
+  matchMinute: string | null;
+  period: string | null;
+  stats: {
+    home: { shots_on_target?: number; corners?: number; red_cards?: number; yellow_cards?: number };
+    away: { shots_on_target?: number; corners?: number; red_cards?: number; yellow_cards?: number };
+    timeline: TimelineEvent[];
+  } | null;
+  linkedBetIds: string[];
+}
+
 export default function BetPositions() {
   const [data, setData] = useState<BetsResponse | null>(null);
+  const [liveScores, setLiveScores] = useState<LiveScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
@@ -52,6 +77,28 @@ export default function BetPositions() {
     }
     fetchBets();
   }, []);
+
+  const fetchLiveScores = useCallback(async () => {
+    try {
+      const res = await fetch('https://aibetfinder.com/api/live-scores');
+      if (res.ok) {
+        const json = await res.json();
+        setLiveScores(json.scores || []);
+      }
+    } catch {
+      // Live scores unavailable
+    }
+  }, []);
+
+  // Fetch live scores when expanded, refresh every 30s
+  useEffect(() => {
+    if (collapsed) return;
+    fetchLiveScores();
+    const interval = setInterval(fetchLiveScores, 30000);
+    return () => clearInterval(interval);
+  }, [collapsed, fetchLiveScores]);
+
+  const hasLive = liveScores.some(s => s.state === 'live');
 
   const headerRight = loading ? (
     <span className="text-[13px] text-[var(--text-tertiary)]">Loading...</span>
@@ -80,6 +127,9 @@ export default function BetPositions() {
           <h2 className="text-[13px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
             Betting
           </h2>
+          {hasLive && (
+            <span className="w-2 h-2 rounded-full bg-[var(--red)] animate-pulse" title="Live matches" />
+          )}
           <svg
             className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ${collapsed ? '' : 'rotate-90'}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
@@ -118,12 +168,135 @@ export default function BetPositions() {
             </div>
           </div>
 
+          {/* Live Scores */}
+          {liveScores.length > 0 && (
+            <div className="space-y-1.5">
+              {liveScores.map(score => (
+                <LiveScoreCard key={score.eventId} score={score} />
+              ))}
+            </div>
+          )}
+
           {/* Active Bets */}
-          {data.bets.filter(b => b.status === 'active').map(bet => <BetCard key={bet.id} bet={bet} />)}
+          {data.bets
+            .filter(b => b.status === 'active')
+            .filter(b => !liveScores.some(s => s.linkedBetIds.includes(b.id) && s.state === 'live'))
+            .map(bet => <BetCard key={bet.id} bet={bet} />)
+          }
 
           {/* Settled Bets Summary */}
           {data.bets.some(b => b.status !== 'active') && (
             <SettledSummary bets={data.bets.filter(b => b.status !== 'active')} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LiveScoreCard({ score }: { score: LiveScore }) {
+  const teams = score.matchName.split(' vs ').map(t => t.trim());
+  const home = teams[0] || score.matchName;
+  const away = teams[1] || '';
+  const isLive = score.state === 'live';
+
+  const formatPeriod = (period: string | null) => {
+    if (!period) return '';
+    switch (period) {
+      case 'first_half': return '1st Half';
+      case 'second_half': return '2nd Half';
+      case 'half_time': return 'Half Time';
+      case 'full_time': return 'Full Time';
+      default: return period.replace(/_/g, ' ');
+    }
+  };
+
+  const formatKickoff = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  };
+
+  return (
+    <div className="card p-3" style={{ borderLeft: `3px solid ${isLive ? 'var(--green)' : 'var(--text-tertiary)'}` }}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{score.competition}</span>
+        {isLive ? (
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
+            <span className="text-[10px] font-bold text-[var(--green)] uppercase">
+              {score.matchMinute ? `${score.matchMinute}` : formatPeriod(score.period)}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[10px] text-[var(--text-tertiary)]">
+            {formatKickoff(score.kickoff)}
+          </span>
+        )}
+      </div>
+
+      {/* Score */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[13px] font-semibold text-[var(--text-primary)]">{home}</span>
+            <span className="text-[18px] font-bold text-[var(--text-primary)] tabular-nums">
+              {score.score ? score.score[0] : '-'}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] font-semibold text-[var(--text-primary)]">{away}</span>
+            <span className="text-[18px] font-bold text-[var(--text-primary)] tabular-nums">
+              {score.score ? score.score[1] : '-'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      {score.stats && isLive && (
+        <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
+          <div className="flex items-center justify-between text-[10px] text-[var(--text-tertiary)]">
+            <div className="flex items-center gap-3">
+              {(score.stats.home.shots_on_target != null || score.stats.away.shots_on_target != null) && (
+                <span>Shots: {score.stats.home.shots_on_target ?? 0} - {score.stats.away.shots_on_target ?? 0}</span>
+              )}
+              {(score.stats.home.corners != null || score.stats.away.corners != null) && (
+                <span>Corners: {score.stats.home.corners ?? 0} - {score.stats.away.corners ?? 0}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {((score.stats.home.red_cards ?? 0) > 0 || (score.stats.away.red_cards ?? 0) > 0) && (
+                <span className="text-[var(--red)] font-bold">
+                  Red: {score.stats.home.red_cards ?? 0} - {score.stats.away.red_cards ?? 0}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Timeline events */}
+          {score.stats.timeline.length > 0 && (
+            <div className="mt-1.5 space-y-0.5">
+              {score.stats.timeline.slice(-5).map((evt, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-[10px]">
+                  <span className="text-[var(--text-tertiary)] tabular-nums w-5">{evt.minute}&apos;</span>
+                  <span>
+                    {evt.type === 'goal' && <span className="text-[var(--green)]">Goal</span>}
+                    {evt.type === 'red_card' && <span className="text-[var(--red)]">Red Card</span>}
+                    {evt.type === 'yellow_card' && <span className="text-[var(--yellow)]">Yellow</span>}
+                    {evt.type === 'penalty' && <span className="text-[var(--accent)]">Penalty</span>}
+                    {!['goal', 'red_card', 'yellow_card', 'penalty'].includes(evt.type) && (
+                      <span className="text-[var(--text-tertiary)]">{evt.type}</span>
+                    )}
+                  </span>
+                  <span className="text-[var(--text-secondary)]">
+                    {evt.player || evt.side}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
