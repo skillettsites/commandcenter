@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   } else if (range === 'all') {
     startDate = '2020-01-01';
     timeDimension = 'date';
-  } else if (range === 'today') {
+  } else if (range === 'today' || range === '1h') {
     startDate = 'today';
     timeDimension = 'dateHour';
   } else {
@@ -91,7 +91,18 @@ export async function GET(request: NextRequest) {
   }
 
   // Sort by dateHour ascending
-  const hourly = Array.from(merged.values()).sort((a, b) => a.dateHour.localeCompare(b.dateHour));
+  let hourly = Array.from(merged.values()).sort((a, b) => a.dateHour.localeCompare(b.dateHour));
+
+  // For '1h' range, filter to only the current and previous hour
+  if (range === '1h') {
+    const now = new Date();
+    const currentHour = now.getUTCHours();
+    const prevHour = currentHour === 0 ? 23 : currentHour - 1;
+    const todayStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const currentKey = `${todayStr}${String(currentHour).padStart(2, '0')}`;
+    const prevKey = `${todayStr}${String(prevHour).padStart(2, '0')}`;
+    hourly = hourly.filter(h => h.dateHour === currentKey || h.dateHour === prevKey);
+  }
 
   // Per-site breakdown for the bar chart
   const perSite = gaProjects.map((project, i) => {
