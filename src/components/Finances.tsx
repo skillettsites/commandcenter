@@ -136,9 +136,9 @@ function BreakdownBar({ data }: { data: { label: string; value: number; color: s
   );
 }
 
-export default function Finances() {
+export default function Finances({ startExpanded = false }: { startExpanded?: boolean }) {
   const [data, setData] = useState<FinancesData | null>(null);
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(!startExpanded);
   const [expandedSection, setExpandedSection] = useState<Section | null>(null);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);

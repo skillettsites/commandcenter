@@ -5,8 +5,6 @@ import SearchActivity from '@/components/SearchActivity';
 import BetPositions from '@/components/BetPositions';
 import EmailList from '@/components/EmailList';
 import TaskList from '@/components/TaskList';
-import Finances from '@/components/Finances';
-
 export const dynamic = 'force-dynamic';
 
 export default function Home() {
@@ -20,7 +18,6 @@ export default function Home() {
         <BetPositions />
         <EmailList />
         <TaskList />
-        <Finances />
       </div>
     </main>
   );
