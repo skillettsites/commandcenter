@@ -55,8 +55,8 @@ interface DividendData {
   monthlyTotals: Record<string, { received: number; forecast: number }>;
   thisMonthReceived: number;
   thisMonthExpected: number;
-  annualEstimate: number;
-  monthlyEstimate: number;
+  annualReceived: number;
+  monthlyAverage: number;
   jepqTarget: {
     name: string;
     capital: number;
@@ -336,10 +336,10 @@ function DividendSection({ dividends }: { dividends: DividendData }) {
         <div className="text-right">
           <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">Est. annual</div>
           <div className="text-[13px] font-medium text-[var(--text-primary)]">
-            £{dividends.annualEstimate.toLocaleString()}/yr
+            £{dividends.annualReceived.toLocaleString()}/yr
           </div>
           <div className="text-[10px] text-[var(--text-tertiary)]">
-            ~£{dividends.monthlyEstimate.toLocaleString()}/mo
+            ~£{dividends.monthlyAverage.toLocaleString()}/mo
           </div>
         </div>
       </div>
@@ -693,7 +693,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[14px] font-medium text-[var(--text-primary)]">
-                      ~£{data.dividends.monthlyEstimate.toLocaleString()}/mo
+                      ~£{data.dividends.monthlyAverage.toLocaleString()}/mo
                     </span>
                     <svg
                       className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ${expandedSection === 'dividends' ? 'rotate-90' : ''}`}

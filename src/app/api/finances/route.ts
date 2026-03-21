@@ -70,13 +70,49 @@ async function fetchForexRate(): Promise<number> {
   }
 }
 
-function generateDividendForecast(holdingValues: Record<string, number>) {
+interface YahooDividendEvent {
+  amount: number;
+  date: number; // unix timestamp
+}
+
+interface YahooDividendResult {
+  chart?: {
+    result?: Array<{
+      events?: {
+        dividends?: Record<string, YahooDividendEvent>;
+      };
+    }>;
+  };
+}
+
+async function fetchDividendHistory(symbol: string): Promise<YahooDividendEvent[]> {
+  try {
+    // Fetch 2 years of dividend history
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=2y&events=div`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      next: { revalidate: 3600 }, // cache 1 hour
+    });
+    if (!res.ok) return [];
+    const data: YahooDividendResult = await res.json();
+    const divs = data.chart?.result?.[0]?.events?.dividends;
+    if (!divs) return [];
+    return Object.values(divs).sort((a, b) => a.date - b.date);
+  } catch {
+    return [];
+  }
+}
+
+async function generateDividendData(
+  holdingValues: Record<string, number>,
+  forexRate: number
+) {
   const now = new Date();
-  const currentMonth = now.getMonth() + 1; // 1-12
+  const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
   interface DividendPayment {
-    date: string; // YYYY-MM
+    date: string;
     month: number;
     year: number;
     source: string;
@@ -86,29 +122,100 @@ function generateDividendForecast(holdingValues: Record<string, number>) {
 
   const payments: DividendPayment[] = [];
 
-  // Generate 12 months of data: 3 months back + current + 8 months forward
-  for (let offset = -3; offset <= 8; offset++) {
-    let month = currentMonth + offset;
-    let year = currentYear;
-    if (month < 1) { month += 12; year -= 1; }
-    if (month > 12) { month -= 12; year += 1; }
+  // Fetch real dividend history for stocks from Yahoo Finance
+  const stockSymbols = stockHoldings.filter(s => s.shares > 0).map(s => s.symbol);
+  const fundSymbolMap = fundHoldings.filter(f => f.yahooSymbol).map(f => ({ id: f.id, name: f.name, symbol: f.yahooSymbol, units: f.units }));
 
-    const dateStr = `${year}-${String(month).padStart(2, '0')}`;
+  const allSymbols = [
+    ...stockSymbols.map(s => ({ symbol: s, type: 'stock' as const })),
+    ...fundSymbolMap.map(f => ({ symbol: f.symbol, type: 'fund' as const })),
+  ];
 
-    for (const schedule of dividendSchedules) {
-      if (!schedule.paysDividend) continue;
+  const divHistories = await Promise.all(allSymbols.map(s => fetchDividendHistory(s.symbol)));
+
+  // Process stock dividends (reported per share, multiply by shares held)
+  for (let i = 0; i < stockSymbols.length; i++) {
+    const symbol = stockSymbols[i];
+    const holding = stockHoldings.find(s => s.symbol === symbol);
+    if (!holding) continue;
+    const divs = divHistories[i];
+
+    for (const div of divs) {
+      const d = new Date(div.date * 1000);
+      const month = d.getMonth() + 1;
+      const year = d.getFullYear();
+      const dateStr = `${year}-${String(month).padStart(2, '0')}`;
+
+      // Convert USD dividend to GBP
+      const totalGBP = div.amount * holding.shares * forexRate;
+
+      payments.push({
+        date: dateStr,
+        month,
+        year,
+        source: holding.name,
+        amount: Math.round(totalGBP * 100) / 100,
+        status: 'received',
+      });
+    }
+  }
+
+  // Process fund dividends (reported per unit, multiply by units held)
+  for (let i = 0; i < fundSymbolMap.length; i++) {
+    const fund = fundSymbolMap[i];
+    const divs = divHistories[stockSymbols.length + i];
+
+    for (const div of divs) {
+      const d = new Date(div.date * 1000);
+      const month = d.getMonth() + 1;
+      const year = d.getFullYear();
+      const dateStr = `${year}-${String(month).padStart(2, '0')}`;
+
+      // Fund divs are already in GBP (pence per unit from Yahoo for .L funds)
+      // Yahoo returns in the fund's currency, for GBP funds it's already GBP
+      const totalGBP = div.amount * fund.units;
+
+      payments.push({
+        date: dateStr,
+        month,
+        year,
+        source: fund.name,
+        amount: Math.round(totalGBP * 100) / 100,
+        status: 'received',
+      });
+    }
+  }
+
+  // For future months, use the most recent dividend per holding as forecast
+  const latestBySource: Record<string, number> = {};
+  const freqBySource: Record<string, number[]> = {};
+  for (const p of payments) {
+    latestBySource[p.source] = p.amount;
+    if (!freqBySource[p.source]) freqBySource[p.source] = [];
+    if (!freqBySource[p.source].includes(p.month)) freqBySource[p.source].push(p.month);
+  }
+
+  // Also add schedule-based forecasts for holdings with no Yahoo dividend data
+  for (const schedule of dividendSchedules) {
+    if (!schedule.paysDividend) continue;
+    if (latestBySource[schedule.holdingName]) continue; // already have real data
+
+    const holdingValue = holdingValues[schedule.holdingId] || 0;
+    if (holdingValue <= 0) continue;
+
+    const paymentsPerYear = schedule.paymentMonths.length;
+    const annualIncome = holdingValue * (schedule.annualYieldPercent / 100);
+    const paymentAmount = annualIncome / paymentsPerYear;
+
+    for (let offset = -3; offset <= 8; offset++) {
+      let month = currentMonth + offset;
+      let year = currentYear;
+      if (month < 1) { month += 12; year -= 1; }
+      if (month > 12) { month -= 12; year += 1; }
       if (!schedule.paymentMonths.includes(month)) continue;
 
-      const holdingValue = holdingValues[schedule.holdingId] || 0;
-      if (holdingValue <= 0) continue;
-
-      const paymentsPerYear = schedule.paymentMonths.length;
-      const annualIncome = holdingValue * (schedule.annualYieldPercent / 100);
-      const paymentAmount = annualIncome / paymentsPerYear;
-
-      // Past months and current month before the 15th are "received"
+      const dateStr = `${year}-${String(month).padStart(2, '0')}`;
       const isPast = year < currentYear || (year === currentYear && month < currentMonth);
-      const isCurrentEarly = year === currentYear && month === currentMonth && now.getDate() >= 15;
 
       payments.push({
         date: dateStr,
@@ -116,7 +223,35 @@ function generateDividendForecast(holdingValues: Record<string, number>) {
         year,
         source: schedule.holdingName,
         amount: Math.round(paymentAmount * 100) / 100,
-        status: isPast || isCurrentEarly ? 'received' : 'forecast',
+        status: isPast ? 'received' : 'forecast',
+      });
+    }
+  }
+
+  // Add forecasts for the next 9 months based on latest known dividend
+  for (const [source, lastAmount] of Object.entries(latestBySource)) {
+    const months = freqBySource[source] || [];
+    if (months.length === 0) continue;
+
+    for (let offset = 0; offset <= 9; offset++) {
+      let month = currentMonth + offset;
+      let year = currentYear;
+      if (month > 12) { month -= 12; year += 1; }
+
+      if (!months.includes(month)) continue;
+      const dateStr = `${year}-${String(month).padStart(2, '0')}`;
+
+      // Skip if we already have a real payment for this month+source
+      const exists = payments.some(p => p.date === dateStr && p.source === source);
+      if (exists) continue;
+
+      payments.push({
+        date: dateStr,
+        month,
+        year,
+        source,
+        amount: lastAmount,
+        status: 'forecast',
       });
     }
   }
@@ -131,25 +266,23 @@ function generateDividendForecast(holdingValues: Record<string, number>) {
     monthlyTotals[p.date][p.status] += p.amount;
   }
 
-  // Current month summary
   const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
   const thisMonth = monthlyTotals[currentDateStr] || { received: 0, forecast: 0 };
 
-  // Annual estimated income
-  let annualEstimate = 0;
-  for (const schedule of dividendSchedules) {
-    if (!schedule.paysDividend) continue;
-    const holdingValue = holdingValues[schedule.holdingId] || 0;
-    annualEstimate += holdingValue * (schedule.annualYieldPercent / 100);
-  }
+  // Annual total from actual received payments in last 12 months
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const annualReceived = payments
+    .filter(p => p.status === 'received' && new Date(p.date + '-15') >= oneYearAgo)
+    .reduce((sum, p) => sum + p.amount, 0);
 
   return {
     payments,
     monthlyTotals,
     thisMonthReceived: Math.round(thisMonth.received * 100) / 100,
     thisMonthExpected: Math.round(thisMonth.forecast * 100) / 100,
-    annualEstimate: Math.round(annualEstimate),
-    monthlyEstimate: Math.round(annualEstimate / 12),
+    annualReceived: Math.round(annualReceived),
+    monthlyAverage: Math.round(annualReceived / 12),
     jepqTarget: {
       name: jepqTarget.name,
       capital: jepqTarget.estimatedDeployableCapital,
@@ -223,8 +356,8 @@ export async function GET() {
     holdingValues[f.id] = f.currentValue;
   }
 
-  // Generate dividend forecast
-  const dividends = generateDividendForecast(holdingValues);
+  // Generate dividend data from real Yahoo Finance dividend history
+  const dividends = await generateDividendData(holdingValues, forexRate);
 
   // Totals
   const stocksTotal = stocks.reduce((sum, s) => sum + (s.currentValue ?? 0), 0);
