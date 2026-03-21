@@ -252,6 +252,65 @@ ${trimmed}`,
   }
 }
 
+// Estimate property value from Land Registry comparables using Claude Haiku
+async function estimateFromComparables(
+  comparables: LandRegistryTransaction[],
+  propertyAddress: string,
+  premiumNotes: string,
+  propertyName: string
+): Promise<{ estimate: number | null; low: number | null; high: number | null }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || comparables.length === 0) return { estimate: null, low: null, high: null };
+
+  const client = new Anthropic({ apiKey });
+
+  const salesList = comparables
+    .slice(0, 15)
+    .map(c => `${c.address}: £${c.price.toLocaleString()} (${c.date})`)
+    .join('\n');
+
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [
+        {
+          role: 'user',
+          content: `Based on these recent comparable sales in the same building/postcode, estimate the current market value for: ${propertyAddress}
+
+Property notes: ${premiumNotes || 'Standard unit'}
+
+Recent comparable sales:
+${salesList}
+
+Return ONLY a JSON object with three numbers (no text, no markdown):
+{"estimate": NUMBER, "low": NUMBER, "high": NUMBER}
+
+The estimate should reflect the premium notes (e.g. if it says top floor, terrace, south-facing, estimate at the upper end of comparables). Give a realistic range.`,
+        },
+      ],
+    });
+
+    const textContent = message.content.find((c) => c.type === 'text');
+    if (!textContent || textContent.type !== 'text') return { estimate: null, low: null, high: null };
+
+    let jsonStr = textContent.text.trim();
+    if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+
+    const parsed = JSON.parse(jsonStr);
+    return {
+      estimate: parsed.estimate ?? null,
+      low: parsed.low ?? null,
+      high: parsed.high ?? null,
+    };
+  } catch (err) {
+    console.error('Claude estimation from comparables error:', err);
+    return { estimate: null, low: null, high: null };
+  }
+}
+
 // Get cached valuations from Supabase
 async function getCachedValuations(): Promise<PropertyValuation[]> {
   try {
@@ -342,13 +401,23 @@ export async function GET(request: Request) {
           fetchLandRegistryData(property.postcode || 'E1W'),
         ]);
 
-        // Parse Zoopla estimate with Claude
+        // Parse Zoopla estimate with Claude, or estimate from Land Registry if Zoopla blocked
         let zooplaResult = { estimate: null as number | null, low: null as number | null, high: null as number | null };
         if (zooplaContent) {
           zooplaResult = await parseZooplaWithClaude(
             zooplaContent,
             property.address!,
             property.premiumNotes || ''
+          );
+        }
+
+        // If Zoopla failed, estimate from Land Registry comparable sales using Claude
+        if (!zooplaResult.estimate && landRegistryData.length > 0) {
+          zooplaResult = await estimateFromComparables(
+            landRegistryData,
+            property.address!,
+            property.premiumNotes || '',
+            property.name
           );
         }
 
