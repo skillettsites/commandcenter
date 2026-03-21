@@ -118,7 +118,7 @@ export const dividendSchedules: DividendSchedule[] = [
     holdingId: 'ubs-global',
     holdingName: 'UBS Global Enhanced Eq Income',
     holdingType: 'fund',
-    annualYieldPercent: 4.5,
+    annualYieldPercent: 7.5,
     frequency: 'quarterly',
     paysDividend: true,
     paymentMonths: [3, 6, 9, 12], // Mar, Jun, Sep, Dec
