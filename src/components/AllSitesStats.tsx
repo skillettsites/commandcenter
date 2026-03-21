@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { projects } from '@/lib/projects';
 
 interface HourlyData {
   dateHour: string;
@@ -22,6 +23,14 @@ interface CombinedData {
   perSite: PerSiteData[];
 }
 
+interface SiteTodayData {
+  siteId: string;
+  name: string;
+  color: string;
+  visitors: number;
+  pageViews: number;
+}
+
 interface AggregatedStats {
   todayVisitors: number;
   monthVisitors: number;
@@ -29,6 +38,7 @@ interface AggregatedStats {
   todayPageViews: number;
   monthPageViews: number;
   allTimePageViews: number;
+  sitesToday: SiteTodayData[];
 }
 
 const RANGE_LABEL: Record<string, string> = { '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
@@ -47,11 +57,27 @@ export default function AllSitesStats() {
       .then(json => {
         if (json?.data) {
           const results = json.data as Array<{
+            siteId: string;
             activeUsers: number;
             pageViews: number;
             monthVisitors: number;
             totalVisitors: number;
           }>;
+
+          const sitesToday: SiteTodayData[] = results
+            .filter(r => r.activeUsers > 0 || r.pageViews > 0)
+            .map(r => {
+              const proj = projects.find(p => p.id === r.siteId);
+              return {
+                siteId: r.siteId,
+                name: proj?.name || r.siteId,
+                color: proj?.color || '#888',
+                visitors: r.activeUsers,
+                pageViews: r.pageViews,
+              };
+            })
+            .sort((a, b) => b.visitors - a.visitors || b.pageViews - a.pageViews);
+
           setStats({
             todayVisitors: results.reduce((s, r) => s + r.activeUsers, 0),
             monthVisitors: results.reduce((s, r) => s + r.monthVisitors, 0),
@@ -59,6 +85,7 @@ export default function AllSitesStats() {
             todayPageViews: results.reduce((s, r) => s + r.pageViews, 0),
             monthPageViews: 0,
             allTimePageViews: 0,
+            sitesToday,
           });
         }
       })
@@ -127,6 +154,27 @@ export default function AllSitesStats() {
               <StatBox label="This Month" value={stats?.monthVisitors ?? 0} />
               <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} />
             </div>
+
+            {/* Sites with visitors today */}
+            {stats?.sitesToday && stats.sitesToday.length > 0 && (
+              <div className="mb-4 space-y-1">
+                <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+                  Active Today
+                </p>
+                {stats.sitesToday.map(site => (
+                  <div key={site.siteId} className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: site.color }} />
+                      <span className="text-[11px] text-[var(--text-secondary)]">{site.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium text-[var(--text-primary)]">{site.visitors} visitors</span>
+                      <span className="text-[10px] text-[var(--text-tertiary)]">{site.pageViews} views</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Chart */}
             {loading && !data ? (
