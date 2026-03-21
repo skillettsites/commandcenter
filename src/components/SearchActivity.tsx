@@ -220,7 +220,7 @@ function LineChart({ data, color, range }: LineChartProps) {
 export default function SearchActivity() {
   const [data, setData] = useState<SearchData | null>(null);
   const [chartData, setChartData] = useState<ChartData | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [expandedSite, setExpandedSite] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<TimeRange>('1m');
   const [error, setError] = useState(false);
