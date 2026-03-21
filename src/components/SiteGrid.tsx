@@ -216,8 +216,11 @@ function SiteRow({
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [gscData, setGscData] = useState<GscData | null>(null);
   const [bingData, setBingData] = useState<BingData | null>(null);
+  const [searchStats, setSearchStats] = useState<{ today: number; month: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
+
+  const hasSearchTracking = site.id === 'carcostcheck' || site.id === 'postcodecheck';
 
   const cycleRange = () => {
     const next = chartRange === '24h' ? '1m' : chartRange === '1m' ? 'all' : '24h';
@@ -257,6 +260,19 @@ function SiteRow({
         );
       }
 
+      if (hasSearchTracking) {
+        fetches.push(
+          fetch(`/api/searches?site_id=${site.id}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data?.[site.id]) {
+                setSearchStats({ today: data[site.id].today, month: data[site.id].month });
+              }
+            })
+            .catch(() => {})
+        );
+      }
+
       Promise.all(fetches).finally(() => setLoading(false));
     }
   }, [expanded, chartRange, site.id, site.gaPropertyId, site.gscSiteUrl, site.bingSiteUrl]);
@@ -267,6 +283,7 @@ function SiteRow({
       setDetail(null);
       setGscData(null);
       setBingData(null);
+      setSearchStats(null);
       setChartRange('24h');
     }
   }, [expanded]);
@@ -387,6 +404,25 @@ function SiteRow({
                     Bing not configured
                   </span>
                 )}
+              </div>
+            )}
+
+            {/* Search/check stats */}
+            {searchStats && (searchStats.today > 0 || searchStats.month > 0) && (
+              <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
+                <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                  {site.id === 'carcostcheck' ? 'Plates Checked' : 'Postcodes Checked'}
+                </h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[14px] font-semibold text-[var(--green)]">{searchStats.today}</div>
+                    <div className="text-[9px] text-[var(--text-tertiary)]">Today</div>
+                  </div>
+                  <div>
+                    <div className="text-[14px] font-semibold text-[var(--text-primary)]">{searchStats.month.toLocaleString()}</div>
+                    <div className="text-[9px] text-[var(--text-tertiary)]">This Month</div>
+                  </div>
+                </div>
               </div>
             )}
 
