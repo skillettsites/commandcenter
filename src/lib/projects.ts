@@ -7,7 +7,7 @@ export const projects: Project[] = [
   { id: 'tapwaterscore', name: 'TapWaterScore', url: 'https://tapwaterscore.vercel.app', color: '#06B6D4', gaPropertyId: '528464841' },
   { id: 'medcostcheck', name: 'MedCostCheck', url: 'https://medcostcheck.vercel.app', color: '#8B5CF6', gaPropertyId: '528436588' },
   { id: 'findyourstay', name: 'FindYourStay', url: 'https://findyourstay.com', color: '#F59E0B', gaPropertyId: '528486093', gscSiteUrl: 'sc-domain:findyourstay.com' },
-  { id: 'helpafterloss', name: 'HelpAfterLoss', url: 'https://helpafterloss.co.uk', color: '#EC4899', gaPropertyId: '529337369', gscSiteUrl: 'https://helpafterloss.co.uk/', bingSiteUrl: 'https://helpafterloss.co.uk/' },
+  { id: 'helpafterloss', name: 'HelpAfterLoss', url: 'https://helpafterloss.co.uk', color: '#EC4899', gaPropertyId: '529337369', gscSiteUrl: 'sc-domain:helpafterloss.co.uk', bingSiteUrl: 'https://helpafterloss.co.uk/' },
   { id: 'helpafterlife', name: 'HelpAfterLife', url: 'https://helpafterlife.com', color: '#D946EF', gscSiteUrl: 'sc-domain:helpafterlife.com', bingSiteUrl: 'https://helpafterlife.com/' },
   { id: 'aibetfinder', name: 'AI Bet Finder', url: 'https://aibetfinder.com', color: '#F43F5E', gscSiteUrl: 'sc-domain:aibetfinder.com' },
   { id: 'bestlondontours', name: 'BestLondonTours', url: 'https://bestlondontours.co.uk', color: '#E11D48', gscSiteUrl: 'sc-domain:bestlondontours.co.uk', bingSiteUrl: 'https://bestlondontours.co.uk/' },
