@@ -9,17 +9,17 @@ const FUND_CONFIGS = [
   {
     id: 'fidelity-enhanced',
     sedol: 'BD1NLK5',
-    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices-and-factsheets/search-results/f/fidelity-enhanced-income-w-income',
+    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/f/fidelity-enhanced-income-class-w-income',
   },
   {
     id: 'ubs-global',
     sedol: 'B3LBSQ4',
-    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices-and-factsheets/search-results/u/ubs-global-enhanced-equity-income-sustainable-b-inc',
+    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/u/ubs-global-enhanced-equity-income-c-income',
   },
   {
     id: 'aegon-high-yield',
     sedol: 'B1FQYP9',
-    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices-and-factsheets/search-results/a/aegon-high-yield-bond-b-income',
+    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/a/aegon-high-yield-bond-class-b-income',
   },
 ];
 
