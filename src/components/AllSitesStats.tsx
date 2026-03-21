@@ -34,7 +34,7 @@ interface AggregatedStats {
 const RANGE_LABEL: Record<string, string> = { '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
 
 export default function AllSitesStats() {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [chartRange, setChartRange] = useState<'24h' | '1m' | 'all'>('24h');
   const [data, setData] = useState<CombinedData | null>(null);
   const [loading, setLoading] = useState(false);

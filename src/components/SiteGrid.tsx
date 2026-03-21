@@ -59,7 +59,7 @@ export default function SiteGrid() {
       }))
   );
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
