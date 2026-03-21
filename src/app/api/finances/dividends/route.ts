@@ -10,16 +10,19 @@ const FUND_CONFIGS = [
     id: 'fidelity-enhanced',
     sedol: 'BD1NLK5',
     hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/f/fidelity-enhanced-income-class-w-income',
+    trustnetUrl: 'https://www.trustnet.com/factsheets/O/gmtr/fidelity-enhanced-income/',
   },
   {
     id: 'ubs-global',
     sedol: 'B3LBSQ4',
     hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/u/ubs-global-enhanced-equity-income-c-income',
+    trustnetUrl: 'https://www.trustnet.com/factsheets/o/kyxy/ubs-global-enhanced-equity-income-c-inc',
   },
   {
     id: 'aegon-high-yield',
     sedol: 'B1FQYP9',
     hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/a/aegon-high-yield-bond-class-b-income',
+    trustnetUrl: 'https://www.trustnet.com/factsheets/o/cws6/kames-high-yield-bond-b-inc',
   },
 ];
 
@@ -42,25 +45,37 @@ interface FundDividendData {
   fetched_at: string;
 }
 
-// Fetch HTML from a Hargreaves Lansdown factsheet page
-async function fetchHLPage(url: string): Promise<string | null> {
+// Fetch fund page content. Try Trustnet via Jina reader first (renders JS), fall back to HL direct
+async function fetchFundPage(config: typeof FUND_CONFIGS[0]): Promise<string | null> {
+  // Try Trustnet via Jina reader (renders JavaScript, gets yield data)
+  if (config.trustnetUrl) {
+    try {
+      const jinaUrl = `https://r.jina.ai/${config.trustnetUrl}`;
+      const res = await fetch(jinaUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      });
+      if (res.ok) {
+        const text = await res.text();
+        if (text.length > 500 && !text.includes('404')) return text;
+      }
+    } catch (err) {
+      console.error(`Trustnet/Jina fetch error for ${config.id}:`, err);
+    }
+  }
+
+  // Fallback: fetch HL page directly
   try {
-    const res = await fetch(url, {
+    const res = await fetch(config.hlUrl, {
       headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-GB,en;q=0.9',
-        'Cache-Control': 'no-cache',
       },
     });
-    if (!res.ok) {
-      console.error(`HL fetch failed for ${url}: ${res.status}`);
-      return null;
-    }
+    if (!res.ok) return null;
     return await res.text();
   } catch (err) {
-    console.error(`HL fetch error for ${url}:`, err);
+    console.error(`HL fetch error for ${config.id}:`, err);
     return null;
   }
 }
@@ -224,7 +239,10 @@ function isCacheFresh(fetchedAt: string): boolean {
   return now - fetchedDate < CACHE_TTL_MS;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const forceRefresh = searchParams.get('refresh') === '1';
+
   // Step 1: Check cache
   const cached = await getCachedData();
   const cachedMap = new Map<string, FundDividendData>();
@@ -233,17 +251,19 @@ export async function GET() {
   }
 
   // Step 2: Determine which funds need refreshing
-  const fundsToFetch = FUND_CONFIGS.filter((config) => {
-    const cachedItem = cachedMap.get(config.id);
-    if (!cachedItem) return true;
-    return !isCacheFresh(cachedItem.fetched_at);
-  });
+  const fundsToFetch = forceRefresh
+    ? FUND_CONFIGS
+    : FUND_CONFIGS.filter((config) => {
+        const cachedItem = cachedMap.get(config.id);
+        if (!cachedItem) return true;
+        return !isCacheFresh(cachedItem.fetched_at);
+      });
 
   // Step 3: Fetch and parse stale/missing funds
   if (fundsToFetch.length > 0) {
     const fetchResults = await Promise.all(
       fundsToFetch.map(async (config) => {
-        const html = await fetchHLPage(config.hlUrl);
+        const html = await fetchFundPage(config);
         if (!html) {
           // HL down; keep cached data if available
           return cachedMap.get(config.id) || null;
