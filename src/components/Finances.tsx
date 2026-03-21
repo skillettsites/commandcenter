@@ -169,12 +169,17 @@ function BreakdownBar({ data }: { data: { label: string; value: number; color: s
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function DividendChart({ dividends, range }: { dividends: DividendData; range: DividendRange }) {
+  const [selectedBar, setSelectedBar] = useState<number | null>(null);
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  // For "This Month" view, show individual payments on exact dates
-  // For Year/All, show monthly totals as before
+  // Reset selection when range changes
+  useEffect(() => { setSelectedBar(null); }, [range]);
+
+  // Build bars based on range
+  let bars: { date: string; label: string; received: number; forecast: number; total: number; details: string[] }[];
+
   if (range === 'month') {
     const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
     const monthPayments = dividends.payments.filter(p => p.date === currentDateStr);
@@ -183,31 +188,93 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
       <div className="py-6 text-center text-[11px] text-[var(--text-tertiary)]">No payments this month</div>
     );
 
-    // Group by source for individual bars
-    const bars = monthPayments.map((p, i) => ({
+    bars = monthPayments.map(p => ({
       date: p.date,
       label: p.source.split(' ').slice(0, 2).join(' '),
       received: p.status === 'received' ? p.amount : 0,
       forecast: p.status === 'forecast' ? p.amount : 0,
       total: p.amount,
-      fullLabel: `${p.source}: £${p.amount.toFixed(2)}`,
+      details: [`${p.source}`, `£${p.amount.toFixed(2)}`, p.status === 'received' ? 'Received' : 'Expected'],
     }));
+  } else {
+    const sortedDates = Object.keys(dividends.monthlyTotals).sort();
+    const filteredDates = range === 'year'
+      ? sortedDates.filter(d => d.startsWith(String(currentYear)))
+      : sortedDates;
 
-    const maxValue = Math.max(...bars.map(b => b.total), 1);
-    const svgWidth = 500;
-    const svgHeight = 120;
-    const barGap = 6;
-    const barWidth = Math.max(20, (svgWidth - 40) / bars.length - barGap);
-    const startX = 20;
+    if (filteredDates.length === 0) return null;
 
-    return (
+    bars = filteredDates.map(date => {
+      const totals = dividends.monthlyTotals[date] || { received: 0, forecast: 0 };
+      const month = parseInt(date.split('-')[1]);
+      const year = parseInt(date.split('-')[0]);
+      const monthPayments = dividends.payments.filter(p => p.date === date);
+      return {
+        date,
+        label: MONTH_LABELS[month - 1] + (range === 'all' ? ` '${String(year).slice(2)}` : ''),
+        received: totals.received,
+        forecast: totals.forecast,
+        total: totals.received + totals.forecast,
+        details: monthPayments.map(p => `${p.source.split(' ').slice(0, 2).join(' ')}: £${p.amount.toFixed(2)}`),
+      };
+    });
+  }
+
+  const maxValue = Math.max(...bars.map(b => b.total), 1);
+  const svgWidth = 500;
+  const svgHeight = 140;
+  const barGap = range === 'month' ? 6 : 2;
+  const barWidth = Math.max(range === 'month' ? 20 : 8, (svgWidth - 40) / bars.length - barGap);
+  const startX = 20;
+  const sel = selectedBar !== null ? bars[selectedBar] : null;
+
+  return (
+    <div>
+      {/* Selected bar detail popup */}
+      {sel && (
+        <div className="mb-2 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-light)] fade-in">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[12px] font-semibold text-[var(--text-primary)]">{sel.label}</span>
+            <span className="text-[13px] font-bold text-[var(--green)]">£{sel.total.toFixed(2)}</span>
+          </div>
+          {sel.received > 0 && sel.forecast > 0 && (
+            <div className="flex gap-3 text-[10px] mb-1">
+              <span className="text-[var(--green)]">£{sel.received.toFixed(2)} received</span>
+              <span className="text-[var(--text-tertiary)]">£{sel.forecast.toFixed(2)} expected</span>
+            </div>
+          )}
+          {sel.details.length > 0 && (
+            <div className="space-y-0.5 mt-1 border-t border-[var(--border-light)] pt-1">
+              {sel.details.map((d, i) => (
+                <div key={i} className="text-[11px] text-[var(--text-secondary)]">{d}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${svgWidth} ${svgHeight + 24}`}
-          className="w-full"
+          className="w-full cursor-pointer"
+          style={{ minWidth: bars.length > 8 ? `${bars.length * 45}px` : '100%' }}
           preserveAspectRatio="xMinYMid meet"
+          onClick={(e) => {
+            const svg = e.currentTarget;
+            const rect = svg.getBoundingClientRect();
+            const clickX = ((e.clientX - rect.left) / rect.width) * svgWidth;
+            let closest = 0;
+            let minDist = Infinity;
+            bars.forEach((_, i) => {
+              const barCenterX = startX + i * (barWidth + barGap) + barWidth / 2;
+              const dist = Math.abs(barCenterX - clickX);
+              if (dist < minDist) { minDist = dist; closest = i; }
+            });
+            setSelectedBar(selectedBar === closest ? null : closest);
+          }}
         >
-          {[0.5, 1].map((frac) => {
+          {/* Y-axis guide lines */}
+          {[0.25, 0.5, 0.75, 1].map((frac) => {
             const y = svgHeight - (frac * svgHeight);
             return (
               <g key={frac}>
@@ -218,93 +285,22 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
               </g>
             );
           })}
+
+          {/* Bars */}
           {bars.map((bar, i) => {
-            const x = startX + i * (barWidth + barGap);
-            const h = (bar.total / maxValue) * svgHeight;
-            const isReceived = bar.received > 0;
-            return (
-              <g key={i}>
-                <rect x={x} y={svgHeight - h} width={barWidth} height={h} rx={3} fill="#30d158" opacity={isReceived ? 0.85 : 0.3} />
-                <text x={x + barWidth / 2} y={svgHeight - h - 4} textAnchor="middle" fontSize={8} fill="var(--text-secondary)" fontWeight={600}>
-                  £{bar.total.toFixed(2)}
-                </text>
-                <text x={x + barWidth / 2} y={svgHeight + 12} textAnchor="middle" fontSize={7} fill="var(--text-tertiary)">
-                  {bar.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
-  }
-
-  const sortedDates = Object.keys(dividends.monthlyTotals).sort();
-  let filteredDates: string[];
-
-  if (range === 'year') {
-    filteredDates = sortedDates.filter(d => d.startsWith(String(currentYear)));
-  } else {
-    filteredDates = sortedDates;
-  }
-
-  if (filteredDates.length === 0) return null;
-
-  // Build bar data for year/all views
-  const bars = filteredDates.map(date => {
-    const totals = dividends.monthlyTotals[date] || { received: 0, forecast: 0 };
-    const month = parseInt(date.split('-')[1]);
-    const year = parseInt(date.split('-')[0]);
-    return {
-      date,
-      label: MONTH_LABELS[month - 1] + (range === 'all' ? ` '${String(year).slice(2)}` : ''),
-      received: totals.received,
-      forecast: totals.forecast,
-      total: totals.received + totals.forecast,
-    };
-  });
-
-  const maxValue = Math.max(...bars.map(b => b.total), 1);
-  const chartWidth = 100; // percentage-based
-  const chartHeight = 120;
-  const barGap = 2;
-
-  // SVG chart
-  const svgWidth = 500;
-  const svgHeight = chartHeight;
-  const barWidth = Math.max(8, (svgWidth - 40) / bars.length - barGap);
-  const startX = 20;
-
-  return (
-    <div className="w-full overflow-x-auto">
-      <svg
-        viewBox={`0 0 ${svgWidth} ${svgHeight + 24}`}
-        className="w-full"
-        style={{ minWidth: bars.length > 6 ? `${bars.length * 50}px` : '100%' }}
-        preserveAspectRatio="xMinYMid meet"
-      >
-        {/* Y-axis guide lines */}
-        {[0.25, 0.5, 0.75, 1].map((frac) => {
-          const y = svgHeight - (frac * svgHeight);
-          return (
-            <g key={frac}>
-              <line x1={startX} y1={y} x2={svgWidth - 10} y2={y} stroke="var(--border-light)" strokeWidth={0.5} strokeDasharray="3,3" />
-              <text x={startX - 4} y={y + 3} textAnchor="end" fontSize={8} fill="var(--text-tertiary)">
-                £{Math.round(maxValue * frac).toLocaleString()}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Bars */}
-        {bars.map((bar, i) => {
           const x = startX + i * (barWidth + barGap);
           const receivedH = (bar.received / maxValue) * svgHeight;
           const forecastH = (bar.forecast / maxValue) * svgHeight;
           const totalH = receivedH + forecastH;
+          const isSelected = selectedBar === i;
+          const dimmed = selectedBar !== null && !isSelected;
 
           return (
-            <g key={bar.date}>
+            <g key={i} style={{ opacity: dimmed ? 0.4 : 1, transition: 'opacity 0.2s' }}>
+              {/* Selection highlight */}
+              {isSelected && (
+                <rect x={x - 2} y={0} width={barWidth + 4} height={svgHeight + 20} rx={4} fill="var(--accent)" opacity={0.08} />
+              )}
               {/* Forecast portion (lighter, on top) */}
               {forecastH > 0 && (
                 <rect
@@ -313,7 +309,7 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
                   width={barWidth}
                   height={forecastH}
                   rx={2}
-                  fill="#30d158"
+                  fill={isSelected ? '#34d399' : '#30d158'}
                   opacity={0.3}
                 />
               )}
@@ -325,19 +321,19 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
                   width={barWidth}
                   height={receivedH}
                   rx={forecastH > 0 ? 0 : 2}
-                  fill="#30d158"
+                  fill={isSelected ? '#34d399' : '#30d158'}
                   opacity={0.85}
                 />
               )}
-              {/* Amount label on top */}
-              {bar.total > 0 && (
+              {/* Amount label on top (only show for selected or if not too crowded) */}
+              {bar.total > 0 && (isSelected || bars.length <= 6) && (
                 <text
                   x={x + barWidth / 2}
-                  y={svgHeight - totalH - 3}
+                  y={svgHeight - totalH - 4}
                   textAnchor="middle"
-                  fontSize={7}
-                  fill="var(--text-secondary)"
-                  fontWeight={500}
+                  fontSize={isSelected ? 9 : 7}
+                  fill={isSelected ? 'var(--text-primary)' : 'var(--text-secondary)'}
+                  fontWeight={isSelected ? 700 : 500}
                 >
                   £{Math.round(bar.total).toLocaleString()}
                 </text>
@@ -347,8 +343,9 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
                 x={x + barWidth / 2}
                 y={svgHeight + 14}
                 textAnchor="middle"
-                fontSize={8}
-                fill="var(--text-tertiary)"
+                fontSize={isSelected ? 9 : 8}
+                fill={isSelected ? 'var(--text-primary)' : 'var(--text-tertiary)'}
+                fontWeight={isSelected ? 600 : 400}
               >
                 {bar.label}
               </text>
