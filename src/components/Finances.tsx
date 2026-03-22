@@ -415,41 +415,20 @@ function DividendSection({ dividends, properties = [] }: { dividends: DividendDa
     filteredPayments = dividends.payments.filter(p => p.year === currentYear);
   }
 
+  // Combined totals (dividends + rental)
+  const combinedMonthly = dividends.monthlyAverage + Math.round(netRental);
+  const combinedAnnual = dividends.annualReceived + Math.round(netRental * 12);
+  const combinedThisMonth = dividends.thisMonthReceived + Math.round(netRental);
+
   return (
     <div className="px-3.5 pb-3 fade-in">
-      {/* Rental passive income */}
-      {totalRent > 0 && (
-        <div className="mb-3 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-light)]">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Property Passive Income</span>
-            <span className={`text-[13px] font-bold ${netRental >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-              {netRental >= 0 ? '+' : ''}£{netRental.toFixed(0)}/mo
-            </span>
-          </div>
-          <div className="space-y-0.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-[var(--text-tertiary)]">Rent (OpenRent)</span>
-              <span className="text-[11px] text-[var(--green)]">+£{totalRent.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-[var(--text-tertiary)]">Mortgage (Paratus)</span>
-              <span className="text-[11px] text-[var(--red)]">-£{totalMortgagePay.toLocaleString()}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-[var(--text-tertiary)]">Service + ground rent</span>
-              <span className="text-[11px] text-[var(--red)]">-£{totalService.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Monthly income summary */}
+      {/* Monthly income summary (dividends + rental combined) */}
       <div className="flex items-center justify-between mb-3">
         <div>
-          <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">This month</div>
+          <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">This month (total)</div>
           <div className="flex items-center gap-2">
             <span className="text-[13px] font-medium text-[var(--green)]">
-              £{dividends.thisMonthReceived.toFixed(0)} received
+              £{combinedThisMonth.toLocaleString()}
             </span>
             {dividends.thisMonthExpected > 0 && (
               <span className="text-[12px] text-[var(--text-tertiary)]">
@@ -461,12 +440,28 @@ function DividendSection({ dividends, properties = [] }: { dividends: DividendDa
         <div className="text-right">
           <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">Est. annual</div>
           <div className="text-[13px] font-medium text-[var(--text-primary)]">
-            £{dividends.annualReceived.toLocaleString()}/yr
+            £{combinedAnnual.toLocaleString()}/yr
           </div>
           <div className="text-[10px] text-[var(--text-tertiary)]">
-            ~£{dividends.monthlyAverage.toLocaleString()}/mo
+            ~£{combinedMonthly.toLocaleString()}/mo
           </div>
         </div>
+      </div>
+
+      {/* Breakdown: dividends vs rental */}
+      <div className="space-y-0.5 mb-3 text-[10px]">
+        <div className="flex items-center justify-between text-[var(--text-tertiary)]">
+          <span>Dividends</span>
+          <span>£{dividends.monthlyAverage.toLocaleString()}/mo</span>
+        </div>
+        {netRental !== 0 && (
+          <div className="flex items-center justify-between text-[var(--text-tertiary)]">
+            <span>Rental net (£{totalRent.toLocaleString()} - £{(totalMortgagePay + totalService).toLocaleString()} costs)</span>
+            <span className={netRental >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}>
+              {netRental >= 0 ? '+' : ''}£{netRental.toFixed(0)}/mo
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Range toggle */}
@@ -854,7 +849,11 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[14px] font-medium text-[var(--text-primary)]">
-                      ~£{data.dividends.monthlyAverage.toLocaleString()}/mo
+                      ~£{(data.dividends.monthlyAverage + Math.round(
+                        keepingProperties.reduce((s, p) => s + (p.rentalIncome || 0), 0) -
+                        keepingProperties.reduce((s, p) => s + (p.mortgagePayment || 0), 0) -
+                        keepingProperties.reduce((s, p) => s + (p.serviceCharge || 0), 0)
+                      )).toLocaleString()}/mo
                     </span>
                     <svg
                       className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ${expandedSection === 'dividends' ? 'rotate-90' : ''}`}
