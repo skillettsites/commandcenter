@@ -72,6 +72,7 @@ interface DividendPayment {
   source: string;
   amount: number;
   status: 'received' | 'forecast';
+  expectedDay?: number;
 }
 
 interface DividendData {
@@ -583,8 +584,8 @@ function DividendSection({ dividends, properties = [] }: { dividends: DividendDa
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     p.status === 'received' ? 'bg-[var(--green)]' : 'bg-[var(--green)]/30'
                   }`} />
-                  <span className="text-[10px] text-[var(--text-tertiary)] w-[52px] flex-shrink-0">
-                    {MONTH_LABELS[p.month - 1]} {p.year}
+                  <span className="text-[10px] text-[var(--text-tertiary)] w-[72px] flex-shrink-0">
+                    {p.expectedDay ? `~${p.expectedDay}` : ''} {MONTH_LABELS[p.month - 1]} {String(p.year).slice(2)}
                   </span>
                   <span className="text-[11px] text-[var(--text-secondary)] truncate">{p.source}</span>
                 </div>

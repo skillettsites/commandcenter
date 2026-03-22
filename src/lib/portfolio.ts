@@ -100,6 +100,8 @@ export interface DividendSchedule {
   paysDividend: boolean;
   // For known payment months (1-12). Monthly = all months, quarterly = specific months
   paymentMonths: number[];
+  // Approximate payment day of month (based on historical patterns)
+  expectedPayDay?: number;
 }
 
 export const stockHoldings: StockHolding[] = [
@@ -227,6 +229,7 @@ export const dividendSchedules: DividendSchedule[] = [
     frequency: 'monthly',
     paysDividend: true,
     paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 25, // typically pays around 25th each month
   },
   {
     holdingId: 'ubs-global',
@@ -236,6 +239,7 @@ export const dividendSchedules: DividendSchedule[] = [
     frequency: 'quarterly',
     paysDividend: true,
     paymentMonths: [3, 6, 9, 12], // Mar, Jun, Sep, Dec
+    expectedPayDay: 15, // typically mid-month
   },
   {
     holdingId: 'aegon-high-yield',
@@ -245,6 +249,7 @@ export const dividendSchedules: DividendSchedule[] = [
     frequency: 'monthly', // actually pays monthly per Trustnet data
     paysDividend: true,
     paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 14, // typically mid-month
   },
   {
     holdingId: 'NVDA',
@@ -254,6 +259,7 @@ export const dividendSchedules: DividendSchedule[] = [
     frequency: 'quarterly',
     paysDividend: true,
     paymentMonths: [1, 4, 7, 10], // Jan, Apr, Jul, Oct
+    expectedPayDay: 27, // typically late month
   },
   {
     holdingId: 'GOOGL',
@@ -272,6 +278,7 @@ export const dividendSchedules: DividendSchedule[] = [
     frequency: 'monthly',
     paysDividend: true,
     paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 7, // typically first week of month
   },
   {
     holdingId: 'PLTR',

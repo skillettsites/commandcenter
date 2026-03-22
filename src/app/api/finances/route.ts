@@ -165,6 +165,15 @@ async function generateDividendData(
     amount: number;
     status: 'received' | 'forecast';
     dataSource: 'hl_scraped' | 'yahoo' | 'estimated';
+    expectedDay?: number; // approximate day of month payment arrives
+  }
+
+  // Build a map of holding name to expected pay day
+  const payDayMap: Record<string, number> = {};
+  for (const sched of dividendSchedules) {
+    if (sched.expectedPayDay) {
+      payDayMap[sched.holdingName] = sched.expectedPayDay;
+    }
   }
 
   const payments: DividendPayment[] = [];
@@ -345,6 +354,11 @@ async function generateDividendData(
   }
 
   // Sort by date then source
+  // Add expected pay day to each payment
+  for (const p of payments) {
+    p.expectedDay = payDayMap[p.source];
+  }
+
   payments.sort((a, b) => a.date.localeCompare(b.date) || a.source.localeCompare(b.source));
 
   // Monthly totals
