@@ -1151,6 +1151,38 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
             </div>
           </div>
 
+          {/* CRYPTO SECTION */}
+          <div>
+            <div
+              onClick={() => toggleSection('crypto' as Section)}
+              className="px-3.5 py-2.5 cursor-pointer active:bg-[var(--bg-elevated)] transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-6 rounded-full flex-shrink-0 bg-[#f7931a]" />
+                  <span className="text-[14px] font-medium text-[var(--text-primary)]">Crypto</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[14px] font-medium text-[var(--text-tertiary)]">TBC</span>
+                  <svg
+                    className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ${expandedSection === ('crypto' as Section) ? 'rotate-90' : ''}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {expandedSection === ('crypto' as Section) && (
+              <div className="px-3.5 pb-3 fade-in ml-3">
+                <p className="text-[12px] text-[var(--text-tertiary)]">
+                  Holdings on OKX. To be confirmed.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* POKEMON SECTION */}
           {data.pokemon && data.pokemon.cards.length > 0 && (
             <div>

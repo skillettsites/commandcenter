@@ -57,6 +57,17 @@ export const upcomingMoney: UpcomingMoney[] = [
   { id: 'house-sale-sister', source: 'Sister (from house sale)', amount: 100000, notes: 'Sister giving her share', status: 'pending' },
 ];
 
+export interface CryptoHolding {
+  id: string;
+  symbol: string;
+  name: string;
+  amount: number;
+  exchange: string;
+}
+
+// TBC - user to confirm holdings on OKX
+export const cryptoHoldings: CryptoHolding[] = [];
+
 export interface PokemonCard {
   id: string;
   name: string;
