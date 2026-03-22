@@ -1060,6 +1060,37 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                       </div>
                     ))}
                   </div>
+
+                  {/* Upcoming money */}
+                  <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
+                    <div className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                      Upcoming (£{(40000 + 100000 + 300000 + 100000).toLocaleString()})
+                    </div>
+                    <div className="space-y-1.5">
+                      {[
+                        { source: 'Sister (loan repayment)', amount: 40000, status: 'confirmed' },
+                        { source: 'Mum (probate)', amount: 100000, status: 'expected' },
+                        { source: 'House sale (my share)', amount: 300000, status: 'pending' },
+                        { source: 'Sister (from house sale)', amount: 100000, status: 'pending' },
+                      ].map((item) => (
+                        <div key={item.source} className="flex items-center justify-between py-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              item.status === 'confirmed' ? 'bg-[var(--green)]' :
+                              item.status === 'expected' ? 'bg-[var(--orange)]' : 'bg-[var(--text-tertiary)]'
+                            }`} />
+                            <span className="text-[11px] text-[var(--text-secondary)]">{item.source}</span>
+                          </div>
+                          <span className="text-[12px] font-medium text-[var(--text-primary)]">{formatGBP(item.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 mt-2 text-[9px] text-[var(--text-tertiary)]">
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--green)]" />Confirmed</span>
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--orange)]" />Expected</span>
+                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />Pending</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

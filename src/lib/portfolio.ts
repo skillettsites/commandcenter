@@ -42,6 +42,21 @@ export interface CashHolding {
   balance: number;
 }
 
+export interface UpcomingMoney {
+  id: string;
+  source: string;
+  amount: number;
+  notes: string;
+  status: 'confirmed' | 'expected' | 'pending';
+}
+
+export const upcomingMoney: UpcomingMoney[] = [
+  { id: 'sister-loan', source: 'Sister (loan repayment)', amount: 40000, notes: 'Owed to me', status: 'confirmed' },
+  { id: 'mum-probate', source: 'Mum (probate)', amount: 100000, notes: 'From estate', status: 'expected' },
+  { id: 'house-sale-mine', source: 'House sale (my share)', amount: 300000, notes: 'When mum sells house', status: 'pending' },
+  { id: 'house-sale-sister', source: 'Sister (from house sale)', amount: 100000, notes: 'Sister giving her share', status: 'pending' },
+];
+
 export interface DividendSchedule {
   holdingId: string; // matches stock symbol or fund id
   holdingName: string;
