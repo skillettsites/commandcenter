@@ -9,6 +9,7 @@ import {
   cashHoldings,
   dividendSchedules,
   jepqTarget,
+  pokemonCards,
 } from '@/lib/portfolio';
 import { getServiceClient } from '@/lib/supabase';
 
@@ -474,7 +475,12 @@ export async function GET() {
 
   const cashTotal = cashHoldings.reduce((sum, c) => sum + c.balance, 0);
 
-  const netWorth = investmentsTotal + propertyEquity + cashTotal;
+  // Pokemon cards value (USD to GBP)
+  const pokemonTotalUSD = pokemonCards.reduce((sum, c) => sum + c.value, 0);
+  const pokemonTotalGBP = Math.round(pokemonTotalUSD / (forexRate || 1.27));
+  const pokemonCostUSD = pokemonCards.reduce((sum, c) => sum + c.cost, 0);
+
+  const netWorth = investmentsTotal + propertyEquity + cashTotal + pokemonTotalGBP;
 
   return NextResponse.json({
     stocks,
@@ -495,6 +501,12 @@ export async function GET() {
     },
     properties: propertyHoldings,
     cash: cashHoldings,
+    pokemon: {
+      cards: pokemonCards,
+      totalUSD: pokemonTotalUSD,
+      totalGBP: pokemonTotalGBP,
+      costUSD: pokemonCostUSD,
+    },
     forexRate,
     dividends,
     totals: {
@@ -506,6 +518,7 @@ export async function GET() {
       investments: investmentsTotal,
       propertyEquity,
       cash: cashTotal,
+      pokemon: pokemonTotalGBP,
       netWorth,
     },
     timestamp: new Date().toISOString(),

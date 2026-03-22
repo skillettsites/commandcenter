@@ -108,6 +108,12 @@ interface FinancesData {
   cash: CashAccount[];
   forexRate: number;
   dividends: DividendData;
+  pokemon: {
+    cards: { id: string; name: string; number: string; set: string; grade: string; value: number; cost: number }[];
+    totalUSD: number;
+    totalGBP: number;
+    costUSD: number;
+  };
   totals: {
     stocks: number;
     funds: number;
@@ -117,12 +123,13 @@ interface FinancesData {
     investments: number;
     propertyEquity: number;
     cash: number;
+    pokemon: number;
     netWorth: number;
   };
   timestamp: string;
 }
 
-type Section = 'investments' | 'properties' | 'cash' | 'dividends';
+type Section = 'investments' | 'properties' | 'cash' | 'dividends' | 'pokemon';
 type DividendRange = 'month' | 'year' | 'all';
 
 function formatGBP(amount: number, compact = false): string {
@@ -743,6 +750,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                 { label: 'Investments', value: data.totals.investments, color: '#3b82f6' },
                 { label: 'Property Equity', value: data.totals.propertyEquity, color: '#a855f7' },
                 { label: 'Cash', value: data.totals.cash, color: '#22c55e' },
+                { label: 'Pokemon', value: data.totals.pokemon, color: '#f59e0b' },
               ]}
             />
           </div>
@@ -1106,6 +1114,58 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
               )}
             </div>
           </div>
+
+          {/* POKEMON SECTION */}
+          {data.pokemon && data.pokemon.cards.length > 0 && (
+            <div>
+              <div
+                onClick={() => toggleSection('pokemon')}
+                className="px-3.5 py-2.5 cursor-pointer active:bg-[var(--bg-elevated)] transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-6 rounded-full flex-shrink-0 bg-[#f59e0b]" />
+                    <span className="text-[14px] font-medium text-[var(--text-primary)]">Pokemon Cards</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-medium text-[var(--text-primary)]">{formatGBP(data.pokemon.totalGBP)}</span>
+                    <svg
+                      className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform duration-200 ${expandedSection === 'pokemon' ? 'rotate-90' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {expandedSection === 'pokemon' && (
+                <div className="px-3.5 pb-3 fade-in ml-3">
+                  <div className="text-[10px] text-[var(--text-tertiary)] mb-2">
+                    ${data.pokemon.totalUSD.toLocaleString()} USD | Cost: ${data.pokemon.costUSD.toLocaleString()} | P&L: ${(data.pokemon.totalUSD - data.pokemon.costUSD).toLocaleString()}
+                  </div>
+                  <div className="space-y-1">
+                    {data.pokemon.cards.map((card) => (
+                      <div key={card.id} className="flex items-center justify-between py-1">
+                        <div>
+                          <span className="text-[12px] text-[var(--text-secondary)]">{card.name} {card.number}</span>
+                          <span className="text-[10px] text-[var(--text-tertiary)] ml-1.5">{card.grade}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[12px] font-medium text-[var(--text-primary)]">${card.value.toLocaleString()}</span>
+                          {card.cost > 0 && (
+                            <span className={`text-[10px] ml-1.5 ${card.value > card.cost ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                              {card.value > card.cost ? '+' : ''}{Math.round(((card.value - card.cost) / card.cost) * 100)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

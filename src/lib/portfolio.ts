@@ -57,6 +57,29 @@ export const upcomingMoney: UpcomingMoney[] = [
   { id: 'house-sale-sister', source: 'Sister (from house sale)', amount: 100000, notes: 'Sister giving her share', status: 'pending' },
 ];
 
+export interface PokemonCard {
+  id: string;
+  name: string;
+  number: string;
+  set: string;
+  grade: string; // PSA grade
+  value: number; // current value in USD
+  cost: number; // purchase cost in USD
+}
+
+export const pokemonCards: PokemonCard[] = [
+  { id: 'charizard-4', name: 'Charizard', number: '#4', set: 'Base Set Shadowless', grade: 'PSA 8', value: 4255, cost: 1800 },
+  { id: 'blastoise-2', name: 'Blastoise', number: '#2', set: 'Base Set Shadowless', grade: 'PSA 9', value: 2497, cost: 950 },
+  { id: 'venusaur-15', name: 'Venusaur', number: '#15', set: 'Base Set Shadowless', grade: 'PSA 9', value: 1598, cost: 820 },
+  { id: 'squirtle-63', name: 'Squirtle', number: '#63', set: 'Base Set Shadowless', grade: 'PSA 10', value: 860, cost: 130 },
+  { id: 'bulbasaur-44', name: 'Bulbasaur', number: '#44', set: 'Base Set Shadowless', grade: 'PSA 9', value: 497, cost: 0 },
+  { id: 'charmander-46', name: 'Charmander', number: '#46', set: 'Base Set Shadowless', grade: 'PSA 10', value: 400, cost: 130 },
+  { id: 'wartortle-42', name: 'Wartortle', number: '#42', set: 'Base Set Shadowless', grade: 'PSA 10', value: 360, cost: 130 },
+  { id: 'charmeleon-24', name: 'Charmeleon', number: '#24', set: 'Base Set Shadowless', grade: 'PSA 10', value: 331, cost: 130 },
+  { id: 'ivysaur-30', name: 'Ivysaur', number: '#30', set: 'Base Set Shadowless', grade: 'PSA 10', value: 322, cost: 130 },
+  { id: 'mewtwo-v-72', name: 'Mewtwo V', number: '#72', set: 'Pokemon Go', grade: 'Ungraded', value: 50, cost: 0 },
+];
+
 export interface DividendSchedule {
   holdingId: string; // matches stock symbol or fund id
   holdingName: string;
