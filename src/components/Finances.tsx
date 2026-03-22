@@ -40,6 +40,9 @@ interface PropertyData {
   value: number;
   mortgage: number;
   type: 'keeping' | 'selling';
+  rentalIncome?: number;
+  mortgagePayment?: number;
+  serviceCharge?: number;
 }
 
 interface PropertyValuationData {
@@ -940,6 +943,38 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                       );
                     })}
                   </div>
+
+                  {/* Rental Income */}
+                  {keepingProperties.some(p => p.rentalIncome) && (() => {
+                    const totalRent = keepingProperties.reduce((s, p) => s + (p.rentalIncome || 0), 0);
+                    const totalMortgage = keepingProperties.reduce((s, p) => s + (p.mortgagePayment || 0), 0);
+                    const totalService = keepingProperties.reduce((s, p) => s + (p.serviceCharge || 0), 0);
+                    const netPassive = totalRent - totalMortgage - totalService;
+                    return (
+                      <div className="ml-3 mb-3 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-light)]">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Passive Income</span>
+                          <span className={`text-[13px] font-bold ${netPassive >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                            {netPassive >= 0 ? '+' : ''}{formatGBP(netPassive)}/mo
+                          </span>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-[var(--text-tertiary)]">Rental income (OpenRent)</span>
+                            <span className="text-[11px] text-[var(--green)]">+{formatGBP(totalRent)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-[var(--text-tertiary)]">Mortgage (Paratus)</span>
+                            <span className="text-[11px] text-[var(--red)]">-{formatGBP(totalMortgage)}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-[var(--text-tertiary)]">Service charge + ground rent</span>
+                            <span className="text-[11px] text-[var(--red)]">-{formatGBP(totalService)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Selling */}
                   <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2 ml-3">

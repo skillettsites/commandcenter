@@ -32,6 +32,9 @@ export interface PropertyHolding {
   postcode?: string;
   premium?: 'upper' | 'mid' | 'lower';
   premiumNotes?: string;
+  rentalIncome?: number; // monthly rental income
+  mortgagePayment?: number; // monthly mortgage payment
+  serviceCharge?: number; // monthly service charge + ground rent
 }
 
 export interface CashHolding {
@@ -148,6 +151,9 @@ export const propertyHoldings: PropertyHolding[] = [
     postcode: 'E1W 3AS',
     premium: 'upper',
     premiumNotes: 'Studio, high floor, nice view',
+    rentalIncome: 1835,
+    mortgagePayment: 1293.50,
+    serviceCharge: 250,
   },
   { id: 'didcot', name: '9 Fen Violet, Didcot', value: 425000, mortgage: 268270, type: 'selling' },
   { id: 'newbury', name: '6 Hennessey, Newbury', value: 500000, mortgage: 342248, type: 'selling' },
