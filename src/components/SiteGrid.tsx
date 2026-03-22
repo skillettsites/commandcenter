@@ -63,7 +63,7 @@ export default function SiteGrid() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(true);
   const [showAll, setShowAll] = useState(false);
-  const [sortMode, setSortMode] = useState<'most-viewed' | 'last-viewed'>('most-viewed');
+  const [sortMode, setSortMode] = useState<'most-viewed' | 'last-viewed' | 'live-now'>('most-viewed');
   const [lastViewed, setLastViewed] = useState<Record<string, number>>({});
 
   // Load last-viewed timestamps from localStorage
@@ -151,11 +151,16 @@ export default function SiteGrid() {
 
   // Sort sites based on selected mode
   const sortedSites = [...sites].sort((a, b) => {
+    if (sortMode === 'live-now') {
+      const aLive = a.realtimeUsers ?? 0;
+      const bLive = b.realtimeUsers ?? 0;
+      if (bLive !== aLive) return bLive - aLive;
+      return (b.visitors ?? 0) - (a.visitors ?? 0);
+    }
     if (sortMode === 'last-viewed') {
       const aTime = lastViewed[a.id] ?? 0;
       const bTime = lastViewed[b.id] ?? 0;
       if (bTime !== aTime) return bTime - aTime;
-      // Fallback to visitors
       return (b.visitors ?? 0) - (a.visitors ?? 0);
     }
     // Most viewed: by visitors descending
@@ -239,6 +244,16 @@ export default function SiteGrid() {
             }`}
           >
             Most Viewed
+          </button>
+          <button
+            onClick={() => setSortMode('live-now')}
+            className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
+              sortMode === 'live-now'
+                ? 'bg-[var(--green)] text-white'
+                : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] active:opacity-70'
+            }`}
+          >
+            Live Now
           </button>
           <button
             onClick={() => setSortMode('last-viewed')}
