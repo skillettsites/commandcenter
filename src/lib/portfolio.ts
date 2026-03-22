@@ -236,10 +236,10 @@ export const dividendSchedules: DividendSchedule[] = [
     holdingName: 'UBS Global Enhanced Eq Income',
     holdingType: 'fund',
     annualYieldPercent: 7.2, // HL factsheet verified 21 Mar 2026
-    frequency: 'quarterly',
+    frequency: 'monthly',
     paysDividend: true,
-    paymentMonths: [3, 6, 9, 12], // Mar, Jun, Sep, Dec
-    expectedPayDay: 15, // typically mid-month
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 28, // typically end of month
   },
   {
     holdingId: 'aegon-high-yield',
