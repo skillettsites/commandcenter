@@ -15,6 +15,7 @@ interface SiteData {
   pageViews: number | null;
   totalVisitors: number | null;
   monthVisitors: number | null;
+  realtimeUsers: number | null;
   gaPropertyId?: string;
   gscSiteUrl?: string;
   bingSiteUrl?: string;
@@ -56,6 +57,7 @@ export default function SiteGrid() {
         pageViews: null,
         totalVisitors: null,
         monthVisitors: null,
+        realtimeUsers: null,
       }))
   );
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -121,8 +123,30 @@ export default function SiteGrid() {
       }
     }
 
+    async function fetchRealtime() {
+      try {
+        const res = await fetch('/api/analytics/realtime');
+        if (res.ok) {
+          const { data } = await res.json();
+          setSites(prev =>
+            prev.map(site => {
+              const rt = data.find((d: { siteId: string; realtimeUsers: number }) => d.siteId === site.id);
+              return rt ? { ...site, realtimeUsers: rt.realtimeUsers } : site;
+            })
+          );
+        }
+      } catch {
+        // Realtime not available
+      }
+    }
+
     fetchHealth();
     fetchAnalytics();
+    fetchRealtime();
+
+    // Refresh realtime every 30 seconds
+    const rtInterval = setInterval(fetchRealtime, 30000);
+    return () => clearInterval(rtInterval);
   }, []);
 
   // Sort sites based on selected mode
@@ -151,6 +175,7 @@ export default function SiteGrid() {
   const totalPageViews = sites.reduce((sum, s) => sum + (s.pageViews ?? 0), 0);
   const allTimeVisitors = sites.reduce((sum, s) => sum + (s.totalVisitors ?? 0), 0);
   const monthlyVisitors = sites.reduce((sum, s) => sum + (s.monthVisitors ?? 0), 0);
+  const totalRealtime = sites.reduce((sum, s) => sum + (s.realtimeUsers ?? 0), 0);
 
   return (
     <div className="space-y-2">
@@ -179,6 +204,12 @@ export default function SiteGrid() {
           {monthlyVisitors > 0 && (
             <span className="text-[13px] text-[var(--text-secondary)]">
               {monthlyVisitors.toLocaleString()} month
+            </span>
+          )}
+          {totalRealtime > 0 && (
+            <span className="text-[13px] text-[var(--green)] flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
+              {totalRealtime} live
             </span>
           )}
           {totalVisitors > 0 && (
@@ -407,6 +438,12 @@ function SiteRow({
               </div>
             )}
             <div className="text-right">
+              {site.realtimeUsers !== null && site.realtimeUsers > 0 && (
+                <div className="flex items-center justify-end gap-1 mb-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
+                  <span className="text-[10px] font-medium text-[var(--green)]">{site.realtimeUsers} now</span>
+                </div>
+              )}
               <span className={`text-[13px] font-medium ${
                 site.visitors === null ? 'text-[var(--text-tertiary)]' :
                 site.visitors > 0 ? 'text-[var(--green)]' : 'text-[var(--text-secondary)]'
