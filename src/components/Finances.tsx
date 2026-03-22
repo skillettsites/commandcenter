@@ -126,8 +126,13 @@ type Section = 'investments' | 'properties' | 'cash' | 'dividends';
 type DividendRange = 'month' | 'year' | 'all';
 
 function formatGBP(amount: number, compact = false): string {
-  if (compact && Math.abs(amount) >= 1000) {
-    return '£' + (amount / 1000).toFixed(amount >= 10000 ? 0 : 1) + 'k';
+  if (compact) {
+    if (Math.abs(amount) >= 1000000) {
+      return '£' + (amount / 1000000).toFixed(2) + 'm';
+    }
+    if (Math.abs(amount) >= 1000) {
+      return '£' + Math.round(amount / 1000).toLocaleString() + 'k';
+    }
   }
   return '£' + amount.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
