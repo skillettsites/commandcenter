@@ -68,7 +68,19 @@ export async function GET(req: NextRequest) {
     const today = clicks.filter((c) => c.created_at.startsWith(todayStr)).length;
     const month = clicks.filter((c) => c.created_at.startsWith(monthStr)).length;
 
-    return NextResponse.json({ today, month, total: clicks.length, sites });
+    // By type breakdown (for FindYourStay which has both expedia + gyg)
+    const byType: Record<string, SiteStats> = {};
+    const types = [...new Set(clicks.map(c => c.type))];
+    for (const type of types) {
+      const typeClicks = clicks.filter(c => c.type === type);
+      byType[type] = {
+        today: typeClicks.filter(c => c.created_at.startsWith(todayStr)).length,
+        month: typeClicks.filter(c => c.created_at.startsWith(monthStr)).length,
+        total: typeClicks.length,
+      };
+    }
+
+    return NextResponse.json({ today, month, total: clicks.length, sites, byType });
   } catch {
     return NextResponse.json({ sites: {} });
   }
