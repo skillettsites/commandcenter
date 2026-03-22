@@ -392,7 +392,7 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
   );
 }
 
-function DividendSection({ dividends }: { dividends: DividendData }) {
+function DividendSection({ dividends, properties = [] }: { dividends: DividendData; properties?: PropertyData[] }) {
   const [range, setRange] = useState<DividendRange>('year');
   const [showBreakdown, setShowBreakdown] = useState(false);
 
@@ -400,6 +400,12 @@ function DividendSection({ dividends }: { dividends: DividendData }) {
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
   const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+
+  // Rental income calculations
+  const totalRent = properties.reduce((s, p) => s + (p.rentalIncome || 0), 0);
+  const totalMortgagePay = properties.reduce((s, p) => s + (p.mortgagePayment || 0), 0);
+  const totalService = properties.reduce((s, p) => s + (p.serviceCharge || 0), 0);
+  const netRental = totalRent - totalMortgagePay - totalService;
 
   // Filter payments for breakdown based on range
   let filteredPayments = dividends.payments;
@@ -411,6 +417,32 @@ function DividendSection({ dividends }: { dividends: DividendData }) {
 
   return (
     <div className="px-3.5 pb-3 fade-in">
+      {/* Rental passive income */}
+      {totalRent > 0 && (
+        <div className="mb-3 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-light)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Property Passive Income</span>
+            <span className={`text-[13px] font-bold ${netRental >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+              {netRental >= 0 ? '+' : ''}£{netRental.toFixed(0)}/mo
+            </span>
+          </div>
+          <div className="space-y-0.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-[var(--text-tertiary)]">Rent (OpenRent)</span>
+              <span className="text-[11px] text-[var(--green)]">+£{totalRent.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-[var(--text-tertiary)]">Mortgage (Paratus)</span>
+              <span className="text-[11px] text-[var(--red)]">-£{totalMortgagePay.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-[var(--text-tertiary)]">Service + ground rent</span>
+              <span className="text-[11px] text-[var(--red)]">-£{totalService.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Monthly income summary */}
       <div className="flex items-center justify-between mb-3">
         <div>
@@ -835,7 +867,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
               </div>
 
               {expandedSection === 'dividends' && data.dividends && (
-                <DividendSection dividends={data.dividends} />
+                <DividendSection dividends={data.dividends} properties={keepingProperties} />
               )}
             </div>
 
@@ -943,38 +975,6 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                       );
                     })}
                   </div>
-
-                  {/* Rental Income */}
-                  {keepingProperties.some(p => p.rentalIncome) && (() => {
-                    const totalRent = keepingProperties.reduce((s, p) => s + (p.rentalIncome || 0), 0);
-                    const totalMortgage = keepingProperties.reduce((s, p) => s + (p.mortgagePayment || 0), 0);
-                    const totalService = keepingProperties.reduce((s, p) => s + (p.serviceCharge || 0), 0);
-                    const netPassive = totalRent - totalMortgage - totalService;
-                    return (
-                      <div className="ml-3 mb-3 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border-light)]">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Passive Income</span>
-                          <span className={`text-[13px] font-bold ${netPassive >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
-                            {netPassive >= 0 ? '+' : ''}{formatGBP(netPassive)}/mo
-                          </span>
-                        </div>
-                        <div className="space-y-0.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[var(--text-tertiary)]">Rental income (OpenRent)</span>
-                            <span className="text-[11px] text-[var(--green)]">+{formatGBP(totalRent)}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[var(--text-tertiary)]">Mortgage (Paratus)</span>
-                            <span className="text-[11px] text-[var(--red)]">-{formatGBP(totalMortgage)}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-[var(--text-tertiary)]">Service charge + ground rent</span>
-                            <span className="text-[11px] text-[var(--red)]">-{formatGBP(totalService)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
 
                   {/* Selling */}
                   <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2 ml-3">
