@@ -104,9 +104,19 @@ export async function GET(request: NextRequest) {
     hourly = hourly.filter(h => h.dateHour === currentKey || h.dateHour === prevKey);
   }
 
-  // Per-site breakdown for the bar chart
+  // For '1h' range, build the set of allowed dateHour keys so per-site bars match
+  let allowedKeys: Set<string> | null = null;
+  if (range === '1h') {
+    allowedKeys = new Set(hourly.map(h => h.dateHour));
+  }
+
+  // Per-site breakdown for the bar chart (filtered to match the selected range)
   const perSite = gaProjects.map((project, i) => {
-    const data = allResults[i];
+    let data = allResults[i];
+    // For '1h', filter per-site data to same hours as the chart
+    if (allowedKeys) {
+      data = data.filter(r => allowedKeys!.has(r.dateHour));
+    }
     const totalViews = data.reduce((sum, r) => sum + r.pageViews, 0);
     const totalUsers = data.reduce((sum, r) => sum + r.users, 0);
     return {
