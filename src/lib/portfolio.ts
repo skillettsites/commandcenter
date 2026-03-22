@@ -180,6 +180,7 @@ export const cashHoldings: CashHolding[] = [
   { account: 'NatWest 8002', balance: 2154 },
   { account: 'Revolut', balance: 1941 },
   { account: 'Premium Bonds', balance: 26000 },
+  { account: 'DRS Real Estate Ltd', balance: 19489 },
 ];
 
 // Dividend/income schedules for all holdings
