@@ -170,8 +170,9 @@ export default function SiteGrid() {
     return (b.pageViews ?? 0) - (a.pageViews ?? 0);
   });
 
-  const visibleSites = showAll ? sortedSites : sortedSites.slice(0, 5);
-  const hasMore = sortedSites.length > 5;
+  const filteredSites = sortMode === 'live-now' ? sortedSites.filter(s => (s.realtimeUsers ?? 0) > 0) : sortedSites;
+  const visibleSites = showAll ? filteredSites : filteredSites.slice(0, 5);
+  const hasMore = filteredSites.length > 5;
 
   const allUp = sites.every(s => s.status === 'up');
   const anyDown = sites.some(s => s.status === 'down');
@@ -271,6 +272,11 @@ export default function SiteGrid() {
       {/* Compact list view (expanded) */}
       {!collapsed && (
         <div className="card overflow-hidden divide-y divide-[var(--border-light)] fade-in">
+          {sortMode === 'live-now' && filteredSites.length === 0 && (
+            <div className="px-3.5 py-6 text-center">
+              <p className="text-[13px] text-[var(--text-tertiary)]">No live visitors right now</p>
+            </div>
+          )}
           {visibleSites.map(site => (
             <SiteRow
               key={site.id}
@@ -293,7 +299,7 @@ export default function SiteGrid() {
               className="px-3.5 py-2 cursor-pointer active:bg-[var(--bg-elevated)] transition-colors text-center"
             >
               <span className="text-[13px] font-medium text-[var(--accent)]">
-                {showAll ? 'Show Less' : `View All ${sortedSites.length} Sites`}
+                {showAll ? 'Show Less' : `View All ${filteredSites.length} Sites`}
               </span>
             </div>
           )}
