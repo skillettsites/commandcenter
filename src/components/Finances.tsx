@@ -719,6 +719,12 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
             <div className="text-center py-3 rounded-lg bg-[var(--bg-elevated)]">
               <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-0.5">Total Net Worth</div>
               <div className="text-[24px] font-bold text-[var(--text-primary)]">{formatGBP(data.totals.netWorth)}</div>
+              <div className="flex items-center justify-center gap-1.5 mt-1">
+                <span className="w-4 border-t border-dashed border-[var(--orange)]" />
+                <span className="text-[11px] text-[var(--orange)]">
+                  {formatGBP(data.totals.netWorth + 540000)} inc. pending £540k
+                </span>
+              </div>
             </div>
           </div>
 
