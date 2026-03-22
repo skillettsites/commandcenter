@@ -275,7 +275,7 @@ function SiteRow({
   const [chartRange, setChartRange] = useState<'today' | '24h' | '1m' | 'all'>('today');
 
   const hasSearchTracking = site.id === 'carcostcheck' || site.id === 'postcodecheck';
-  const hasAffiliateTracking = site.id === 'findyourstay';
+  const hasAffiliateTracking = site.id === 'findyourstay' || site.id === 'bestlondontours' || site.id === 'thebesttours';
 
   const cycleRange = () => {
     const next = chartRange === 'today' ? '24h' : chartRange === '24h' ? '1m' : chartRange === '1m' ? 'all' : 'today';
@@ -329,11 +329,12 @@ function SiteRow({
       }
 
       if (hasAffiliateTracking) {
+        const affiliateSiteId = site.id === 'thebesttours' ? 'thebesttours' : site.id === 'bestlondontours' ? 'bestlondontours' : 'findyourstay';
         fetches.push(
-          fetch('/api/affiliate-clicks')
+          fetch(`/api/affiliate-clicks?site=${affiliateSiteId}`)
             .then(res => res.ok ? res.json() : null)
             .then(data => {
-              if (data) setAffiliateClicks(data);
+              if (data) setAffiliateClicks({ today: data.today || 0, month: data.month || 0, total: data.total || 0 });
             })
             .catch(() => {})
         );
@@ -487,7 +488,7 @@ function SiteRow({
             {/* Affiliate click stats */}
             {affiliateClicks && (affiliateClicks.today > 0 || affiliateClicks.month > 0 || affiliateClicks.total > 0) && (
               <div className="flex items-center gap-3 py-1.5 px-2.5 rounded-lg bg-[var(--bg-elevated)]">
-                <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Expedia Clicks</span>
+                <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">{site.id === 'findyourstay' ? 'Affiliate Clicks' : 'GYG Clicks'}</span>
                 <div className="flex items-center gap-2 ml-auto">
                   <span className="text-[11px] text-[var(--text-secondary)]">
                     Today: <span className="font-semibold text-[var(--text-primary)]">{affiliateClicks.today}</span>
