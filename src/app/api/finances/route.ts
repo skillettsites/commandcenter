@@ -61,19 +61,21 @@ interface YahooChartResult {
       meta?: {
         regularMarketPrice?: number;
         currency?: string;
+        chartPreviousClose?: number;
+        previousClose?: number;
       };
     }>;
   };
 }
 
-async function fetchPrice(symbol: string): Promise<{ price: number; currency: string } | null> {
+async function fetchPrice(symbol: string): Promise<{ price: number; currency: string; previousClose: number | null } | null> {
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-      next: { revalidate: 300 }, // cache for 5 minutes
+      next: { revalidate: 120 }, // cache for 2 minutes (was 5)
     });
 
     if (!res.ok) return null;
@@ -85,6 +87,7 @@ async function fetchPrice(symbol: string): Promise<{ price: number; currency: st
     return {
       price: meta.regularMarketPrice,
       currency: meta.currency || 'USD',
+      previousClose: meta.chartPreviousClose || meta.previousClose || null,
     };
   } catch {
     return null;
@@ -403,11 +406,20 @@ export async function GET() {
   const stocks = stockHoldings.map((holding, i) => {
     const priceData = stockPrices[i];
     const livePrice = priceData?.price ?? null;
+    const previousClose = priceData?.previousClose ?? null;
     const livePriceGBP = livePrice !== null ? livePrice * forexRate : null;
     const currentValue = livePriceGBP !== null ? livePriceGBP * holding.shares : null;
     const gainLoss = currentValue !== null ? currentValue - holding.costBasis : null;
     const gainLossPercent = gainLoss !== null && holding.costBasis > 0
       ? (gainLoss / holding.costBasis) * 100
+      : null;
+
+    // Daily change
+    const dailyChangePercent = livePrice !== null && previousClose !== null && previousClose > 0
+      ? ((livePrice - previousClose) / previousClose) * 100
+      : null;
+    const dailyChangeGBP = livePriceGBP !== null && previousClose !== null
+      ? (livePrice! - previousClose) * forexRate * holding.shares
       : null;
 
     return {
@@ -417,6 +429,8 @@ export async function GET() {
       currentValue,
       gainLoss,
       gainLossPercent,
+      dailyChangePercent,
+      dailyChangeGBP,
     };
   });
 

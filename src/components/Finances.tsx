@@ -14,6 +14,8 @@ interface StockData {
   currentValue: number | null;
   gainLoss: number | null;
   gainLossPercent: number | null;
+  dailyChangePercent: number | null;
+  dailyChangeGBP: number | null;
 }
 
 interface FundData {
@@ -611,6 +613,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
   const [expandedSection, setExpandedSection] = useState<Section | null>(null);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [investmentView, setInvestmentView] = useState<'today' | 'alltime'>('today');
   const [valuations, setValuations] = useState<PropertyValuationData[]>([]);
   const [valuationsLoading, setValuationsLoading] = useState(false);
 
@@ -648,7 +651,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
   useEffect(() => {
     fetchData();
     fetchValuations();
-    const interval = setInterval(fetchData, 300000); // 5 minutes
+    const interval = setInterval(fetchData, 120000); // 2 minutes
     return () => clearInterval(interval);
   }, [fetchData, fetchValuations]);
 
@@ -781,10 +784,34 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
 
               {expandedSection === 'investments' && (
                 <div className="px-3.5 pb-3 fade-in">
+                  {/* Today / All Time toggle */}
+                  <div className="flex gap-1 mb-3 ml-3">
+                    <button
+                      onClick={() => setInvestmentView('today')}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                        investmentView === 'today'
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      onClick={() => setInvestmentView('alltime')}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                        investmentView === 'alltime'
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      All Time
+                    </button>
+                  </div>
+
                   {/* Stocks */}
                   <div className="mb-3">
                     <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2 ml-3">
-                      Stocks (live prices)
+                      Stocks (live, updates every 2 min)
                     </h4>
                     <div className="space-y-1.5 ml-3">
                       {data.stocks.map((stock) => (
@@ -808,8 +835,17 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                               {stock.currentValue !== null ? formatGBP(stock.currentValue) : '--'}
                             </div>
                             <div className="flex items-center gap-1 justify-end">
-                              <GainLossText value={stock.gainLoss} size="xs" />
-                              <PercentBadge value={stock.gainLossPercent} />
+                              {investmentView === 'today' ? (
+                                <>
+                                  <GainLossText value={stock.dailyChangeGBP ?? null} size="xs" />
+                                  <PercentBadge value={stock.dailyChangePercent ?? null} />
+                                </>
+                              ) : (
+                                <>
+                                  <GainLossText value={stock.gainLoss} size="xs" />
+                                  <PercentBadge value={stock.gainLossPercent} />
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
