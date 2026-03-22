@@ -202,7 +202,7 @@ function BreakdownBar({ data }: { data: { label: string; value: number; color: s
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function DividendChart({ dividends, range }: { dividends: DividendData; range: DividendRange }) {
+function DividendChart({ dividends, range, rentalNet = 0 }: { dividends: DividendData; range: DividendRange; rentalNet?: number }) {
   const [selectedBar, setSelectedBar] = useState<number | null>(null);
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
@@ -212,7 +212,7 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
   useEffect(() => { setSelectedBar(null); }, [range]);
 
   // Build bars based on range
-  let bars: { date: string; label: string; received: number; forecast: number; total: number; details: string[] }[];
+  let bars: { date: string; label: string; received: number; forecast: number; rental: number; total: number; details: string[] }[];
 
   if (range === 'month') {
     const currentDateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
@@ -227,9 +227,22 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
       label: p.source.split(' ').slice(0, 2).join(' '),
       received: p.status === 'received' ? p.amount : 0,
       forecast: p.status === 'forecast' ? p.amount : 0,
+      rental: 0,
       total: p.amount,
       details: [`${p.source}`, `£${p.amount.toFixed(2)}`, p.status === 'received' ? 'Received' : 'Expected'],
     }));
+    // Add rental as a separate bar in month view
+    if (rentalNet > 0) {
+      bars.push({
+        date: currentDateStr,
+        label: 'Rental Net',
+        received: rentalNet,
+        forecast: 0,
+        rental: rentalNet,
+        total: rentalNet,
+        details: ['Property rental income', `£${rentalNet.toFixed(0)}/mo net`],
+      });
+    }
   } else {
     const sortedDates = Object.keys(dividends.monthlyTotals).sort();
     const filteredDates = range === 'year'
@@ -243,13 +256,17 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
       const month = parseInt(date.split('-')[1]);
       const year = parseInt(date.split('-')[0]);
       const monthPayments = dividends.payments.filter(p => p.date === date);
+      const rental = rentalNet > 0 ? rentalNet : 0;
+      const details = monthPayments.map(p => `${p.source.split(' ').slice(0, 2).join(' ')}: £${p.amount.toFixed(2)}`);
+      if (rental > 0) details.push(`Rental net: £${rental.toFixed(0)}`);
       return {
         date,
         label: MONTH_LABELS[month - 1] + (range === 'all' ? ` '${String(year).slice(2)}` : ''),
         received: totals.received,
         forecast: totals.forecast,
-        total: totals.received + totals.forecast,
-        details: monthPayments.map(p => `${p.source.split(' ').slice(0, 2).join(' ')}: £${p.amount.toFixed(2)}`),
+        rental,
+        total: totals.received + totals.forecast + rental,
+        details,
       };
     });
   }
@@ -325,7 +342,8 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
           const x = startX + i * (barWidth + barGap);
           const receivedH = (bar.received / maxValue) * svgHeight;
           const forecastH = (bar.forecast / maxValue) * svgHeight;
-          const totalH = receivedH + forecastH;
+          const rentalH = ((bar.rental || 0) / maxValue) * svgHeight;
+          const totalH = receivedH + forecastH + rentalH;
           const isSelected = selectedBar === i;
           const dimmed = selectedBar !== null && !isSelected;
 
@@ -335,14 +353,26 @@ function DividendChart({ dividends, range }: { dividends: DividendData; range: D
               {isSelected && (
                 <rect x={x - 2} y={0} width={barWidth + 4} height={svgHeight + 20} rx={4} fill="var(--accent)" opacity={0.08} />
               )}
-              {/* Forecast portion (lighter, on top) */}
-              {forecastH > 0 && (
+              {/* Rental portion (orange, on top) */}
+              {rentalH > 0 && (
                 <rect
                   x={x}
                   y={svgHeight - totalH}
                   width={barWidth}
-                  height={forecastH}
+                  height={rentalH}
                   rx={2}
+                  fill={isSelected ? '#fb923c' : '#f97316'}
+                  opacity={0.85}
+                />
+              )}
+              {/* Forecast portion (lighter) */}
+              {forecastH > 0 && (
+                <rect
+                  x={x}
+                  y={svgHeight - (receivedH + forecastH)}
+                  width={barWidth}
+                  height={forecastH}
+                  rx={rentalH > 0 ? 0 : 2}
                   fill={isSelected ? '#34d399' : '#30d158'}
                   opacity={0.3}
                 />
@@ -482,7 +512,7 @@ function DividendSection({ dividends, properties = [] }: { dividends: DividendDa
       </div>
 
       {/* Chart */}
-      <DividendChart dividends={dividends} range={range} />
+      <DividendChart dividends={dividends} range={range} rentalNet={netRental} />
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-2 mb-3">
