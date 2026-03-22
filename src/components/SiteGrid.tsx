@@ -270,10 +270,12 @@ function SiteRow({
   const [gscData, setGscData] = useState<GscData | null>(null);
   const [bingData, setBingData] = useState<BingData | null>(null);
   const [searchStats, setSearchStats] = useState<{ today: number; month: number } | null>(null);
+  const [affiliateClicks, setAffiliateClicks] = useState<{ today: number; month: number; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [chartRange, setChartRange] = useState<'today' | '24h' | '1m' | 'all'>('today');
 
   const hasSearchTracking = site.id === 'carcostcheck' || site.id === 'postcodecheck';
+  const hasAffiliateTracking = site.id === 'findyourstay';
 
   const cycleRange = () => {
     const next = chartRange === 'today' ? '24h' : chartRange === '24h' ? '1m' : chartRange === '1m' ? 'all' : 'today';
@@ -326,6 +328,17 @@ function SiteRow({
         );
       }
 
+      if (hasAffiliateTracking) {
+        fetches.push(
+          fetch('/api/affiliate-clicks')
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data) setAffiliateClicks(data);
+            })
+            .catch(() => {})
+        );
+      }
+
       Promise.all(fetches).finally(() => setLoading(false));
     }
   }, [expanded, chartRange, site.id, site.gaPropertyId, site.gscSiteUrl, site.bingSiteUrl]);
@@ -337,6 +350,7 @@ function SiteRow({
       setGscData(null);
       setBingData(null);
       setSearchStats(null);
+      setAffiliateClicks(null);
       setChartRange('today');
     }
   }, [expanded]);
@@ -468,6 +482,24 @@ function SiteRow({
                 today={searchStats.today}
                 month={searchStats.month}
               />
+            )}
+
+            {/* Affiliate click stats */}
+            {affiliateClicks && (affiliateClicks.today > 0 || affiliateClicks.month > 0 || affiliateClicks.total > 0) && (
+              <div className="flex items-center gap-3 py-1.5 px-2.5 rounded-lg bg-[var(--bg-elevated)]">
+                <span className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Expedia Clicks</span>
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-[11px] text-[var(--text-secondary)]">
+                    Today: <span className="font-semibold text-[var(--text-primary)]">{affiliateClicks.today}</span>
+                  </span>
+                  <span className="text-[11px] text-[var(--text-secondary)]">
+                    Month: <span className="font-semibold text-[var(--text-primary)]">{affiliateClicks.month}</span>
+                  </span>
+                  <span className="text-[11px] text-[var(--text-secondary)]">
+                    Total: <span className="font-semibold text-[var(--text-primary)]">{affiliateClicks.total}</span>
+                  </span>
+                </div>
+              </div>
             )}
 
             {/* GSC stats bar */}
