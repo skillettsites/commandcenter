@@ -442,17 +442,17 @@ function SiteRow({
 
           {/* Stats */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            {site.totalVisitors !== null && site.totalVisitors > 0 && (
+            {site.totalVisitors !== null && (
               <div className="text-right">
-                <span className="text-[13px] font-medium text-[var(--text-primary)]">
+                <span className={`text-[13px] font-medium ${site.totalVisitors > 0 ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`}>
                   {site.totalVisitors.toLocaleString()}
                 </span>
                 <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">total</span>
               </div>
             )}
-            {site.monthVisitors !== null && site.monthVisitors > 0 && (
+            {site.monthVisitors !== null && (
               <div className="text-right">
-                <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+                <span className={`text-[13px] font-medium ${site.monthVisitors > 0 ? 'text-[var(--text-secondary)]' : 'text-[var(--text-tertiary)]'}`}>
                   {site.monthVisitors.toLocaleString()}
                 </span>
                 <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">month</span>
