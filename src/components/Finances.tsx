@@ -106,6 +106,8 @@ interface FinancesData {
     unvestedValue: number;
     totalValue: number;
     isLive: boolean;
+    dailyChangePercent: number | null;
+    dailyChangeGBP: number | null;
   };
   properties: PropertyData[];
   cash: CashAccount[];
@@ -880,10 +882,14 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                           </div>
                           <div className="text-right flex-shrink-0 ml-2">
                             <div className="text-[13px] font-medium text-[var(--text-primary)]">{formatGBP(fund.currentValue)}</div>
-                            <div className="flex items-center gap-1 justify-end">
-                              <GainLossText value={fund.gainLoss} size="xs" />
-                              <PercentBadge value={fund.gainLossPercent} />
-                            </div>
+                            {investmentView === 'alltime' ? (
+                              <div className="flex items-center gap-1 justify-end">
+                                <GainLossText value={fund.gainLoss} size="xs" />
+                                <PercentBadge value={fund.gainLossPercent} />
+                              </div>
+                            ) : (
+                              <div className="text-[10px] text-[var(--text-tertiary)]">no daily data</div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -906,8 +912,15 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <div className="text-[13px] font-medium text-[var(--text-primary)]">{formatGBP(data.etrade.vestedValue)}</div>
-                        {data.etrade.unvestedValue > 0 && (
-                          <div className="text-[10px] text-[var(--text-tertiary)]">+{formatGBP(data.etrade.unvestedValue)} unvested</div>
+                        {investmentView === 'today' && data.etrade.dailyChangeGBP !== null ? (
+                          <div className="flex items-center gap-1 justify-end">
+                            <GainLossText value={data.etrade.dailyChangeGBP} size="xs" />
+                            <PercentBadge value={data.etrade.dailyChangePercent} />
+                          </div>
+                        ) : (
+                          data.etrade.unvestedValue > 0 && (
+                            <div className="text-[10px] text-[var(--text-tertiary)]">+{formatGBP(data.etrade.unvestedValue)} unvested</div>
+                          )
                         )}
                       </div>
                     </div>
