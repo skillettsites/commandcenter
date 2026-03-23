@@ -111,7 +111,7 @@ export const stockHoldings: StockHolding[] = [
   { symbol: 'JEPQ', name: 'JEPQ', shares: 564, costBasis: 10800, account: 'ISA', currency: 'USD' },
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4463, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15089, account: 'F&S', currency: 'USD' },
-  { symbol: '2TSL.L', name: '2x Tesla ETP', shares: 104, costBasis: 9909, account: 'F&S', currency: 'GBP' },
+  { symbol: 'TS2X.L', name: '2x Tesla ETP', shares: 104, costBasis: 9909, account: 'F&S', currency: 'GBP' },
 ];
 
 export const fundHoldings: FundHolding[] = [
