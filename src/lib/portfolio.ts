@@ -156,8 +156,8 @@ export const fundHoldings: FundHolding[] = [
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 73240 },
-  { account: 'F&S Cash', balance: 132 },
+  { account: 'ISA Cash', balance: 72386 },
+  { account: 'F&S Cash', balance: 19832 },
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
@@ -212,7 +212,7 @@ export const propertyHoldings: PropertyHolding[] = [
 ];
 
 export const cashHoldings: CashHolding[] = [
-  { account: 'NatWest 3775', balance: 52649 },
+  { account: 'NatWest 3775', balance: 32949 },
   { account: 'NatWest 8002', balance: 2154 },
   { account: 'Revolut', balance: 1941 },
   { account: 'Premium Bonds', balance: 26000 },
