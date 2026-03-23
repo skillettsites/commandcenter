@@ -488,10 +488,22 @@ export async function GET() {
   // Use USD values from E*Trade converted at live forex, with live ICE price for % change tracking
   const icePrice = await fetchPrice(etradeHoldings.symbol);
   const icePriceGBP = icePrice ? icePrice.price * forexRate : null;
-  // Convert E*Trade USD values to GBP at live rate (matches E*Trade's own conversion)
-  const etradeVestedValue = Math.round(etradeHoldings.esppValueUSD * forexRate);
-  const etradeUnvestedValue = Math.round(etradeHoldings.rsValueUSD * forexRate);
+  // Use LIVE ICE price x shares for accurate valuation (fallback to static USD values)
+  const etradeVestedValue = icePriceGBP
+    ? Math.round(icePriceGBP * etradeHoldings.vestedShares)
+    : Math.round(etradeHoldings.esppValueUSD * forexRate);
+  const etradeUnvestedValue = icePriceGBP
+    ? Math.round(icePriceGBP * etradeHoldings.unvestedShares)
+    : Math.round(etradeHoldings.rsValueUSD * forexRate);
   const etradeTotalValue = etradeVestedValue + etradeUnvestedValue;
+
+  // ICE daily change
+  const iceDailyChangePercent = icePrice?.previousClose
+    ? ((icePrice.price - icePrice.previousClose) / icePrice.previousClose) * 100
+    : null;
+  const iceDailyChangeGBP = icePrice?.previousClose && icePriceGBP
+    ? (icePrice.price - icePrice.previousClose) * forexRate * etradeHoldings.vestedShares
+    : null;
 
   // Totals
   const stocksTotal = stocks.reduce((sum, s) => sum + (s.currentValue ?? 0), 0);
@@ -526,6 +538,8 @@ export async function GET() {
       unvestedValue: etradeUnvestedValue,
       totalValue: etradeTotalValue,
       isLive: icePrice !== null,
+      dailyChangePercent: iceDailyChangePercent,
+      dailyChangeGBP: iceDailyChangeGBP,
     },
     properties: propertyHoldings,
     cash: cashHoldings,
