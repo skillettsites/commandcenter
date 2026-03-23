@@ -106,10 +106,12 @@ export interface DividendSchedule {
 
 export const stockHoldings: StockHolding[] = [
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281, account: 'ISA', currency: 'USD' },
-  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 108, costBasis: 8150, account: 'ISA', currency: 'USD' },
-  { symbol: 'JEPQ', name: 'JEPQ', shares: 41, costBasis: 813, account: 'ISA', currency: 'USD' },
+  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 151, costBasis: 13542, account: 'ISA', currency: 'USD' },
+  { symbol: 'AMZN', name: 'Amazon', shares: 78, costBasis: 12415, account: 'ISA', currency: 'USD' },
+  { symbol: 'JEPQ', name: 'JEPQ', shares: 564, costBasis: 10800, account: 'ISA', currency: 'USD' },
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4463, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15089, account: 'F&S', currency: 'USD' },
+  { symbol: '2TSL.L', name: '2x Tesla ETP', shares: 104, costBasis: 9909, account: 'F&S', currency: 'GBP' },
 ];
 
 export const fundHoldings: FundHolding[] = [
@@ -156,8 +158,8 @@ export const fundHoldings: FundHolding[] = [
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 72386 },
-  { account: 'F&S Cash', balance: 19832 },
+  { account: 'ISA Cash', balance: 40156 },
+  { account: 'F&S Cash', balance: 9923 },
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
