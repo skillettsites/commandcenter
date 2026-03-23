@@ -214,7 +214,7 @@ export const propertyHoldings: PropertyHolding[] = [
 ];
 
 export const cashHoldings: CashHolding[] = [
-  { account: 'NatWest 3775', balance: 32949 },
+  { account: 'NatWest 3775', balance: 12949 },
   { account: 'NatWest 8002', balance: 2154 },
   { account: 'Revolut', balance: 1941 },
   { account: 'Premium Bonds', balance: 26000 },
