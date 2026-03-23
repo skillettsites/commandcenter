@@ -209,7 +209,7 @@ export const propertyHoldings: PropertyHolding[] = [
     serviceCharge: 250,
   },
   { id: 'didcot', name: '9 Fen Violet, Didcot', value: 425000, mortgage: 268270, type: 'selling' },
-  { id: 'newbury', name: '6 Hennessey, Newbury', value: 500000, mortgage: 342248, type: 'selling' },
+  { id: 'newbury', name: '6 Hennessey, Newbury', value: 485000, mortgage: 342248, type: 'selling' },
   { id: 'shoeburyness', name: 'Flat 5 Sandpipers, Shoeburyness', value: 350000, mortgage: 213503, type: 'selling' },
 ];
 
