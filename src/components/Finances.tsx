@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import NetWorthChart from './NetWorthChart';
+import ShareDetail from './ShareDetail';
 
 interface StockData {
   symbol: string;
@@ -9,6 +10,7 @@ interface StockData {
   shares: number;
   costBasis: number;
   account: string;
+  currency: string;
   livePrice: number | null;
   livePriceGBP: number | null;
   currentValue: number | null;
@@ -617,6 +619,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [investmentView, setInvestmentView] = useState<'today' | 'alltime'>('today');
+  const [expandedShare, setExpandedShare] = useState<string | null>(null);
   const [valuations, setValuations] = useState<PropertyValuationData[]>([]);
   const [valuationsLoading, setValuationsLoading] = useState(false);
 
@@ -818,39 +821,69 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                     </h4>
                     <div className="space-y-1.5 ml-3">
                       {data.stocks.map((stock) => (
-                        <div key={stock.symbol} className="flex items-center justify-between py-1">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[12px] font-mono font-medium text-[var(--accent)]">{stock.symbol}</span>
-                              <span className="text-[11px] text-[var(--text-secondary)] truncate">{stock.name}</span>
-                              <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">{stock.account}</span>
+                        <div key={stock.symbol}>
+                          <div
+                            className="flex items-center justify-between py-1 cursor-pointer rounded-lg hover:bg-[var(--bg-card)] px-1 -mx-1 transition-colors"
+                            onClick={() => setExpandedShare(expandedShare === stock.symbol ? null : stock.symbol)}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[12px] font-mono font-medium text-[var(--accent)]">{stock.symbol}</span>
+                                <span className="text-[11px] text-[var(--text-secondary)] truncate">{stock.name}</span>
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-[var(--bg-elevated)] text-[var(--text-tertiary)]">{stock.account}</span>
+                                <svg
+                                  className={`w-3 h-3 text-[var(--text-tertiary)] transition-transform duration-200 ${expandedShare === stock.symbol ? 'rotate-90' : ''}`}
+                                  fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-[var(--text-tertiary)]">{stock.shares} shares</span>
+                                {stock.livePriceGBP !== null && (
+                                  <span className="text-[10px] text-[var(--text-tertiary)]">@ £{stock.livePriceGBP.toFixed(2)}</span>
+                                )}
+                                <span className="text-[10px] text-[var(--text-tertiary)]">cost £{stock.costBasis.toLocaleString()}</span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-[var(--text-tertiary)]">{stock.shares} shares</span>
-                              {stock.livePriceGBP !== null && (
-                                <span className="text-[10px] text-[var(--text-tertiary)]">@ £{stock.livePriceGBP.toFixed(2)}</span>
-                              )}
-                              <span className="text-[10px] text-[var(--text-tertiary)]">cost £{stock.costBasis.toLocaleString()}</span>
+                            <div className="text-right flex-shrink-0 ml-2">
+                              <div className="text-[13px] font-medium text-[var(--text-primary)]">
+                                {stock.currentValue !== null ? formatGBP(stock.currentValue) : '--'}
+                              </div>
+                              <div className="flex items-center gap-1 justify-end">
+                                {investmentView === 'today' ? (
+                                  <>
+                                    <GainLossText value={stock.dailyChangeGBP ?? null} size="xs" />
+                                    <PercentBadge value={stock.dailyChangePercent ?? null} />
+                                  </>
+                                ) : (
+                                  <>
+                                    <GainLossText value={stock.gainLoss} size="xs" />
+                                    <PercentBadge value={stock.gainLossPercent} />
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <div className="text-[13px] font-medium text-[var(--text-primary)]">
-                              {stock.currentValue !== null ? formatGBP(stock.currentValue) : '--'}
-                            </div>
-                            <div className="flex items-center gap-1 justify-end">
-                              {investmentView === 'today' ? (
-                                <>
-                                  <GainLossText value={stock.dailyChangeGBP ?? null} size="xs" />
-                                  <PercentBadge value={stock.dailyChangePercent ?? null} />
-                                </>
-                              ) : (
-                                <>
-                                  <GainLossText value={stock.gainLoss} size="xs" />
-                                  <PercentBadge value={stock.gainLossPercent} />
-                                </>
-                              )}
-                            </div>
-                          </div>
+                          {expandedShare === stock.symbol && (
+                            <ShareDetail
+                              symbol={stock.symbol}
+                              name={stock.name}
+                              shares={stock.shares}
+                              costBasis={stock.costBasis}
+                              currentValue={stock.currentValue}
+                              livePrice={stock.livePrice}
+                              livePriceGBP={stock.livePriceGBP}
+                              dailyChangeGBP={stock.dailyChangeGBP}
+                              dailyChangePercent={stock.dailyChangePercent}
+                              gainLoss={stock.gainLoss}
+                              gainLossPercent={stock.gainLossPercent}
+                              account={stock.account}
+                              currency={stock.currency || 'USD'}
+                              forexRate={data.forexRate}
+                              onClose={() => setExpandedShare(null)}
+                            />
+                          )}
                         </div>
                       ))}
                     </div>
