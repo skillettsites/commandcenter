@@ -46,7 +46,14 @@ async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
 
 export async function GET(req: NextRequest) {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return NextResponse.json({ sites: {} });
+    return NextResponse.json({
+      error: "Missing Supabase credentials",
+      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasUrlRuntime: !!process.env.SUPABASE_URL,
+      hasKeyRuntime: !!process.env.SUPABASE_ANON_KEY,
+      sites: {}
+    });
   }
 
   const mode = req.nextUrl.searchParams.get("mode");
