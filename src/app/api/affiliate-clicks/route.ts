@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Use non-NEXT_PUBLIC versions at runtime (server-side API routes don't need NEXT_PUBLIC prefix)
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+// Use service role key for server-side API to bypass RLS
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY || process.env.SUPABASE_KEY || "";
 
 interface ClickRow {
   id: number;
@@ -28,8 +28,8 @@ async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
   const url = `${SUPABASE_URL}/rest/v1/affiliate_clicks?order=created_at.desc&select=id,type,city,section,site,url,created_at,geo_city,geo_region,geo_country${extraParams}`;
   const res = await fetch(url, {
     headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
     },
     cache: 'no-store',
   });
@@ -45,13 +45,13 @@ async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
 }
 
 export async function GET(req: NextRequest) {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
     return NextResponse.json({
       error: "Missing Supabase credentials",
       hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_KEY,
       hasUrlRuntime: !!process.env.SUPABASE_URL,
-      hasKeyRuntime: !!process.env.SUPABASE_ANON_KEY,
+      hasKeyRuntime: !!process.env.SUPABASE_KEY,
       sites: {}
     });
   }
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     // Full mode returns everything the dashboard needs
     if (mode === "full") {
       const clicks = await fetchClicks("&limit=10000");
-      console.log(`[affiliate-clicks] full mode: fetched ${clicks.length} clicks, URL=${SUPABASE_URL?.slice(0,30)}, key=${SUPABASE_ANON_KEY?.slice(0,20)}...`);
+      console.log(`[affiliate-clicks] full mode: fetched ${clicks.length} clicks, URL=${SUPABASE_URL?.slice(0,30)}, key=${SUPABASE_KEY?.slice(0,20)}...`);
       const now = new Date();
       const todayStr = now.toISOString().slice(0, 10);
       const monthStr = now.toISOString().slice(0, 7);
