@@ -2,6 +2,7 @@ import DashboardHeader from '@/components/DashboardHeader';
 import AllSitesStats from '@/components/AllSitesStats';
 import SiteGrid from '@/components/SiteGrid';
 import SearchActivity from '@/components/SearchActivity';
+import AffiliateClicks from '@/components/AffiliateClicks';
 import BetPositions from '@/components/BetPositions';
 import EmailList from '@/components/EmailList';
 import TaskList from '@/components/TaskList';
@@ -17,6 +18,7 @@ export default function Home() {
           <AllSitesStats />
           <SiteGrid />
           <SearchActivity />
+          <AffiliateClicks />
           <BetPositions />
           <EmailList />
           <TaskList />
