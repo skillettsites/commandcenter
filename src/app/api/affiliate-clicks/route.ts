@@ -32,8 +32,15 @@ async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
     },
     cache: 'no-store',
   });
-  if (!res.ok) return [];
-  return res.json();
+  if (!res.ok) {
+    console.error(`[affiliate-clicks] Supabase fetch failed: ${res.status} ${res.statusText}`);
+    const body = await res.text();
+    console.error(`[affiliate-clicks] Response body: ${body.slice(0, 200)}`);
+    return [];
+  }
+  const data = await res.json();
+  console.log(`[affiliate-clicks] Supabase returned ${Array.isArray(data) ? data.length : 'non-array'} rows`);
+  return data;
 }
 
 export async function GET(req: NextRequest) {
@@ -47,6 +54,7 @@ export async function GET(req: NextRequest) {
     // Full mode returns everything the dashboard needs
     if (mode === "full") {
       const clicks = await fetchClicks("&limit=10000");
+      console.log(`[affiliate-clicks] full mode: fetched ${clicks.length} clicks, URL=${SUPABASE_URL?.slice(0,30)}, key=${SUPABASE_ANON_KEY?.slice(0,20)}...`);
       const now = new Date();
       const todayStr = now.toISOString().slice(0, 10);
       const monthStr = now.toISOString().slice(0, 7);
