@@ -30,7 +30,7 @@ async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
       apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
     },
-    next: { revalidate: 30 },
+    cache: 'no-store',
   });
   if (!res.ok) return [];
   return res.json();
