@@ -25,7 +25,7 @@ interface SiteStats {
 }
 
 async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
-  const url = `${SUPABASE_URL}/rest/v1/affiliate_clicks?order=created_at.desc&select=id,type,city,section,site,url,created_at,geo_city,geo_region,geo_country${extraParams}`;
+  const url = `${SUPABASE_URL}/rest/v1/affiliate_clicks?order=created_at.desc&select=id,type,city,section,site,created_at,geo_city,geo_region,geo_country${extraParams}`;
   const res = await fetch(url, {
     headers: {
       apikey: SUPABASE_KEY,
