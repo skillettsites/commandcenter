@@ -16,6 +16,7 @@ export const projects: Project[] = [
   { id: 'daveknowsai', name: 'DaveKnowsAI', url: 'https://daveknowsai.com', color: '#A855F7', gaPropertyId: '529258215', gscSiteUrl: 'sc-domain:daveknowsai.com', bingSiteUrl: 'https://daveknowsai.com/' },
   { id: 'askyourstay', name: 'AskYourStay', url: 'https://askyourstay.com', color: '#0EA5E9', gaPropertyId: '529406812', gscSiteUrl: 'sc-domain:askyourstay.com', bingSiteUrl: 'https://askyourstay.com/' },
   { id: 'aicareerswap', name: 'AICareerSwap', url: 'https://aicareerswap.com', color: '#F472B6', gaPropertyId: '529412747', gscSiteUrl: 'sc-domain:aicareerswap.com', bingSiteUrl: 'https://aicareerswap.com/' },
+  { id: 'briefmynews', name: 'BriefMyNews', url: 'https://briefmynews.com', color: '#DC2626', gaPropertyId: '52972611', gscSiteUrl: 'sc-domain:briefmynews.com', bingSiteUrl: 'https://briefmynews.com/' },
   { id: 'dashboard', name: 'Dashboard', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
 ];
