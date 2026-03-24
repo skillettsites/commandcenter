@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  ReferenceLine,
 } from 'recharts';
 
 interface ChartPoint {
@@ -163,6 +164,11 @@ export default function ShareDetail({
   const pricePerShareGBP = livePriceGBP !== null ? livePriceGBP : null;
   const costPerShare = shares > 0 ? costBasis / shares : 0;
 
+  // Average buy price in the chart's native currency
+  const avgBuyNative = shares > 0
+    ? (currency === 'GBP' ? costBasis / shares : (costBasis / shares) / forexRate)
+    : null;
+
   // Format X-axis ticks
   const getTickFormatter = (p: Period) => (dateStr: string) => formatDateLabel(dateStr, p);
 
@@ -275,6 +281,21 @@ export default function ShareDetail({
                 dot={false}
                 animationDuration={500}
               />
+              {avgBuyNative !== null && (
+                <ReferenceLine
+                  y={avgBuyNative}
+                  stroke="#ffd60a"
+                  strokeDasharray="6 3"
+                  strokeWidth={1.5}
+                  label={{
+                    value: `Avg Buy: ${currency === 'GBP' ? '£' : '$'}${avgBuyNative.toFixed(2)}`,
+                    position: 'right',
+                    fill: '#ffd60a',
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         ) : (
