@@ -11,12 +11,14 @@ export default function TaskList() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('pending');
   const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [sortMode, setSortMode] = useState<'important' | 'latest'>('important');
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (filter !== 'all') params.set('status', filter);
     if (projectFilter !== 'all') params.set('project', projectFilter);
+    if (sortMode === 'latest') params.set('sort', 'latest');
 
     const res = await fetch(`/api/tasks?${params}`);
     if (res.ok) {
@@ -24,7 +26,7 @@ export default function TaskList() {
       setTasks(data);
     }
     setLoading(false);
-  }, [filter, projectFilter]);
+  }, [filter, projectFilter, sortMode]);
 
   useEffect(() => {
     fetchTasks();
@@ -77,6 +79,26 @@ export default function TaskList() {
       </div>
 
       <ProjectFilter selected={projectFilter} onChange={setProjectFilter} />
+
+      {/* Sort toggle */}
+      <div className="flex gap-1 bg-[var(--bg-card)] rounded-xl p-1">
+        {([
+          { key: 'important' as const, label: 'Most Important' },
+          { key: 'latest' as const, label: 'Latest' },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setSortMode(key)}
+            className={`flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+              sortMode === key
+                ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-tertiary)] active:text-[var(--text-primary)]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <div className="space-y-2">
         {!loading && tasks.length === 0 && (

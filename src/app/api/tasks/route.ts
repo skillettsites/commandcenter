@@ -6,12 +6,18 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
   const project = searchParams.get('project');
+  const sort = searchParams.get('sort');
 
-  let query = supabase
-    .from('tasks')
-    .select('*')
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: false });
+  let query = supabase.from('tasks').select('*');
+
+  if (sort === 'latest') {
+    query = query.order('created_at', { ascending: false });
+  } else {
+    // Default: most important (priority high>medium>low, then newest first)
+    query = query
+      .order('priority', { ascending: true })
+      .order('created_at', { ascending: false });
+  }
 
   if (status) query = query.eq('status', status);
   if (project) query = query.eq('project', project);
