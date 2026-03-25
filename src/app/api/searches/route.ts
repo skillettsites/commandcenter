@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
       const sorted = Array.from(grouped.entries())
         .map(([query, data]) => ({ query, ...data }))
-        .sort((a, b) => b.count - a.count);
+        .sort((a, b) => new Date(b.lastSearched).getTime() - new Date(a.lastSearched).getTime());
 
       results[siteId] = {
         total: rows?.length ?? 0,
