@@ -2,6 +2,7 @@ import DashboardHeader from '@/components/DashboardHeader';
 import AllSitesStats from '@/components/AllSitesStats';
 import SiteGrid from '@/components/SiteGrid';
 import SearchActivity from '@/components/SearchActivity';
+import GeoAnalytics from '@/components/GeoAnalytics';
 import AffiliateClicks from '@/components/AffiliateClicks';
 import BetPositions from '@/components/BetPositions';
 import EmailList from '@/components/EmailList';
@@ -18,6 +19,7 @@ export default function Home() {
           <AllSitesStats />
           <SiteGrid />
           <SearchActivity />
+          <GeoAnalytics />
           <AffiliateClicks />
           <BetPositions />
           <EmailList />

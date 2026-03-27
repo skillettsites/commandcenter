@@ -231,5 +231,104 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({ error: 'Invalid view parameter. Use: summary, top-pages, geo, recent, or full' }, { status: 400 });
+  // Geo detail: countries with percentages, cities with regions, city pairs (searches), device breakdown
+  if (view === 'geo-detail') {
+    const siteIds = siteFilter ? [siteFilter] : ALL_SITES;
+
+    // Fetch pageviews for geo data
+    const { data: pvRows } = await supabase
+      .from('pageviews')
+      .select('site_id, geo_country, geo_city, geo_region, device_type')
+      .in('site_id', siteIds)
+      .gte('created_at', fromDate)
+      .limit(20000);
+
+    const rows = pvRows ?? [];
+    const totalRows = rows.length;
+
+    // Aggregate countries
+    const countryMap = new Map<string, number>();
+    const cityMap = new Map<string, { city: string; region: string; country: string; count: number }>();
+    const deviceMap: Record<string, number> = {};
+
+    for (const row of rows) {
+      if (row.geo_country) {
+        countryMap.set(row.geo_country, (countryMap.get(row.geo_country) ?? 0) + 1);
+      }
+      if (row.geo_city) {
+        const key = `${row.geo_city}|${row.geo_region || ''}|${row.geo_country || ''}`;
+        const existing = cityMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          cityMap.set(key, {
+            city: row.geo_city,
+            region: row.geo_region || '',
+            country: row.geo_country || '',
+            count: 1,
+          });
+        }
+      }
+      const dt = row.device_type || 'unknown';
+      deviceMap[dt] = (deviceMap[dt] ?? 0) + 1;
+    }
+
+    const topCountries = Array.from(countryMap.entries())
+      .map(([country, count]) => ({
+        country,
+        count,
+        percentage: totalRows > 0 ? Math.round((count / totalRows) * 1000) / 10 : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 30);
+
+    const topCities = Array.from(cityMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 40);
+
+    // City pairs: only for postcodecheck and carcostcheck, from the searches table
+    let cityPairs: Array<{ visitorCity: string; searchedArea: string; count: number }> = [];
+    const searchSites = siteIds.filter(s => s === 'postcodecheck' || s === 'carcostcheck');
+
+    if (searchSites.length > 0) {
+      const { data: searchRows } = await supabase
+        .from('searches')
+        .select('geo_city, search_query')
+        .in('site_id', searchSites)
+        .gte('created_at', fromDate)
+        .not('geo_city', 'is', null)
+        .limit(10000);
+
+      if (searchRows && searchRows.length > 0) {
+        const pairMap = new Map<string, { visitorCity: string; searchedArea: string; count: number }>();
+        for (const row of searchRows) {
+          if (row.geo_city && row.search_query) {
+            const key = `${row.geo_city}|${row.search_query}`;
+            const existing = pairMap.get(key);
+            if (existing) {
+              existing.count++;
+            } else {
+              pairMap.set(key, {
+                visitorCity: row.geo_city,
+                searchedArea: row.search_query,
+                count: 1,
+              });
+            }
+          }
+        }
+        cityPairs = Array.from(pairMap.values())
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 30);
+      }
+    }
+
+    return NextResponse.json({
+      topCountries,
+      topCities,
+      cityPairs,
+      deviceBreakdown: deviceMap,
+    });
+  }
+
+  return NextResponse.json({ error: 'Invalid view parameter. Use: summary, top-pages, geo, geo-detail, recent, or full' }, { status: 400 });
 }
