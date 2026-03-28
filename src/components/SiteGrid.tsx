@@ -16,6 +16,7 @@ interface SiteData {
   totalVisitors: number | null;
   monthVisitors: number | null;
   realtimeUsers: number | null;
+  trackedToday: number | null;
   gaPropertyId?: string;
   gscSiteUrl?: string;
   bingSiteUrl?: string;
@@ -58,6 +59,7 @@ export default function SiteGrid() {
         totalVisitors: null,
         monthVisitors: null,
         realtimeUsers: null,
+        trackedToday: null,
       }))
   );
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -140,9 +142,27 @@ export default function SiteGrid() {
       }
     }
 
+    async function fetchTrackedPageviews() {
+      try {
+        const res = await fetch('/api/pageviews?view=summary&range=today');
+        if (res.ok) {
+          const data = await res.json();
+          setSites(prev =>
+            prev.map(site => {
+              const siteData = data[site.id];
+              return siteData ? { ...site, trackedToday: siteData.today ?? 0 } : site;
+            })
+          );
+        }
+      } catch {
+        // Supabase pageviews not available
+      }
+    }
+
     fetchHealth();
     fetchAnalytics();
     fetchRealtime();
+    fetchTrackedPageviews();
 
     // Refresh realtime every 30 seconds
     const rtInterval = setInterval(fetchRealtime, 30000);
@@ -177,7 +197,7 @@ export default function SiteGrid() {
   const allUp = sites.every(s => s.status === 'up');
   const anyDown = sites.some(s => s.status === 'down');
   const checking = sites.some(s => s.status === 'checking');
-  const totalVisitors = sites.reduce((sum, s) => sum + (s.visitors ?? 0), 0);
+  const totalVisitors = sites.reduce((sum, s) => sum + Math.max(s.visitors ?? 0, s.trackedToday ?? 0), 0);
   const totalPageViews = sites.reduce((sum, s) => sum + (s.pageViews ?? 0), 0);
   const allTimeVisitors = sites.reduce((sum, s) => sum + (s.totalVisitors ?? 0), 0);
   const monthlyVisitors = sites.reduce((sum, s) => sum + (s.monthVisitors ?? 0), 0);
@@ -465,13 +485,22 @@ function SiteRow({
                   <span className="text-[10px] font-medium text-[var(--green)]">{site.realtimeUsers} now</span>
                 </div>
               )}
-              <span className={`text-[13px] font-medium ${
-                site.visitors === null ? 'text-[var(--text-tertiary)]' :
-                site.visitors > 0 ? 'text-[var(--green)]' : 'text-[var(--text-secondary)]'
-              }`}>
-                {site.visitors === null ? '-' : site.visitors}
-              </span>
-              <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">today</span>
+              {(() => {
+                const gaToday = site.visitors ?? 0;
+                const tracked = site.trackedToday ?? 0;
+                const best = Math.max(gaToday, tracked);
+                const isTrackedHigher = tracked > gaToday && tracked > 0;
+                return (
+                  <>
+                    <span className={`text-[13px] font-medium ${
+                      best === 0 ? 'text-[var(--text-secondary)]' : 'text-[var(--green)]'
+                    }`}>
+                      {best}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">today</span>
+                  </>
+                );
+              })()}
             </div>
             <div className="text-right">
               <span className={`text-[13px] font-medium ${
