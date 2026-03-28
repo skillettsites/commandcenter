@@ -17,7 +17,7 @@ function getAuth(): GoogleAuth | null {
       client_email: email,
       private_key: key.replace(/\\n/g, '\n'),
     },
-    scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],
+    scopes: ['https://www.googleapis.com/auth/webmasters'],
   });
   return _auth;
 }
