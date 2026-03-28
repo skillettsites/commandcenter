@@ -78,7 +78,29 @@ async function takeSnapshot() {
     console.error('Failed to fetch tracked searches for snapshot:', err);
   }
 
-  // Step 4: Fetch GSC data per site and upsert metrics
+  // Step 4: Fetch conversion event counts from Supabase
+  let trackedConversions: Record<string, { checkouts: number; purchases: number }> = {};
+  try {
+    const { data: convRows } = await supabase
+      .from('conversion_events')
+      .select('site_id, event_type')
+      .gte('created_at', `${today}T00:00:00Z`);
+
+    for (const row of convRows ?? []) {
+      if (!trackedConversions[row.site_id]) {
+        trackedConversions[row.site_id] = { checkouts: 0, purchases: 0 };
+      }
+      if (row.event_type === 'checkout_started') {
+        trackedConversions[row.site_id].checkouts++;
+      } else if (row.event_type === 'premium_purchased') {
+        trackedConversions[row.site_id].purchases++;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch conversion events for snapshot:', err);
+  }
+
+  // Step 5: Fetch GSC data per site and upsert metrics
   for (const site of GA_SITES) {
     try {
       let gscClicks = 0;
@@ -117,6 +139,8 @@ async function takeSnapshot() {
         ga_pageviews: gaData[site.id]?.pageviews || 0,
         tracked_pageviews: trackedPageviews[site.id] || 0,
         tracked_searches: trackedSearches[site.id] || 0,
+        tracked_checkouts: trackedConversions[site.id]?.checkouts || 0,
+        tracked_purchases: trackedConversions[site.id]?.purchases || 0,
       };
 
       const { error } = await supabase
