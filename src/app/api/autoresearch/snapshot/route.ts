@@ -9,9 +9,18 @@ const GSC_SITES = projects.filter(p => p.gscSiteUrl);
 // Sites that have GA configured
 const GA_SITES = projects.filter(p => p.gaPropertyId && p.id !== 'personal' && p.id !== 'dashboard' && p.id !== 'general');
 
-// POST /api/autoresearch/snapshot
-// Takes a daily snapshot of all sites' current metrics and upserts into site_metrics
+// GET handler for Vercel Cron (crons send GET requests)
+export async function GET() {
+  return takeSnapshot();
+}
+
+// POST handler for manual triggers
 export async function POST() {
+  return takeSnapshot();
+}
+
+// Takes a daily snapshot of all sites' current metrics and upserts into site_metrics
+async function takeSnapshot() {
   const supabase = getServiceClient();
   const today = new Date().toISOString().split('T')[0];
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL

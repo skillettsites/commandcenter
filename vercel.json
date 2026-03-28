@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/autoresearch/snapshot",
+      "schedule": "3 3 * * *"
+    }
+  ]
+}
