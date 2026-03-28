@@ -50,36 +50,44 @@ export default function AllSitesStats() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
 
-  // Fetch aggregated summary stats on mount
+  // Fetch aggregated summary stats on mount (GA4 + Supabase, use higher of each)
   useEffect(() => {
-    fetch('/api/analytics')
-      .then(res => res.ok ? res.json() : null)
-      .then(json => {
-        if (json?.data) {
-          const results = json.data as Array<{
+    Promise.all([
+      fetch('/api/analytics').then(res => res.ok ? res.json() : null),
+      fetch('/api/pageviews?view=summary&range=today').then(res => res.ok ? res.json() : null),
+    ])
+      .then(([gaJson, pvJson]) => {
+        if (gaJson?.data) {
+          const results = gaJson.data as Array<{
             siteId: string;
             activeUsers: number;
             pageViews: number;
             monthVisitors: number;
             totalVisitors: number;
           }>;
+          const tracked = (pvJson ?? {}) as Record<string, { today: number }>;
 
           const sitesToday: SiteTodayData[] = results
-            .filter(r => r.activeUsers > 0 || r.pageViews > 0)
             .map(r => {
               const proj = projects.find(p => p.id === r.siteId);
+              const trackedToday = tracked[r.siteId]?.today ?? 0;
+              const bestVisitors = Math.max(r.activeUsers, trackedToday);
               return {
                 siteId: r.siteId,
                 name: proj?.name || r.siteId,
                 color: proj?.color || '#888',
-                visitors: r.activeUsers,
+                visitors: bestVisitors,
                 pageViews: r.pageViews,
               };
             })
+            .filter(r => r.visitors > 0 || r.pageViews > 0)
             .sort((a, b) => b.visitors - a.visitors || b.pageViews - a.pageViews);
 
           setStats({
-            todayVisitors: results.reduce((s, r) => s + r.activeUsers, 0),
+            todayVisitors: results.reduce((s, r) => {
+              const trackedToday = tracked[r.siteId]?.today ?? 0;
+              return s + Math.max(r.activeUsers, trackedToday);
+            }, 0),
             monthVisitors: results.reduce((s, r) => s + r.monthVisitors, 0),
             allTimeVisitors: results.reduce((s, r) => s + r.totalVisitors, 0),
             todayPageViews: results.reduce((s, r) => s + r.pageViews, 0),
