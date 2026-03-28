@@ -38,16 +38,15 @@ export async function GET() {
       try {
         const propertyId = `properties/${project.gaPropertyId}`;
 
-        // Fetch realtime stats (instant, no delay), month-to-date, and all-time in parallel
-        const [realtimeResponse, monthResponse, totalResponse] = await Promise.all([
-          client.runRealtimeReport({
+        // Fetch today stats, month-to-date visitors, and all-time visitors in parallel
+        const [todayResponse, monthResponse, totalResponse] = await Promise.all([
+          client.runReport({
             property: propertyId,
+            dateRanges: [{ startDate: 'today', endDate: 'today' }],
             metrics: [
               { name: 'activeUsers' },
+              { name: 'sessions' },
               { name: 'screenPageViews' },
-            ],
-            minuteRanges: [
-              { name: 'today', startMinutesAgo: 1440, endMinutesAgo: 0 },
             ],
           }),
           client.runReport({
@@ -62,15 +61,15 @@ export async function GET() {
           }),
         ]);
 
-        const realtimeRow = realtimeResponse[0].rows?.[0];
+        const todayRow = todayResponse[0].rows?.[0];
         const monthRow = monthResponse[0].rows?.[0];
         const totalRow = totalResponse[0].rows?.[0];
 
         return {
           siteId: project.id,
-          activeUsers: parseInt(realtimeRow?.metricValues?.[0]?.value ?? '0'),
-          sessions: 0,
-          pageViews: parseInt(realtimeRow?.metricValues?.[1]?.value ?? '0'),
+          activeUsers: parseInt(todayRow?.metricValues?.[0]?.value ?? '0'),
+          sessions: parseInt(todayRow?.metricValues?.[1]?.value ?? '0'),
+          pageViews: parseInt(todayRow?.metricValues?.[2]?.value ?? '0'),
           monthVisitors: parseInt(monthRow?.metricValues?.[0]?.value ?? '0'),
           totalVisitors: parseInt(totalRow?.metricValues?.[0]?.value ?? '0'),
         };
