@@ -3,6 +3,7 @@ import AllSitesStats from '@/components/AllSitesStats';
 import SiteGrid from '@/components/SiteGrid';
 import SearchActivity from '@/components/SearchActivity';
 import GeoAnalytics from '@/components/GeoAnalytics';
+import AutoResearch from '@/components/AutoResearch';
 import AffiliateClicks from '@/components/AffiliateClicks';
 import BetPositions from '@/components/BetPositions';
 import EmailList from '@/components/EmailList';
@@ -20,6 +21,7 @@ export default function Home() {
           <SiteGrid />
           <SearchActivity />
           <GeoAnalytics />
+          <AutoResearch />
           <AffiliateClicks />
           <BetPositions />
           <EmailList />
