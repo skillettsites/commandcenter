@@ -17,6 +17,7 @@ export default function Home() {
       <PullToRefresh>
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 pb-24">
           <DashboardHeader />
+          <TaskList />
           <AllSitesStats />
           <SiteGrid />
           <SearchActivity />
@@ -25,7 +26,6 @@ export default function Home() {
           <AffiliateClicks />
           <BetPositions />
           <EmailList />
-          <TaskList />
         </div>
       </PullToRefresh>
     </main>
