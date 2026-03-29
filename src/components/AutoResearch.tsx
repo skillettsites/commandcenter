@@ -34,6 +34,40 @@ interface ChangeRow {
   created_at: string;
 }
 
+interface PageAuditRow {
+  id: string;
+  site_id: string;
+  url: string;
+  audited_at: string;
+  monthly_clicks: number;
+  monthly_impressions: number;
+  has_affiliate_cta: boolean;
+  has_structured_data: boolean;
+  has_images: boolean;
+  data_table_position: string;
+  internal_link_count: number;
+  external_link_count: number;
+  word_count: number;
+  has_h1: boolean;
+  heading_count: number;
+  issues: string[];
+  suggestions: string[];
+  score: number;
+  status: string;
+}
+
+interface PageAuditResponse {
+  audits: PageAuditRow[];
+  summary: {
+    total: number;
+    totalIssues: number;
+    avgScore: number;
+    needsWork: number;
+    optimized: number;
+    skipped: number;
+  };
+}
+
 interface MetricsResponse {
   metrics: MetricRow[];
   changes: ChangeRow[];
@@ -46,6 +80,7 @@ interface MetricsResponse {
 
 type TimeRange = '7d' | '1m' | '3m';
 type ChartMetric = 'clicks' | 'impressions' | 'position';
+type ActiveTab = 'metrics' | 'optimization';
 
 const TRACKED_SITES = projects.filter(
   (p) => p.gaPropertyId && p.id !== 'personal' && p.id !== 'dashboard' && p.id !== 'general'
@@ -175,6 +210,11 @@ export default function AutoResearch() {
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [snapshotRunning, setSnapshotRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('metrics');
+  const [auditData, setAuditData] = useState<PageAuditResponse | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditRunning, setAuditRunning] = useState(false);
+  const [expandedAudit, setExpandedAudit] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -196,24 +236,63 @@ export default function AutoResearch() {
     }
   }, [selectedSite, timeRange]);
 
+  const fetchAuditData = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedSite !== 'all') params.set('site_id', selectedSite);
+      const res = await fetch(`/api/autoresearch/page-audit?${params}`);
+      if (res.ok) {
+        const json: PageAuditResponse = await res.json();
+        setAuditData(json);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [selectedSite]);
+
   useEffect(() => {
     if (!collapsed) {
-      fetchData();
+      if (activeTab === 'metrics') {
+        fetchData();
+      } else {
+        fetchAuditData();
+      }
     }
-  }, [collapsed, fetchData]);
+  }, [collapsed, activeTab, fetchData, fetchAuditData]);
 
   const runSnapshot = async () => {
     setSnapshotRunning(true);
     try {
       const res = await fetch('/api/autoresearch/snapshot', { method: 'POST' });
       if (res.ok) {
-        // Refresh data after snapshot
         await fetchData();
       }
     } catch {
       // Silently fail, user can retry
     } finally {
       setSnapshotRunning(false);
+    }
+  };
+
+  const runAudit = async () => {
+    setAuditRunning(true);
+    try {
+      const body = selectedSite !== 'all' ? { siteUrl: selectedSite } : {};
+      const res = await fetch('/api/autoresearch/page-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        await fetchAuditData();
+      }
+    } catch {
+      // Silently fail, user can retry
+    } finally {
+      setAuditRunning(false);
     }
   };
 
@@ -363,186 +442,448 @@ export default function AutoResearch() {
             </div>
           </div>
 
-          {/* Time range + snapshot button */}
-          <div className="px-3.5 pt-2 pb-2 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              {(['7d', '1m', '3m'] as TimeRange[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTimeRange(r);
-                  }}
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
-                    timeRange === r
-                      ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                  }`}
-                >
-                  {RANGE_LABELS[r]}
-                </button>
-              ))}
-            </div>
+          {/* Tab selector: Metrics vs Page Optimization */}
+          <div className="px-3.5 pt-2 pb-1 flex items-center gap-1 border-b border-[var(--border-light)]">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                runSnapshot();
-              }}
-              disabled={snapshotRunning}
-              className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-40"
+              onClick={() => setActiveTab('metrics')}
+              className={`px-3 py-1.5 rounded-t-lg text-[11px] font-semibold transition-colors ${
+                activeTab === 'metrics'
+                  ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border-b-2 border-[var(--accent)]'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
             >
-              {snapshotRunning ? 'Running...' : 'Take Snapshot'}
+              Metrics
+            </button>
+            <button
+              onClick={() => setActiveTab('optimization')}
+              className={`px-3 py-1.5 rounded-t-lg text-[11px] font-semibold transition-colors relative ${
+                activeTab === 'optimization'
+                  ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] border-b-2 border-[var(--accent)]'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              Page Optimization
+              {auditData && auditData.summary.needsWork > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#EF4444] text-white text-[8px] font-bold flex items-center justify-center">
+                  {auditData.summary.needsWork > 9 ? '9+' : auditData.summary.needsWork}
+                </span>
+              )}
             </button>
           </div>
 
-          {/* Loading / Error */}
-          {loading && !data && (
-            <div className="px-3.5 py-6 text-center">
-              <span className="text-[12px] text-[var(--text-tertiary)]">Loading metrics...</span>
-            </div>
-          )}
-
-          {error && !data && (
-            <div className="px-3.5 py-4">
-              <p className="text-[12px] text-[var(--text-tertiary)]">
-                Could not load AutoResearch data. Run a snapshot first to populate metrics.
-              </p>
-            </div>
-          )}
-
-          {data && (
-            <div>
-              {/* Chart metric selector */}
-              <div className="px-3.5 pb-2 flex items-center gap-1 border-b border-[var(--border-light)]">
-                {(['clicks', 'impressions', 'position'] as ChartMetric[]).map((m) => (
-                  <button
-                    key={m}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setChartMetric(m);
-                    }}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
-                      chartMetric === m
-                        ? 'bg-[var(--accent)] text-white'
-                        : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-                    }`}
-                  >
-                    {CHART_LABELS[m]}
-                  </button>
-                ))}
+          {/* ===== METRICS TAB ===== */}
+          {activeTab === 'metrics' && (
+            <>
+              {/* Time range + snapshot button */}
+              <div className="px-3.5 pt-2 pb-2 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {(['7d', '1m', '3m'] as TimeRange[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTimeRange(r);
+                      }}
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                        timeRange === r
+                          ? 'bg-[var(--accent)] text-white'
+                          : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      {RANGE_LABELS[r]}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runSnapshot();
+                  }}
+                  disabled={snapshotRunning}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-40"
+                >
+                  {snapshotRunning ? 'Running...' : 'Take Snapshot'}
+                </button>
               </div>
 
-              {/* Chart */}
-              <div className="px-3.5 py-3">
-                <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
-                  {CHART_LABELS[chartMetric]} over {RANGE_LABELS[timeRange]}
-                </p>
-                {chartValues.length > 0 ? (
-                  <MiniLineChart
-                    data={chartValues}
-                    color={typeof accentColor === 'string' && accentColor.startsWith('#') ? accentColor : '#3B82F6'}
-                    inverted={chartMetric === 'position'}
-                    width={320}
-                    height={100}
-                  />
-                ) : (
-                  <div className="py-6 text-center text-[11px] text-[var(--text-tertiary)]">
-                    No data yet. Run a daily snapshot to start tracking.
-                  </div>
-                )}
-              </div>
+              {/* Loading / Error */}
+              {loading && !data && (
+                <div className="px-3.5 py-6 text-center">
+                  <span className="text-[12px] text-[var(--text-tertiary)]">Loading metrics...</span>
+                </div>
+              )}
 
-              {/* Site Health Summary */}
-              {siteHealth && (
-                <div className="px-3.5 py-2.5 border-t border-[var(--border-light)]">
-                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
-                    Latest Snapshot
+              {error && !data && (
+                <div className="px-3.5 py-4">
+                  <p className="text-[12px] text-[var(--text-tertiary)]">
+                    Could not load AutoResearch data. Run a snapshot first to populate metrics.
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <StatCard label="GSC Clicks" value={siteHealth.gsc_clicks} />
-                    <StatCard label="Impressions" value={siteHealth.gsc_impressions} />
-                    <StatCard label="Avg Position" value={Number(siteHealth.gsc_position).toFixed(1)} />
-                    <StatCard label="GA Visitors" value={siteHealth.ga_visitors} />
-                    <StatCard label="GA Pageviews" value={siteHealth.ga_pageviews} />
-                    <StatCard label="Tracked Views" value={siteHealth.tracked_pageviews} />
-                    <StatCard label="Tracked Searches" value={siteHealth.tracked_searches} />
-                    <StatCard label="Pages Indexed" value={siteHealth.gsc_pages_indexed} />
+                </div>
+              )}
+
+              {data && (
+                <div>
+                  {/* Chart metric selector */}
+                  <div className="px-3.5 pb-2 flex items-center gap-1 border-b border-[var(--border-light)]">
+                    {(['clicks', 'impressions', 'position'] as ChartMetric[]).map((m) => (
+                      <button
+                        key={m}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setChartMetric(m);
+                        }}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                          chartMetric === m
+                            ? 'bg-[var(--accent)] text-white'
+                            : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        {CHART_LABELS[m]}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Chart */}
+                  <div className="px-3.5 py-3">
+                    <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
+                      {CHART_LABELS[chartMetric]} over {RANGE_LABELS[timeRange]}
+                    </p>
+                    {chartValues.length > 0 ? (
+                      <MiniLineChart
+                        data={chartValues}
+                        color={typeof accentColor === 'string' && accentColor.startsWith('#') ? accentColor : '#3B82F6'}
+                        inverted={chartMetric === 'position'}
+                        width={320}
+                        height={100}
+                      />
+                    ) : (
+                      <div className="py-6 text-center text-[11px] text-[var(--text-tertiary)]">
+                        No data yet. Run a daily snapshot to start tracking.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Site Health Summary */}
+                  {siteHealth && (
+                    <div className="px-3.5 py-2.5 border-t border-[var(--border-light)]">
+                      <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
+                        Latest Snapshot
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <StatCard label="GSC Clicks" value={siteHealth.gsc_clicks} />
+                        <StatCard label="Impressions" value={siteHealth.gsc_impressions} />
+                        <StatCard label="Avg Position" value={Number(siteHealth.gsc_position).toFixed(1)} />
+                        <StatCard label="GA Visitors" value={siteHealth.ga_visitors} />
+                        <StatCard label="GA Pageviews" value={siteHealth.ga_pageviews} />
+                        <StatCard label="Tracked Views" value={siteHealth.tracked_pageviews} />
+                        <StatCard label="Tracked Searches" value={siteHealth.tracked_searches} />
+                        <StatCard label="Pages Indexed" value={siteHealth.gsc_pages_indexed} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Changes Log */}
+                  <div className="px-3.5 py-2.5 border-t border-[var(--border-light)]">
+                    <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
+                      Recent Changes
+                    </p>
+                    {data.changes.length === 0 ? (
+                      <p className="text-[11px] text-[var(--text-tertiary)] py-3 text-center">
+                        No changes logged yet. Changes will appear here as AutoResearch makes improvements.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {data.changes.slice(0, 10).map((change) => {
+                          const statusStyle = STATUS_COLORS[change.status] || STATUS_COLORS.pending;
+                          return (
+                            <div
+                              key={change.id}
+                              className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]"
+                            >
+                              <div className="flex items-center justify-between mb-0.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: getSiteColor(change.site_id) }}
+                                  />
+                                  <span className="text-[11px] font-medium text-[var(--text-primary)] truncate">
+                                    {getSiteName(change.site_id)}
+                                  </span>
+                                  {change.page_path && (
+                                    <span className="text-[10px] text-[var(--text-tertiary)] truncate">
+                                      {change.page_path}
+                                    </span>
+                                  )}
+                                </div>
+                                <span
+                                  className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0"
+                                  style={{ backgroundColor: statusStyle.bg, color: statusStyle.text }}
+                                >
+                                  {change.status}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="text-[9px] font-medium uppercase px-1.5 py-0.5 rounded bg-[var(--bg-card)]"
+                                  style={{ color: 'var(--text-tertiary)' }}
+                                >
+                                  {CHANGE_TYPE_LABELS[change.change_type] || change.change_type}
+                                </span>
+                                <span className="text-[11px] text-[var(--text-secondary)] truncate">
+                                  {change.change_description}
+                                </span>
+                              </div>
+                              {/* Before/after metrics if available */}
+                              {(change.metric_before || change.metric_after) && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  {change.metric_before && (
+                                    <span className="text-[10px] text-[var(--text-tertiary)]">
+                                      Before: {Object.entries(change.metric_before).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                    </span>
+                                  )}
+                                  {change.metric_after && (
+                                    <span className="text-[10px] text-[#10B981]">
+                                      After: {Object.entries(change.metric_after).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ===== PAGE OPTIMIZATION TAB ===== */}
+          {activeTab === 'optimization' && (
+            <div>
+              {/* Audit controls */}
+              <div className="px-3.5 pt-2 pb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {auditData && (
+                    <>
+                      <span className="text-[11px] font-medium text-[var(--text-primary)]">
+                        {auditData.summary.total} pages
+                      </span>
+                      <span className="text-[11px] text-[var(--text-tertiary)]">
+                        avg score: {auditData.summary.avgScore}/100
+                      </span>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    runAudit();
+                  }}
+                  disabled={auditRunning}
+                  className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-[var(--bg-elevated)] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-40"
+                >
+                  {auditRunning ? 'Auditing...' : 'Run Audit'}
+                </button>
+              </div>
+
+              {/* Audit summary cards */}
+              {auditData && (
+                <div className="px-3.5 pb-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
+                      <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">Needs Work</p>
+                      <p className="text-[14px] font-semibold text-[#EF4444] mt-0.5">{auditData.summary.needsWork}</p>
+                    </div>
+                    <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
+                      <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">Optimized</p>
+                      <p className="text-[14px] font-semibold text-[#10B981] mt-0.5">{auditData.summary.optimized}</p>
+                    </div>
+                    <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
+                      <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">Total Issues</p>
+                      <p className="text-[14px] font-semibold text-[#F59E0B] mt-0.5">{auditData.summary.totalIssues}</p>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Recent Changes Log */}
-              <div className="px-3.5 py-2.5 border-t border-[var(--border-light)]">
-                <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
-                  Recent Changes
-                </p>
-                {data.changes.length === 0 ? (
-                  <p className="text-[11px] text-[var(--text-tertiary)] py-3 text-center">
-                    No changes logged yet. Changes will appear here as AutoResearch makes improvements.
+              {/* Loading state */}
+              {auditLoading && !auditData && (
+                <div className="px-3.5 py-6 text-center">
+                  <span className="text-[12px] text-[var(--text-tertiary)]">Loading audit data...</span>
+                </div>
+              )}
+
+              {/* No data state */}
+              {!auditLoading && !auditData && (
+                <div className="px-3.5 py-4">
+                  <p className="text-[12px] text-[var(--text-tertiary)] text-center">
+                    No audit data yet. Click &quot;Run Audit&quot; to analyse page structure across your sites.
                   </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {data.changes.slice(0, 10).map((change) => {
-                      const statusStyle = STATUS_COLORS[change.status] || STATUS_COLORS.pending;
-                      return (
-                        <div
-                          key={change.id}
-                          className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]"
-                        >
-                          <div className="flex items-center justify-between mb-0.5">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span
-                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: getSiteColor(change.site_id) }}
-                              />
-                              <span className="text-[11px] font-medium text-[var(--text-primary)] truncate">
-                                {getSiteName(change.site_id)}
-                              </span>
-                              {change.page_path && (
-                                <span className="text-[10px] text-[var(--text-tertiary)] truncate">
-                                  {change.page_path}
-                                </span>
-                              )}
-                            </div>
-                            <span
-                              className="text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: statusStyle.bg, color: statusStyle.text }}
+                </div>
+              )}
+
+              {/* Audit results list */}
+              {auditData && auditData.audits.length > 0 && (
+                <div className="px-3.5 py-2.5 border-t border-[var(--border-light)]">
+                  <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-2">
+                    Pages by Score (worst first)
+                  </p>
+                  <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                    {auditData.audits
+                      .sort((a, b) => {
+                        // Pending items first, then by score ascending
+                        if (a.status === 'pending' && b.status !== 'pending') return -1;
+                        if (a.status !== 'pending' && b.status === 'pending') return 1;
+                        return a.score - b.score;
+                      })
+                      .map((audit) => {
+                        const isExpanded = expandedAudit === audit.id;
+                        const scoreColor = audit.score >= 80
+                          ? '#10B981'
+                          : audit.score >= 50
+                            ? '#F59E0B'
+                            : '#EF4444';
+                        const statusBg = audit.status === 'optimized'
+                          ? 'rgba(16, 185, 129, 0.15)'
+                          : audit.status === 'skipped'
+                            ? 'rgba(107, 114, 128, 0.15)'
+                            : 'rgba(239, 68, 68, 0.15)';
+                        const statusColor = audit.status === 'optimized'
+                          ? '#10B981'
+                          : audit.status === 'skipped'
+                            ? '#6B7280'
+                            : '#EF4444';
+                        const auditIssues = Array.isArray(audit.issues) ? audit.issues : [];
+                        const auditSuggestions = Array.isArray(audit.suggestions) ? audit.suggestions : [];
+
+                        return (
+                          <div
+                            key={audit.id}
+                            className="rounded-lg bg-[var(--bg-elevated)] overflow-hidden"
+                          >
+                            <div
+                              className="px-2.5 py-2 cursor-pointer"
+                              onClick={() => setExpandedAudit(isExpanded ? null : audit.id)}
                             >
-                              {change.status}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className="text-[9px] font-medium uppercase px-1.5 py-0.5 rounded bg-[var(--bg-card)]"
-                              style={{ color: 'var(--text-tertiary)' }}
-                            >
-                              {CHANGE_TYPE_LABELS[change.change_type] || change.change_type}
-                            </span>
-                            <span className="text-[11px] text-[var(--text-secondary)] truncate">
-                              {change.change_description}
-                            </span>
-                          </div>
-                          {/* Before/after metrics if available */}
-                          {(change.metric_before || change.metric_after) && (
-                            <div className="flex items-center gap-2 mt-1">
-                              {change.metric_before && (
-                                <span className="text-[10px] text-[var(--text-tertiary)]">
-                                  Before: {Object.entries(change.metric_before).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                                </span>
-                              )}
-                              {change.metric_after && (
-                                <span className="text-[10px] text-[#10B981]">
-                                  After: {Object.entries(change.metric_after).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                                </span>
-                              )}
+                              <div className="flex items-center justify-between mb-0.5">
+                                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                  <span
+                                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: getSiteColor(audit.site_id) }}
+                                  />
+                                  <span className="text-[10px] text-[var(--text-tertiary)] truncate max-w-[180px]">
+                                    {audit.url.replace(/^https?:\/\/[^/]+/, '')}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <span
+                                    className="text-[11px] font-bold"
+                                    style={{ color: scoreColor }}
+                                  >
+                                    {audit.score}
+                                  </span>
+                                  <span
+                                    className="text-[8px] font-semibold uppercase px-1.5 py-0.5 rounded-full"
+                                    style={{ backgroundColor: statusBg, color: statusColor }}
+                                  >
+                                    {audit.status}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-[var(--text-tertiary)]">
+                                <span>{audit.monthly_clicks} clicks</span>
+                                <span>{audit.monthly_impressions} impr</span>
+                                {auditIssues.length > 0 && (
+                                  <span className="text-[#EF4444]">{auditIssues.length} issues</span>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+
+                            {/* Expanded details */}
+                            {isExpanded && (
+                              <div className="px-2.5 pb-2.5 border-t border-[var(--border-light)]">
+                                {/* Checks grid */}
+                                <div className="grid grid-cols-2 gap-1.5 mt-2 mb-2">
+                                  <CheckBadge label="Affiliate CTA" pass={audit.has_affiliate_cta} />
+                                  <CheckBadge label="Structured Data" pass={audit.has_structured_data} />
+                                  <CheckBadge label="Images" pass={audit.has_images} />
+                                  <CheckBadge label="H1 Tag" pass={audit.has_h1} />
+                                  <CheckBadge
+                                    label={`Internal Links: ${audit.internal_link_count}`}
+                                    pass={audit.internal_link_count >= 3}
+                                  />
+                                  <CheckBadge
+                                    label={`Words: ${audit.word_count}`}
+                                    pass={audit.word_count >= 300}
+                                  />
+                                  <CheckBadge
+                                    label={`Table: ${audit.data_table_position}`}
+                                    pass={audit.data_table_position === 'top' || audit.data_table_position === 'middle'}
+                                  />
+                                  <CheckBadge
+                                    label={`Headings: ${audit.heading_count}`}
+                                    pass={audit.heading_count >= 3}
+                                  />
+                                </div>
+
+                                {/* Issues */}
+                                {auditIssues.length > 0 && (
+                                  <div className="mt-1.5">
+                                    <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-1">
+                                      Issues
+                                    </p>
+                                    {auditIssues.map((issue, i) => (
+                                      <p key={i} className="text-[10px] text-[#EF4444] mb-0.5 pl-2 border-l-2 border-[#EF4444]">
+                                        {issue}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Suggestions */}
+                                {auditSuggestions.length > 0 && (
+                                  <div className="mt-1.5">
+                                    <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider font-semibold mb-1">
+                                      Suggestions
+                                    </p>
+                                    {auditSuggestions.map((suggestion, i) => (
+                                      <p key={i} className="text-[10px] text-[var(--text-secondary)] mb-0.5 pl-2 border-l-2 border-[var(--accent)]">
+                                        {suggestion}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Full URL link */}
+                                <div className="mt-2">
+                                  <a
+                                    href={audit.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-[var(--accent)] hover:underline"
+                                  >
+                                    Open page in new tab
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Empty state when data loaded but no audits */}
+              {auditData && auditData.audits.length === 0 && (
+                <div className="px-3.5 py-4">
+                  <p className="text-[12px] text-[var(--text-tertiary)] text-center">
+                    No audit results found{selectedSite !== 'all' ? ' for this site' : ''}. Click &quot;Run Audit&quot; to start.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -557,6 +898,22 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
       <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</p>
       <p className="text-[14px] font-semibold text-[var(--text-primary)] mt-0.5">{display}</p>
+    </div>
+  );
+}
+
+function CheckBadge({ label, pass }: { label: string; pass: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 text-[10px]">
+      <span
+        className="w-3 h-3 rounded-full flex items-center justify-center text-[7px] font-bold text-white flex-shrink-0"
+        style={{ backgroundColor: pass ? '#10B981' : '#EF4444' }}
+      >
+        {pass ? '\u2713' : '\u2717'}
+      </span>
+      <span className={pass ? 'text-[var(--text-secondary)]' : 'text-[#EF4444]'}>
+        {label}
+      </span>
     </div>
   );
 }
