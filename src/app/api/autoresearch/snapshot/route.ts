@@ -23,9 +23,8 @@ export async function POST() {
 async function takeSnapshot() {
   const supabase = getServiceClient();
   const today = new Date().toISOString().split('T')[0];
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL
+    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
   const results: { siteId: string; status: string; error?: string }[] = [];
 
