@@ -99,6 +99,84 @@ async function takeSnapshot() {
     console.error('Failed to fetch conversion events for snapshot:', err);
   }
 
+  // Step 4b: Fetch affiliate click counts from Supabase (grouped by site)
+  let trackedAffiliateClicks: Record<string, number> = {};
+  try {
+    const todayStart = `${today}T00:00:00Z`;
+    const { data: affRows } = await supabase
+      .from('affiliate_clicks')
+      .select('site')
+      .gte('created_at', todayStart);
+
+    for (const row of affRows ?? []) {
+      const s = row.site || 'unknown';
+      trackedAffiliateClicks[s] = (trackedAffiliateClicks[s] || 0) + 1;
+    }
+  } catch (err) {
+    console.error('Failed to fetch affiliate clicks for snapshot:', err);
+  }
+
+  // Step 4c: Fetch unique countries per site from pageviews (international reach)
+  let uniqueCountries: Record<string, number> = {};
+  try {
+    const todayStart = `${today}T00:00:00Z`;
+    const { data: geoRows } = await supabase
+      .from('pageviews')
+      .select('site_id, geo_country')
+      .gte('created_at', todayStart)
+      .not('geo_country', 'is', null);
+
+    const siteCountryMap: Record<string, Set<string>> = {};
+    for (const row of geoRows ?? []) {
+      if (!siteCountryMap[row.site_id]) {
+        siteCountryMap[row.site_id] = new Set();
+      }
+      if (row.geo_country) {
+        siteCountryMap[row.site_id].add(row.geo_country);
+      }
+    }
+    for (const [siteId, countries] of Object.entries(siteCountryMap)) {
+      uniqueCountries[siteId] = countries.size;
+    }
+  } catch (err) {
+    console.error('Failed to fetch unique countries for snapshot:', err);
+  }
+
+  // Step 4d: Fetch top referrers per site from pageviews
+  let topReferrers: Record<string, string> = {};
+  try {
+    const todayStart = `${today}T00:00:00Z`;
+    const { data: refRows } = await supabase
+      .from('pageviews')
+      .select('site_id, referrer')
+      .gte('created_at', todayStart)
+      .not('referrer', 'is', null);
+
+    const siteRefMap: Record<string, Record<string, number>> = {};
+    for (const row of refRows ?? []) {
+      if (!row.referrer) continue;
+      try {
+        const host = new URL(row.referrer).hostname;
+        if (!siteRefMap[row.site_id]) {
+          siteRefMap[row.site_id] = {};
+        }
+        siteRefMap[row.site_id][host] = (siteRefMap[row.site_id][host] || 0) + 1;
+      } catch {
+        // Skip invalid referrer URLs
+      }
+    }
+    for (const [siteId, refCounts] of Object.entries(siteRefMap)) {
+      // Store top 5 referrers as a JSON string for the column
+      const sorted = Object.entries(refCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([host, count]) => `${host}:${count}`);
+      topReferrers[siteId] = sorted.join(',');
+    }
+  } catch (err) {
+    console.error('Failed to fetch top referrers for snapshot:', err);
+  }
+
   // Step 5: Fetch GSC data per site and upsert metrics
   for (const site of GA_SITES) {
     try {
@@ -143,6 +221,9 @@ async function takeSnapshot() {
         tracked_searches: trackedSearches[site.id] || 0,
         tracked_checkouts: trackedConversions[site.id]?.checkouts || 0,
         tracked_purchases: trackedConversions[site.id]?.purchases || 0,
+        tracked_affiliate_clicks: trackedAffiliateClicks[site.id] || 0,
+        unique_countries: uniqueCountries[site.id] || 0,
+        top_referrers: topReferrers[site.id] || null,
       };
 
       const { error } = await supabase
