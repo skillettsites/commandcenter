@@ -107,6 +107,7 @@ async function takeSnapshot() {
       let gscCtr = 0;
       let gscPosition = 0;
       let gscPagesIndexed = 0;
+      let gscPagesSubmitted = 0;
 
       // Only fetch GSC if the site has a GSC URL configured
       const hasGsc = GSC_SITES.some(s => s.id === site.id);
@@ -120,6 +121,7 @@ async function takeSnapshot() {
             gscCtr = gscJson.ctr || 0;
             gscPosition = gscJson.position || 0;
             gscPagesIndexed = gscJson.pagesIndexed || 0;
+            gscPagesSubmitted = gscJson.pagesSubmitted || 0;
           }
         } catch (err) {
           console.error(`GSC fetch failed for ${site.id}:`, err);
@@ -134,6 +136,7 @@ async function takeSnapshot() {
         gsc_ctr: gscCtr,
         gsc_position: gscPosition,
         gsc_pages_indexed: gscPagesIndexed,
+        gsc_pages_submitted: gscPagesSubmitted,
         ga_visitors: gaData[site.id]?.visitors || 0,
         ga_pageviews: gaData[site.id]?.pageviews || 0,
         tracked_pageviews: trackedPageviews[site.id] || 0,
@@ -162,11 +165,51 @@ async function takeSnapshot() {
   const succeeded = results.filter(r => r.status === 'ok').length;
   const failed = results.filter(r => r.status === 'error').length;
 
+  // Step 6: Check indexing ratios and log warnings for underindexed sites
+  const indexingWarnings: string[] = [];
+  for (const site of GA_SITES) {
+    const hasGsc = GSC_SITES.some(s => s.id === site.id);
+    if (!hasGsc) continue;
+    try {
+      const { data: latest } = await supabase
+        .from('site_metrics')
+        .select('gsc_pages_indexed, gsc_pages_submitted')
+        .eq('site_id', site.id)
+        .eq('date', today)
+        .single();
+
+      if (latest && latest.gsc_pages_submitted > 0) {
+        const ratio = latest.gsc_pages_indexed / latest.gsc_pages_submitted;
+        if (ratio < 0.5) {
+          const pct = Math.round(ratio * 100);
+          const msg = `${site.id}: ${pct}% indexed (${latest.gsc_pages_indexed}/${latest.gsc_pages_submitted})`;
+          indexingWarnings.push(msg);
+          console.warn(`[Indexing Warning] ${msg}`);
+        }
+      }
+    } catch {
+      // Non-critical, skip
+    }
+  }
+
+  // Step 7: Re-submit sitemaps to nudge Google to re-crawl
+  let sitemapResult: { submitted?: number; failed?: number } = {};
+  try {
+    const sitemapRes = await fetch(`${baseUrl}/api/gsc/submit-sitemaps`, { method: 'POST', cache: 'no-store' });
+    if (sitemapRes.ok) {
+      sitemapResult = await sitemapRes.json();
+    }
+  } catch (err) {
+    console.error('Sitemap re-submission failed:', err);
+  }
+
   return NextResponse.json({
     date: today,
     total: results.length,
     succeeded,
     failed,
     results,
+    indexingWarnings,
+    sitemapResubmission: sitemapResult,
   });
 }
