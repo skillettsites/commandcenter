@@ -16,7 +16,13 @@ export async function GET(request: NextRequest) {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const sites = siteFilter ? [siteFilter] : ['carcostcheck', 'postcodecheck'];
+  const allSiteIds = [
+    'carcostcheck', 'postcodecheck', 'tapwaterscore', 'medcostcheck',
+    'findyourstay', 'helpafterloss', 'helpafterlife', 'aibetfinder',
+    'bestlondontours', 'davidskillett', 'thebesttours', 'daveknowsai',
+    'askyourstay', 'aicareerswap', 'briefmynews',
+  ];
+  const sites = siteFilter ? [siteFilter] : allSiteIds;
 
   // Top searched queries grouped by count
   if (view === 'top') {

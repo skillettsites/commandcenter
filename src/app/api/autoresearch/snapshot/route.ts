@@ -46,33 +46,33 @@ async function takeSnapshot() {
     console.error('Failed to fetch GA4 data for snapshot:', err);
   }
 
-  // Step 2: Fetch pageview counts from Supabase tracking
+  // Step 2: Fetch pageview counts directly from Supabase (avoids fragile internal API calls)
   let trackedPageviews: Record<string, number> = {};
   try {
-    const pvRes = await fetch(`${baseUrl}/api/pageviews?view=summary&range=today`, { cache: 'no-store' });
-    if (pvRes.ok) {
-      const pvJson = await pvRes.json();
-      for (const [siteId, counts] of Object.entries(pvJson as Record<string, { today: number }>)) {
-        trackedPageviews[siteId] = (counts as { today: number }).today || 0;
-      }
+    const todayStart = `${today}T00:00:00Z`;
+    const { data: pvRows } = await supabase
+      .from('pageviews')
+      .select('site_id')
+      .gte('created_at', todayStart);
+
+    for (const row of pvRows ?? []) {
+      trackedPageviews[row.site_id] = (trackedPageviews[row.site_id] || 0) + 1;
     }
   } catch (err) {
     console.error('Failed to fetch tracked pageviews for snapshot:', err);
   }
 
-  // Step 3: Fetch search counts from Supabase tracking
+  // Step 3: Fetch search counts directly from Supabase (avoids fragile internal API calls)
   let trackedSearches: Record<string, number> = {};
   try {
-    const srchRes = await fetch(`${baseUrl}/api/searches?range=today`, { cache: 'no-store' });
-    if (srchRes.ok) {
-      const srchJson = await srchRes.json();
-      // The searches API returns per-site counts
-      if (typeof srchJson === 'object') {
-        for (const [siteId, data] of Object.entries(srchJson as Record<string, { count?: number; today?: number }>)) {
-          const d = data as { count?: number; today?: number };
-          trackedSearches[siteId] = d.count || d.today || 0;
-        }
-      }
+    const todayStart = `${today}T00:00:00Z`;
+    const { data: srchRows } = await supabase
+      .from('searches')
+      .select('site_id')
+      .gte('created_at', todayStart);
+
+    for (const row of srchRows ?? []) {
+      trackedSearches[row.site_id] = (trackedSearches[row.site_id] || 0) + 1;
     }
   } catch (err) {
     console.error('Failed to fetch tracked searches for snapshot:', err);
