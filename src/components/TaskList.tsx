@@ -12,6 +12,7 @@ export default function TaskList() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('pending');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [sortMode, setSortMode] = useState<'important' | 'latest'>('important');
+  const [timeFilter, setTimeFilter] = useState<'this-week' | 'all-time'>('this-week');
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -19,6 +20,15 @@ export default function TaskList() {
     if (filter !== 'all') params.set('status', filter);
     if (projectFilter !== 'all') params.set('project', projectFilter);
     if (sortMode === 'latest') params.set('sort', 'latest');
+    if (timeFilter === 'this-week') {
+      const now = new Date();
+      const day = now.getDay();
+      const diff = day === 0 ? 6 : day - 1; // Monday = start of week
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - diff);
+      monday.setHours(0, 0, 0, 0);
+      params.set('since', monday.toISOString());
+    }
 
     const res = await fetch(`/api/tasks?${params}`);
     if (res.ok) {
@@ -26,7 +36,7 @@ export default function TaskList() {
       setTasks(data);
     }
     setLoading(false);
-  }, [filter, projectFilter, sortMode]);
+  }, [filter, projectFilter, sortMode, timeFilter]);
 
   useEffect(() => {
     fetchTasks();
@@ -47,7 +57,7 @@ export default function TaskList() {
   }
 
   const pendingCount = tasks.filter(t => t.status !== 'done').length;
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <div className="space-y-4">
@@ -80,6 +90,26 @@ export default function TaskList() {
                 }`}
               >
                 {f === 'pending' ? 'Pending' : f === 'all' ? 'All' : 'Done'}
+              </button>
+            ))}
+          </div>
+
+          {/* Time filter */}
+          <div className="flex gap-1 bg-[var(--bg-card)] rounded-xl p-1">
+            {([
+              { key: 'this-week' as const, label: 'This Week' },
+              { key: 'all-time' as const, label: 'All Time' },
+            ]).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTimeFilter(key)}
+                className={`flex-1 py-1.5 rounded-lg text-[12px] font-semibold transition-all ${
+                  timeFilter === key
+                    ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-tertiary)] active:text-[var(--text-primary)]'
+                }`}
+              >
+                {label}
               </button>
             ))}
           </div>

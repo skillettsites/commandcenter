@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status');
   const project = searchParams.get('project');
   const sort = searchParams.get('sort');
+  const since = searchParams.get('since');
 
   let query = supabase.from('tasks').select('*');
 
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
 
   if (status) query = query.eq('status', status);
   if (project) query = query.eq('project', project);
+  if (since) query = query.gte('created_at', since);
 
   const { data, error } = await query;
 
