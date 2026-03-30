@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ukTodayStr, ukMonthStr } from "@/lib/uk-time";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
 // Use service role key for server-side API to bypass RLS
@@ -64,8 +65,8 @@ export async function GET(req: NextRequest) {
       const clicks = await fetchClicks("&limit=10000");
       console.log(`[affiliate-clicks] full mode: fetched ${clicks.length} clicks, URL=${SUPABASE_URL?.slice(0,30)}, key=${SUPABASE_KEY?.slice(0,20)}...`);
       const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);
-      const monthStr = now.toISOString().slice(0, 7);
+      const todayStr = ukTodayStr();
+      const monthStr = ukMonthStr();
 
       // Week start (Monday)
       const dayOfWeek = now.getDay();

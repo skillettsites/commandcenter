@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceClient } from '@/lib/supabase';
+import { ukTodayStart, ukMonthStart } from '@/lib/uk-time';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,8 +14,8 @@ export async function GET(request: NextRequest) {
   const supabase = getServiceClient();
 
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const todayStart = ukTodayStart();
+  const monthStart = ukMonthStart();
 
   const allSiteIds = [
     'carcostcheck', 'postcodecheck', 'tapwaterscore', 'medcostcheck',
