@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
+import { getServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
+
+const ALL_SITES = [
+  'findyourstay', 'postcodecheck', 'carcostcheck', 'bestlondontours',
+  'thebesttours', 'daveknowsai', 'aicareerswap', 'helpafterloss',
+  'helpafterlife', 'aibetfinder', 'guardmybusiness', 'briefmynews',
+  'davidskillett', 'skicrowdchecker', 'askyourstay',
+];
 
 let _client: BetaAnalyticsDataClient | null = null;
 
@@ -110,23 +118,62 @@ export async function GET(request: NextRequest) {
     allowedKeys = new Set(hourly.map(h => h.dateHour));
   }
 
-  // Per-site breakdown for the bar chart (filtered to match the selected range)
-  const perSite = gaProjects.map((project, i) => {
+  // Fetch tracked pageviews from Supabase for per-site breakdown
+  const supabase = getServiceClient();
+  const now = new Date();
+  let pvFromDate: string;
+  if (range === '1h') {
+    pvFromDate = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
+  } else if (range === 'today') {
+    pvFromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+  } else if (range === '24h') {
+    pvFromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  } else if (range === '1m') {
+    pvFromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  } else {
+    pvFromDate = '2020-01-01T00:00:00.000Z';
+  }
+
+  // Get tracked pageview counts per site
+  const trackedCounts: Record<string, number> = {};
+  await Promise.all(
+    ALL_SITES.map(async (siteId) => {
+      const { count } = await supabase
+        .from('pageviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('site_id', siteId)
+        .gte('created_at', pvFromDate);
+      trackedCounts[siteId] = count ?? 0;
+    })
+  );
+
+  // Per-site breakdown: tracked pageviews as primary, GA4 as secondary
+  const gaPerSite = new Map(gaProjects.map((project, i) => {
     let data = allResults[i];
-    // For '1h', filter per-site data to same hours as the chart
     if (allowedKeys) {
       data = data.filter(r => allowedKeys!.has(r.dateHour));
     }
     const totalViews = data.reduce((sum, r) => sum + r.pageViews, 0);
     const totalUsers = data.reduce((sum, r) => sum + r.users, 0);
-    return {
-      siteId: project.id,
-      name: project.name,
-      color: project.color,
-      pageViews: totalViews,
-      users: totalUsers,
-    };
-  }).filter(s => s.pageViews > 0).sort((a, b) => b.pageViews - a.pageViews);
+    return [project.id, { views: totalViews, users: totalUsers }] as const;
+  }));
+
+  const allSiteIds = new Set([...ALL_SITES, ...gaProjects.map(p => p.id)]);
+  const perSite = Array.from(allSiteIds)
+    .map(siteId => {
+      const proj = projects.find(p => p.id === siteId);
+      const tracked = trackedCounts[siteId] ?? 0;
+      const ga = gaPerSite.get(siteId);
+      return {
+        siteId,
+        name: proj?.name || siteId,
+        color: proj?.color || '#888',
+        pageViews: tracked,
+        users: ga?.users ?? 0,
+      };
+    })
+    .filter(s => s.pageViews > 0 || s.users > 0)
+    .sort((a, b) => b.pageViews - a.pageViews);
 
   return NextResponse.json({ hourly, perSite });
 }

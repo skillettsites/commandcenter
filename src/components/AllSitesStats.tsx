@@ -29,6 +29,7 @@ interface SiteTodayData {
   color: string;
   visitors: number;
   pageViews: number;
+  gaVisitors: number;
 }
 
 interface AggregatedStats {
@@ -38,6 +39,9 @@ interface AggregatedStats {
   todayPageViews: number;
   monthPageViews: number;
   allTimePageViews: number;
+  gaTodayVisitors: number;
+  gaMonthVisitors: number;
+  gaAllTimeVisitors: number;
   sitesToday: SiteTodayData[];
 }
 
@@ -50,52 +54,68 @@ export default function AllSitesStats() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
 
-  // Fetch aggregated summary stats on mount (GA4 + Supabase, use higher of each)
+  // Fetch aggregated summary stats on mount (tracked pageviews as primary, GA4 as secondary)
   useEffect(() => {
     Promise.all([
       fetch('/api/analytics').then(res => res.ok ? res.json() : null),
-      fetch('/api/pageviews?view=summary&range=today').then(res => res.ok ? res.json() : null),
+      fetch('/api/pageviews?view=summary').then(res => res.ok ? res.json() : null),
     ])
       .then(([gaJson, pvJson]) => {
-        if (gaJson?.data) {
-          const results = gaJson.data as Array<{
-            siteId: string;
-            activeUsers: number;
-            pageViews: number;
-            monthVisitors: number;
-            totalVisitors: number;
-          }>;
-          const tracked = (pvJson ?? {}) as Record<string, { today: number }>;
+        const tracked = (pvJson ?? {}) as Record<string, { today: number; week: number; month: number; total: number }>;
+        const gaResults = (gaJson?.data ?? []) as Array<{
+          siteId: string;
+          activeUsers: number;
+          pageViews: number;
+          monthVisitors: number;
+          totalVisitors: number;
+        }>;
+        const gaMap = new Map(gaResults.map(r => [r.siteId, r]));
 
-          const sitesToday: SiteTodayData[] = results
-            .map(r => {
-              const proj = projects.find(p => p.id === r.siteId);
-              const trackedToday = tracked[r.siteId]?.today ?? 0;
-              const bestVisitors = Math.max(r.activeUsers, trackedToday);
-              return {
-                siteId: r.siteId,
-                name: proj?.name || r.siteId,
-                color: proj?.color || '#888',
-                visitors: bestVisitors,
-                pageViews: r.pageViews,
-              };
-            })
-            .filter(r => r.visitors > 0 || r.pageViews > 0)
-            .sort((a, b) => b.visitors - a.visitors || b.pageViews - a.pageViews);
+        // Build per-site list from tracked pageviews (primary source)
+        const allSiteIds = new Set([
+          ...Object.keys(tracked),
+          ...gaResults.map(r => r.siteId),
+        ]);
 
-          setStats({
-            todayVisitors: results.reduce((s, r) => {
-              const trackedToday = tracked[r.siteId]?.today ?? 0;
-              return s + Math.max(r.activeUsers, trackedToday);
-            }, 0),
-            monthVisitors: results.reduce((s, r) => s + r.monthVisitors, 0),
-            allTimeVisitors: results.reduce((s, r) => s + r.totalVisitors, 0),
-            todayPageViews: results.reduce((s, r) => s + r.pageViews, 0),
-            monthPageViews: 0,
-            allTimePageViews: 0,
-            sitesToday,
-          });
-        }
+        const sitesToday: SiteTodayData[] = Array.from(allSiteIds)
+          .map(siteId => {
+            const proj = projects.find(p => p.id === siteId);
+            const pv = tracked[siteId];
+            const ga = gaMap.get(siteId);
+            return {
+              siteId,
+              name: proj?.name || siteId,
+              color: proj?.color || '#888',
+              visitors: pv?.today ?? 0,
+              pageViews: pv?.today ?? 0,
+              gaVisitors: ga?.activeUsers ?? 0,
+            };
+          })
+          .filter(r => r.visitors > 0 || r.gaVisitors > 0)
+          .sort((a, b) => b.visitors - a.visitors || b.pageViews - a.pageViews);
+
+        // Sum tracked pageviews across all sites
+        const todayTotal = Object.values(tracked).reduce((s, v) => s + (v.today ?? 0), 0);
+        const monthTotal = Object.values(tracked).reduce((s, v) => s + (v.month ?? 0), 0);
+        const allTimeTotal = Object.values(tracked).reduce((s, v) => s + (v.total ?? 0), 0);
+
+        // GA4 totals for comparison
+        const gaTodayTotal = gaResults.reduce((s, r) => s + r.activeUsers, 0);
+        const gaMonthTotal = gaResults.reduce((s, r) => s + r.monthVisitors, 0);
+        const gaAllTimeTotal = gaResults.reduce((s, r) => s + r.totalVisitors, 0);
+
+        setStats({
+          todayVisitors: todayTotal,
+          monthVisitors: monthTotal,
+          allTimeVisitors: allTimeTotal,
+          todayPageViews: todayTotal,
+          monthPageViews: monthTotal,
+          allTimePageViews: allTimeTotal,
+          gaTodayVisitors: gaTodayTotal,
+          gaMonthVisitors: gaMonthTotal,
+          gaAllTimeVisitors: gaAllTimeTotal,
+          sitesToday,
+        });
       })
       .catch(() => {});
   }, []);
@@ -158,9 +178,9 @@ export default function AllSitesStats() {
           <div className="p-3.5">
             {/* Stats grid */}
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <StatBox label="Today" value={stats?.todayVisitors ?? 0} sub={`${stats?.todayPageViews ?? 0} views`} />
-              <StatBox label="This Month" value={stats?.monthVisitors ?? 0} />
-              <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} />
+              <StatBox label="Today" value={stats?.todayVisitors ?? 0} gaSub={stats?.gaTodayVisitors} />
+              <StatBox label="This Month" value={stats?.monthVisitors ?? 0} gaSub={stats?.gaMonthVisitors} />
+              <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} gaSub={stats?.gaAllTimeVisitors} />
             </div>
 
             {/* Chart */}
@@ -196,12 +216,14 @@ export default function AllSitesStats() {
   );
 }
 
-function StatBox({ label, value, sub }: { label: string; value: number; sub?: string }) {
+function StatBox({ label, value, gaSub }: { label: string; value: number; gaSub?: number }) {
   return (
     <div className="text-center">
       <p className="text-[18px] font-bold text-[var(--text-primary)]">{value.toLocaleString()}</p>
       <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</p>
-      {sub && <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">{sub}</p>}
+      {gaSub !== undefined && gaSub > 0 && (
+        <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 opacity-60">GA4: {gaSub.toLocaleString()}</p>
+      )}
     </div>
   );
 }
@@ -347,7 +369,9 @@ function SiteBar({ site, max }: { site: PerSiteData; max: number }) {
           <span className="text-[11px] text-[var(--text-secondary)] truncate">{site.name}</span>
           <div className="flex items-center gap-2 flex-shrink-0 ml-1">
             <span className="text-[11px] font-medium text-[var(--text-primary)]">{site.pageViews.toLocaleString()} views</span>
-            <span className="text-[10px] text-[var(--text-tertiary)]">{site.users.toLocaleString()} users</span>
+            {site.users > 0 && (
+              <span className="text-[10px] text-[var(--text-tertiary)]">GA4: {site.users.toLocaleString()}</span>
+            )}
           </div>
         </div>
         <div className="h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
