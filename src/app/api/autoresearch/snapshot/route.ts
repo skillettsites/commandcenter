@@ -3,6 +3,7 @@ import { getServiceClient } from '@/lib/supabase';
 import { projects } from '@/lib/projects';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 // Sites that have GSC configured
 const GSC_SITES = projects.filter(p => p.gscSiteUrl);
@@ -177,8 +178,8 @@ async function takeSnapshot() {
     console.error('Failed to fetch top referrers for snapshot:', err);
   }
 
-  // Step 5: Fetch GSC data per site and upsert metrics
-  for (const site of GA_SITES) {
+  // Step 5: Fetch GSC data per site in parallel and upsert metrics
+  const sitePromises = GA_SITES.map(async (site) => {
     try {
       let gscClicks = 0;
       let gscImpressions = 0;
@@ -232,14 +233,22 @@ async function takeSnapshot() {
 
       if (error) {
         console.error(`Upsert failed for ${site.id}:`, error);
-        results.push({ siteId: site.id, status: 'error', error: error.message });
-      } else {
-        results.push({ siteId: site.id, status: 'ok' });
+        return { siteId: site.id, status: 'error' as const, error: error.message };
       }
+      return { siteId: site.id, status: 'ok' as const };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`Snapshot failed for ${site.id}:`, msg);
-      results.push({ siteId: site.id, status: 'error', error: msg });
+      return { siteId: site.id, status: 'error' as const, error: msg };
+    }
+  });
+
+  const settled = await Promise.allSettled(sitePromises);
+  for (const result of settled) {
+    if (result.status === 'fulfilled') {
+      results.push(result.value);
+    } else {
+      results.push({ siteId: 'unknown', status: 'error', error: String(result.reason) });
     }
   }
 

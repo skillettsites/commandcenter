@@ -3,6 +3,7 @@ import { getServiceClient } from '@/lib/supabase';
 import { projects } from '@/lib/projects';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 // Known affiliate link patterns
 const AFFILIATE_PATTERNS = [
@@ -122,7 +123,11 @@ export async function POST(request: NextRequest) {
   const allResults: AuditResult[] = [];
   const errors: { siteId: string; error: string }[] = [];
 
-  for (const site of sitesToAudit) {
+  // Process all sites in parallel using Promise.allSettled
+  const sitePromises = sitesToAudit.map(async (site) => {
+    const siteResults: AuditResult[] = [];
+    const siteErrors: { siteId: string; error: string }[] = [];
+
     try {
       // Step 1: Get top pages from GSC (28d data)
       let topPages: { page: string; clicks: number; impressions: number }[] = [];
@@ -132,7 +137,7 @@ export async function POST(request: NextRequest) {
           const gscRes = await fetch(`${baseUrl}/api/gsc/${site.id}`, { cache: 'no-store' });
           if (gscRes.ok) {
             const gscData = await gscRes.json();
-            topPages = (gscData.topPages || []).slice(0, 20);
+            topPages = (gscData.topPages || []).slice(0, 5);
           }
         } catch (err) {
           console.error(`GSC fetch failed for ${site.id}:`, err);
@@ -158,15 +163,30 @@ export async function POST(request: NextRequest) {
             pageInfo.clicks,
             pageInfo.impressions
           );
-          allResults.push(result);
+          siteResults.push(result);
         } catch (err) {
           console.error(`Audit failed for ${fullUrl}:`, err);
-          errors.push({ siteId: site.id, error: `Failed to audit ${fullUrl}` });
+          siteErrors.push({ siteId: site.id, error: `Failed to audit ${fullUrl}` });
         }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      errors.push({ siteId: site.id, error: msg });
+      siteErrors.push({ siteId: site.id, error: msg });
+    }
+
+    return { results: siteResults, errors: siteErrors };
+  });
+
+  const settled = await Promise.allSettled(sitePromises);
+
+  for (let i = 0; i < settled.length; i++) {
+    const outcome = settled[i];
+    if (outcome.status === 'fulfilled') {
+      allResults.push(...outcome.value.results);
+      errors.push(...outcome.value.errors);
+    } else {
+      const site = sitesToAudit[i];
+      errors.push({ siteId: site.id, error: outcome.reason?.message || String(outcome.reason) });
     }
   }
 
