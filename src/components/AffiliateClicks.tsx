@@ -45,17 +45,29 @@ const SITE_COLORS: Record<string, string> = {
   findyourstay: '#F59E0B',
   bestlondontours: '#E11D48',
   thebesttours: '#14B8A6',
+  carcostcheck: '#3B82F6',
+  postcodecheck: '#8B5CF6',
+  helpafterloss: '#6366F1',
+  helpafterlife: '#EC4899',
 };
 
 const SITE_NAMES: Record<string, string> = {
   findyourstay: 'FindYourStay',
   bestlondontours: 'BestLondonTours',
   thebesttours: 'TheBestTours',
+  carcostcheck: 'CarCostCheck',
+  postcodecheck: 'PostcodeCheck',
+  helpafterloss: 'HelpAfterLoss',
+  helpafterlife: 'HelpAfterLife',
 };
 
 const TYPE_COLORS: Record<string, string> = {
   expedia: '#003B95',
   gyg: '#FF5533',
+  sovrn: '#10B981',
+  discovercars: '#F97316',
+  airalo: '#06B6D4',
+  safetywing: '#84CC16',
 };
 
 function timeAgo(dateStr: string): string {
