@@ -421,7 +421,22 @@ export async function GET() {
     const priceData = stockPrices[i];
     const livePrice = priceData?.price ?? null;
     const previousClose = priceData?.previousClose ?? null;
-    const livePriceGBP = livePrice !== null ? livePrice * forexRate : null;
+    const priceCurrency = priceData?.currency ?? 'USD';
+
+    // Convert live price to GBP based on the price currency from Yahoo
+    let livePriceGBP: number | null = null;
+    if (livePrice !== null) {
+      if (priceCurrency === 'GBp') {
+        // London-listed stocks: Yahoo returns price in pence, convert to pounds
+        livePriceGBP = livePrice / 100;
+      } else if (holding.currency === 'GBP') {
+        livePriceGBP = livePrice;
+      } else {
+        // USD stocks: convert to GBP
+        livePriceGBP = livePrice * forexRate;
+      }
+    }
+
     const currentValue = livePriceGBP !== null ? livePriceGBP * holding.shares : null;
     const gainLoss = currentValue !== null ? currentValue - holding.costBasis : null;
     const gainLossPercent = gainLoss !== null && holding.costBasis > 0
@@ -432,9 +447,17 @@ export async function GET() {
     const dailyChangePercent = livePrice !== null && previousClose !== null && previousClose > 0
       ? ((livePrice - previousClose) / previousClose) * 100
       : null;
-    const dailyChangeGBP = livePriceGBP !== null && previousClose !== null
-      ? (livePrice! - previousClose) * forexRate * holding.shares
-      : null;
+    let dailyChangeGBP: number | null = null;
+    if (livePrice !== null && previousClose !== null) {
+      const priceChangePerShare = livePrice - previousClose;
+      if (priceCurrency === 'GBp') {
+        dailyChangeGBP = (priceChangePerShare / 100) * holding.shares;
+      } else if (holding.currency === 'GBP') {
+        dailyChangeGBP = priceChangePerShare * holding.shares;
+      } else {
+        dailyChangeGBP = priceChangePerShare * forexRate * holding.shares;
+      }
+    }
 
     return {
       ...holding,
