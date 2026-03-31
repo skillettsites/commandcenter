@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
 import { getServiceClient } from '@/lib/supabase';
+import { ukTodayStr, ukMonthStr } from '@/lib/uk-time';
 
 export const dynamic = 'force-dynamic';
 
@@ -134,6 +135,55 @@ export async function GET(request: NextRequest) {
     pvFromDate = '2020-01-01T00:00:00.000Z';
   }
 
+  // Fetch Vercel analytics for per-site breakdown
+  const vercelToken = process.env.VERCEL_API_TOKEN;
+  const vercelTeamId = process.env.VERCEL_TEAM_ID;
+  const vercelPerSite: Record<string, { pageViews: number; visitors: number }> = {};
+
+  if (vercelToken && vercelTeamId) {
+    const vercelProjects = projects.filter(p => p.vercelProjectId);
+    const today = ukTodayStr();
+    const monthStart = ukMonthStr() + '-01';
+    const allTimeStart = '2025-01-01';
+
+    // Pick the right date range based on the dashboard range
+    let vFrom: string;
+    let vTo: string;
+    if (range === '1h' || range === 'today' || range === '24h') {
+      vFrom = today;
+      vTo = today;
+    } else if (range === '1m') {
+      vFrom = monthStart;
+      vTo = today;
+    } else {
+      vFrom = allTimeStart;
+      vTo = today;
+    }
+
+    await Promise.all(
+      vercelProjects.map(async (project) => {
+        try {
+          const url = `https://vercel.com/api/web-analytics/overview?projectId=${project.vercelProjectId}&teamId=${vercelTeamId}&from=${vFrom}&to=${vTo}`;
+          const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${vercelToken}` },
+            next: { revalidate: 0 },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.error) {
+              vercelPerSite[project.id] = {
+                pageViews: data.total ?? 0,
+                visitors: data.devices ?? 0,
+              };
+            }
+          }
+        } catch {
+          // skip failed fetches
+        }
+      })
+    );
+  }
+
   // Get tracked pageview counts per site
   const trackedCounts: Record<string, number> = {};
   await Promise.all(
@@ -147,7 +197,7 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  // Per-site breakdown: tracked pageviews as primary, GA4 as secondary
+  // GA4 per-site totals
   const gaPerSite = new Map(gaProjects.map((project, i) => {
     let data = allResults[i];
     if (allowedKeys) {
@@ -158,18 +208,24 @@ export async function GET(request: NextRequest) {
     return [project.id, { views: totalViews, users: totalUsers }] as const;
   }));
 
+  // Per-site breakdown: MAX across Vercel, GA4, and tracked pageviews
   const allSiteIds = new Set([...ALL_SITES, ...gaProjects.map(p => p.id)]);
   const perSite = Array.from(allSiteIds)
     .map(siteId => {
       const proj = projects.find(p => p.id === siteId);
       const tracked = trackedCounts[siteId] ?? 0;
       const ga = gaPerSite.get(siteId);
+      const vercel = vercelPerSite[siteId];
+      const gaViews = ga?.views ?? 0;
+      const gaUsers = ga?.users ?? 0;
+      const vercelViews = vercel?.pageViews ?? 0;
+      const vercelUsers = vercel?.visitors ?? 0;
       return {
         siteId,
         name: proj?.name || siteId,
         color: proj?.color || '#888',
-        pageViews: tracked,
-        users: ga?.users ?? 0,
+        pageViews: Math.max(tracked, gaViews, vercelViews),
+        users: Math.max(gaUsers, vercelUsers),
       };
     })
     .filter(s => s.pageViews > 0 || s.users > 0)
