@@ -1109,19 +1109,24 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
 
                   {/* Selling */}
                   <h4 className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2 ml-3">
-                    Selling (net proceeds)
+                    Selling (net proceeds after mortgage)
                   </h4>
                   <div className="space-y-1 ml-3">
                     {sellingProperties.map((p) => (
                       <div key={p.id} className="flex items-center justify-between py-1">
-                        <span className="text-[12px] text-[var(--text-secondary)]">{p.name}</span>
-                        <span className="text-[13px] font-medium text-[var(--orange)]">{formatGBP(p.value)}</span>
+                        <div>
+                          <span className="text-[12px] text-[var(--text-secondary)]">{p.name}</span>
+                          <span className="text-[9px] text-[var(--text-tertiary)] ml-1.5">
+                            {formatGBP(p.value)} - {formatGBP(p.mortgage)} mtg
+                          </span>
+                        </div>
+                        <span className="text-[13px] font-medium text-[var(--orange)]">{formatGBP(p.value - p.mortgage)}</span>
                       </div>
                     ))}
                     <div className="flex items-center justify-between py-1 border-t border-[var(--border-light)]">
-                      <span className="text-[12px] font-medium text-[var(--text-secondary)]">Total pending sales</span>
+                      <span className="text-[12px] font-medium text-[var(--text-secondary)]">Total net proceeds</span>
                       <span className="text-[13px] font-medium text-[var(--orange)]">
-                        {formatGBP(sellingProperties.reduce((s, p) => s + p.value, 0))}
+                        {formatGBP(sellingProperties.reduce((s, p) => s + (p.value - p.mortgage), 0))}
                       </span>
                     </div>
                   </div>
