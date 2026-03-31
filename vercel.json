@@ -1,12 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/autoresearch/snapshot",
-      "schedule": "3 3 * * *"
-    },
-    {
-      "path": "/api/autoresearch/page-audit",
-      "schedule": "30 3 * * *"
-    }
-  ]
+  "crons": []
 }

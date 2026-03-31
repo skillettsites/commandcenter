@@ -282,17 +282,6 @@ async function takeSnapshot() {
     }
   }
 
-  // Step 7: Re-submit sitemaps to nudge Google to re-crawl
-  let sitemapResult: { submitted?: number; failed?: number } = {};
-  try {
-    const sitemapRes = await fetch(`${baseUrl}/api/gsc/submit-sitemaps`, { method: 'POST', cache: 'no-store' });
-    if (sitemapRes.ok) {
-      sitemapResult = await sitemapRes.json();
-    }
-  } catch (err) {
-    console.error('Sitemap re-submission failed:', err);
-  }
-
   return NextResponse.json({
     date: today,
     total: results.length,
@@ -300,6 +289,5 @@ async function takeSnapshot() {
     failed,
     results,
     indexingWarnings,
-    sitemapResubmission: sitemapResult,
   });
 }
