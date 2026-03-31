@@ -263,42 +263,6 @@ export default function AllSitesStats() {
               </p>
             )}
 
-            {/* Per-site today breakdown */}
-            {stats && stats.sitesToday.length > 0 && (
-              <div className="mb-4 space-y-1">
-                <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-                  Active Today
-                </p>
-                {stats.sitesToday.map(site => {
-                  const proj = projects.find(p => p.id === site.siteId);
-                  const maxVisitors = stats.sitesToday[0].visitors;
-                  const width = Math.max((site.visitors / maxVisitors) * 100, 4);
-                  return (
-                    <div key={site.siteId} className="flex items-center gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[11px] text-[var(--text-secondary)] truncate">{site.name}</span>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-1">
-                            <span className="text-[11px] font-medium text-[var(--text-primary)]">{site.visitors} visitors</span>
-                            <span className="text-[10px] text-[var(--text-tertiary)]">{site.pageViews} pv</span>
-                            {site.source && (
-                              <span className="text-[8px] text-[var(--text-tertiary)] opacity-50">{site.source}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${width}%`, backgroundColor: proj?.color || site.color }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
             {/* Chart */}
             {loading && !data ? (
               <div className="flex items-center justify-center py-8">
