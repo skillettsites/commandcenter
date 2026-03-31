@@ -150,8 +150,8 @@ export const fundHoldings: FundHolding[] = [
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 20926 },
-  { account: 'F&S Cash', balance: 9925 },
+  { account: 'ISA Cash', balance: 20919.34 },
+  { account: 'F&S Cash', balance: 9921.94 },
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
