@@ -1,5 +1,5 @@
 // Portfolio configuration - update values here when data changes
-// Last manual update: 2026-03-31 (from HL account summaries dated 17-06-2024)
+// Last manual update: 2026-03-31 (from HL account summaries)
 
 export interface StockHolding {
   symbol: string;
@@ -106,33 +106,52 @@ export interface DividendSchedule {
 
 export const stockHoldings: StockHolding[] = [
   // ISA holdings
-  { symbol: 'AMD', name: 'Advanced Micro Devices', shares: 64, costBasis: 3849, account: 'ISA', currency: 'USD' },
-  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 293, costBasis: 22110, account: 'ISA', currency: 'USD' },
-  { symbol: 'AMZN', name: 'Amazon', shares: 139, costBasis: 11619, account: 'ISA', currency: 'USD' },
-  { symbol: 'TS2X.L', name: '2x Tesla ETP', shares: 703, costBasis: 53781, account: 'ISA', currency: 'GBP' },
+  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 198, costBasis: 19965, account: 'ISA', currency: 'USD' },
+  { symbol: 'AMZN', name: 'Amazon', shares: 143, costBasis: 22338, account: 'ISA', currency: 'USD' },
+  { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800, account: 'ISA', currency: 'GBP' },
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281, account: 'ISA', currency: 'USD' },
-  { symbol: 'TSLA', name: 'Tesla', shares: 18, costBasis: 2817, account: 'ISA', currency: 'USD' },
   // Fund & Share holdings
-  { symbol: 'PLTR', name: 'Palantir', shares: 307, costBasis: 5547, account: 'F&S', currency: 'USD' },
-  { symbol: 'CARP.L', name: 'WisdomTree Carbon ETC', shares: 147, costBasis: 3374, account: 'F&S', currency: 'GBP' },
+  { symbol: 'TS2X.L', name: '2x Tesla ETP', shares: 104, costBasis: 9909, account: 'F&S', currency: 'GBP' },
+  { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4463, account: 'F&S', currency: 'USD' },
+  { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15089, account: 'F&S', currency: 'USD' },
 ];
 
 export const fundHoldings: FundHolding[] = [
   {
-    id: 'aviva-uk-property',
-    name: 'Aviva Inv UK Property',
-    sedol: 'BYYYZ11',
-    yahooSymbol: '', // No Yahoo symbol available for this fund
-    units: 337.060,
-    currentValue: 277,
-    costBasis: 943,
+    id: 'aegon-high-yield',
+    name: 'Aegon High Yield Bond',
+    sedol: 'B1N9DY5',
+    yahooSymbol: '0P0000HDPV.L',
+    units: 10848.34,
+    currentValue: 9749,
+    costBasis: 9961,
+    account: 'ISA',
+  },
+  {
+    id: 'fidelity-enhanced',
+    name: 'Fidelity Enhanced Income',
+    sedol: 'BYSYZP1',
+    yahooSymbol: '0P0000XMHQ.L',
+    units: 63333.31,
+    currentValue: 52750,
+    costBasis: 49260,
+    account: 'ISA',
+  },
+  {
+    id: 'ubs-global',
+    name: 'UBS Global Enhanced Eq Income',
+    sedol: 'BL0RSP8',
+    yahooSymbol: '0P00012V5G.L',
+    units: 118798.032,
+    currentValue: 39358,
+    costBasis: 38221,
     account: 'ISA',
   },
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 28 },
-  { account: 'F&S Cash', balance: 7185 },
+  { account: 'ISA Cash', balance: 20926 },
+  { account: 'F&S Cash', balance: 9925 },
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
@@ -197,23 +216,34 @@ export const cashHoldings: CashHolding[] = [
 // Dividend/income schedules for all holdings
 export const dividendSchedules: DividendSchedule[] = [
   {
-    holdingId: 'aviva-uk-property',
-    holdingName: 'Aviva Inv UK Property',
+    holdingId: 'fidelity-enhanced',
+    holdingName: 'Fidelity Enhanced Income',
     holdingType: 'fund',
-    annualYieldPercent: 3.5,
-    frequency: 'quarterly',
+    annualYieldPercent: 7.54,
+    frequency: 'monthly',
     paysDividend: true,
-    paymentMonths: [3, 6, 9, 12],
-    expectedPayDay: 15,
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 25,
   },
   {
-    holdingId: 'AMD',
-    holdingName: 'Advanced Micro Devices',
-    holdingType: 'stock',
-    annualYieldPercent: 0,
-    frequency: 'none',
-    paysDividend: false,
-    paymentMonths: [],
+    holdingId: 'ubs-global',
+    holdingName: 'UBS Global Enhanced Eq Income',
+    holdingType: 'fund',
+    annualYieldPercent: 7.2,
+    frequency: 'monthly',
+    paysDividend: true,
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 28,
+  },
+  {
+    holdingId: 'aegon-high-yield',
+    holdingName: 'Aegon High Yield Bond',
+    holdingType: 'fund',
+    annualYieldPercent: 7.27,
+    frequency: 'monthly',
+    paysDividend: true,
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 14,
   },
   {
     holdingId: 'NVDA',
@@ -234,6 +264,16 @@ export const dividendSchedules: DividendSchedule[] = [
     paysDividend: true,
     paymentMonths: [3, 6, 9, 12],
     expectedPayDay: 17,
+  },
+  {
+    holdingId: 'JEQP.L',
+    holdingName: 'JEPQ (Nasdaq Equity Premium Income)',
+    holdingType: 'stock',
+    annualYieldPercent: 10.0,
+    frequency: 'monthly',
+    paysDividend: true,
+    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    expectedPayDay: 7,
   },
   {
     holdingId: 'PLTR',

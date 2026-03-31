@@ -4,13 +4,25 @@ import { getServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// Fund configuration: funds to track for dividend data
+// Fund configuration: the 3 funds to track
 const FUND_CONFIGS = [
   {
-    id: 'aviva-uk-property',
-    sedol: 'BYYYZ11',
-    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/a/aviva-investors-uk-property-class-2-income',
-    trustnetUrl: '',
+    id: 'fidelity-enhanced',
+    sedol: 'BYSYZP1',
+    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/f/fidelity-enhanced-income-class-w-income',
+    trustnetUrl: 'https://www.trustnet.com/factsheets/O/gmtr/fidelity-enhanced-income/',
+  },
+  {
+    id: 'ubs-global',
+    sedol: 'BL0RSP8',
+    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/u/ubs-global-enhanced-equity-income-c-income',
+    trustnetUrl: 'https://www.trustnet.com/factsheets/o/kyxy/ubs-global-enhanced-equity-income-c-inc',
+  },
+  {
+    id: 'aegon-high-yield',
+    sedol: 'B1N9DY5',
+    hlUrl: 'https://www.hl.co.uk/funds/fund-discounts,-prices--and--factsheets/search-results/a/aegon-high-yield-bond-class-b-income',
+    trustnetUrl: 'https://www.trustnet.com/factsheets/o/cws6/kames-high-yield-bond-b-inc',
   },
 ];
 
