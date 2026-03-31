@@ -17,6 +17,7 @@ export interface Project {
   gaPropertyId?: string;
   gscSiteUrl?: string;
   bingSiteUrl?: string;
+  vercelProjectId?: string;
 }
 
 export interface GscData {

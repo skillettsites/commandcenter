@@ -29,7 +29,7 @@ interface SiteTodayData {
   color: string;
   visitors: number;
   pageViews: number;
-  gaVisitors: number;
+  source: string; // which source provided the best number
 }
 
 interface AggregatedStats {
@@ -39,9 +39,7 @@ interface AggregatedStats {
   todayPageViews: number;
   monthPageViews: number;
   allTimePageViews: number;
-  gaTodayVisitors: number;
-  gaMonthVisitors: number;
-  gaAllTimeVisitors: number;
+  sources: { vercel: boolean; ga: boolean; tracked: boolean };
   sitesToday: SiteTodayData[];
 }
 
@@ -54,14 +52,15 @@ export default function AllSitesStats() {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
 
-  // Fetch aggregated summary stats on mount (tracked pageviews as primary, GA4 as secondary)
+  // Fetch all three data sources on mount
   useEffect(() => {
     Promise.all([
-      fetch('/api/analytics').then(res => res.ok ? res.json() : null),
-      fetch('/api/pageviews?view=summary').then(res => res.ok ? res.json() : null),
+      fetch('/api/analytics').then(res => res.ok ? res.json() : null).catch(() => null),
+      fetch('/api/pageviews?view=summary').then(res => res.ok ? res.json() : null).catch(() => null),
+      fetch('/api/vercel-analytics').then(res => res.ok ? res.json() : null).catch(() => null),
     ])
-      .then(([gaJson, pvJson]) => {
-        const tracked = (pvJson ?? {}) as Record<string, { today: number; week: number; month: number; total: number }>;
+      .then(([gaJson, pvJson, vercelJson]) => {
+        // GA4 data
         const gaResults = (gaJson?.data ?? []) as Array<{
           siteId: string;
           activeUsers: number;
@@ -71,49 +70,116 @@ export default function AllSitesStats() {
         }>;
         const gaMap = new Map(gaResults.map(r => [r.siteId, r]));
 
-        // Build per-site list from tracked pageviews (primary source)
+        // Supabase tracked pageviews
+        const tracked = (pvJson ?? {}) as Record<string, { today: number; week: number; month: number; total: number }>;
+
+        // Vercel Web Analytics
+        const vercelResults = (vercelJson?.data ?? []) as Array<{
+          siteId: string;
+          today: { pageViews: number; visitors: number };
+          month: { pageViews: number; visitors: number };
+          allTime: { pageViews: number; visitors: number };
+          enabled: boolean;
+        }>;
+        const vercelMap = new Map(vercelResults.map(r => [r.siteId, r]));
+
+        const hasVercel = vercelResults.some(r => r.enabled);
+        const hasGa = gaResults.length > 0;
+        const hasTracked = Object.keys(tracked).length > 0;
+
+        // Build per-site best numbers
         const allSiteIds = new Set([
           ...Object.keys(tracked),
           ...gaResults.map(r => r.siteId),
+          ...vercelResults.map(r => r.siteId),
         ]);
 
-        const sitesToday: SiteTodayData[] = Array.from(allSiteIds)
-          .map(siteId => {
-            const proj = projects.find(p => p.id === siteId);
-            const pv = tracked[siteId];
-            const ga = gaMap.get(siteId);
-            return {
+        let todayTotal = 0;
+        let monthTotal = 0;
+        let allTimeTotal = 0;
+        let todayPvTotal = 0;
+        let monthPvTotal = 0;
+        let allTimePvTotal = 0;
+
+        const sitesToday: SiteTodayData[] = [];
+
+        for (const siteId of allSiteIds) {
+          const proj = projects.find(p => p.id === siteId);
+          const pv = tracked[siteId];
+          const ga = gaMap.get(siteId);
+          const vc = vercelMap.get(siteId);
+
+          // For each metric, take the MAX across all sources
+          // This gives the most complete picture since each source misses some traffic
+          const todayVisitors = Math.max(
+            vc?.today.visitors ?? 0,
+            ga?.activeUsers ?? 0,
+            pv?.today ?? 0,
+          );
+          const monthVisitors = Math.max(
+            vc?.month.visitors ?? 0,
+            ga?.monthVisitors ?? 0,
+            pv?.month ?? 0,
+          );
+          const allTimeVisitors = Math.max(
+            vc?.allTime.visitors ?? 0,
+            ga?.totalVisitors ?? 0,
+            pv?.total ?? 0,
+          );
+
+          const todayPv = Math.max(
+            vc?.today.pageViews ?? 0,
+            ga?.pageViews ?? 0,
+            pv?.today ?? 0,
+          );
+          const monthPv = Math.max(
+            vc?.month.pageViews ?? 0,
+            pv?.month ?? 0,
+          );
+          const allTimePv = Math.max(
+            vc?.allTime.pageViews ?? 0,
+            pv?.total ?? 0,
+          );
+
+          todayTotal += todayVisitors;
+          monthTotal += monthVisitors;
+          allTimeTotal += allTimeVisitors;
+          todayPvTotal += todayPv;
+          monthPvTotal += monthPv;
+          allTimePvTotal += allTimePv;
+
+          // Determine best source for today
+          const vcToday = vc?.today.visitors ?? 0;
+          const gaToday = ga?.activeUsers ?? 0;
+          const pvToday = pv?.today ?? 0;
+          const bestToday = Math.max(vcToday, gaToday, pvToday);
+          const source = bestToday === vcToday && vcToday > 0 ? 'Vercel'
+            : bestToday === gaToday && gaToday > 0 ? 'GA4'
+            : bestToday === pvToday && pvToday > 0 ? 'Tracked'
+            : '';
+
+          if (todayVisitors > 0) {
+            sitesToday.push({
               siteId,
               name: proj?.name || siteId,
               color: proj?.color || '#888',
-              visitors: pv?.today ?? 0,
-              pageViews: pv?.today ?? 0,
-              gaVisitors: ga?.activeUsers ?? 0,
-            };
-          })
-          .filter(r => r.visitors > 0 || r.gaVisitors > 0)
-          .sort((a, b) => b.visitors - a.visitors || b.pageViews - a.pageViews);
+              visitors: todayVisitors,
+              pageViews: todayPv,
+              source,
+            });
+          }
+        }
 
-        // Sum tracked pageviews across all sites
-        const todayTotal = Object.values(tracked).reduce((s, v) => s + (v.today ?? 0), 0);
-        const monthTotal = Object.values(tracked).reduce((s, v) => s + (v.month ?? 0), 0);
-        const allTimeTotal = Object.values(tracked).reduce((s, v) => s + (v.total ?? 0), 0);
-
-        // GA4 totals for comparison
-        const gaTodayTotal = gaResults.reduce((s, r) => s + r.activeUsers, 0);
-        const gaMonthTotal = gaResults.reduce((s, r) => s + r.monthVisitors, 0);
-        const gaAllTimeTotal = gaResults.reduce((s, r) => s + r.totalVisitors, 0);
+        sitesToday.sort((a, b) => b.visitors - a.visitors || b.pageViews - a.pageViews);
 
         setStats({
           todayVisitors: todayTotal,
           monthVisitors: monthTotal,
           allTimeVisitors: allTimeTotal,
-          todayPageViews: todayTotal,
-          monthPageViews: monthTotal,
-          allTimePageViews: allTimeTotal,
-          gaTodayVisitors: gaTodayTotal,
-          gaMonthVisitors: gaMonthTotal,
-          gaAllTimeVisitors: gaAllTimeTotal,
+          todayPageViews: todayPvTotal,
+          monthPageViews: monthPvTotal,
+          allTimePageViews: allTimePvTotal,
+          sources: { vercel: hasVercel, ga: hasGa, tracked: hasTracked },
           sitesToday,
         });
       })
@@ -134,6 +200,15 @@ export default function AllSitesStats() {
   const cycleRange = () => {
     setChartRange(prev => prev === '1h' ? 'today' : prev === 'today' ? '24h' : prev === '24h' ? '1m' : prev === '1m' ? 'all' : '1h');
   };
+
+  // Build source tag string
+  const sourceTag = stats?.sources
+    ? [
+        stats.sources.vercel ? 'Vercel' : null,
+        stats.sources.ga ? 'GA4' : null,
+        stats.sources.tracked ? 'Tracked' : null,
+      ].filter(Boolean).join(' + ')
+    : '';
 
   return (
     <div className="space-y-2">
@@ -177,11 +252,52 @@ export default function AllSitesStats() {
         <div className="card overflow-hidden fade-in">
           <div className="p-3.5">
             {/* Stats grid */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <StatBox label="Today" value={stats?.todayVisitors ?? 0} gaSub={stats?.gaTodayVisitors} />
-              <StatBox label="This Month" value={stats?.monthVisitors ?? 0} gaSub={stats?.gaMonthVisitors} />
-              <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} gaSub={stats?.gaAllTimeVisitors} />
+            <div className="grid grid-cols-3 gap-3 mb-1">
+              <StatBox label="Today" value={stats?.todayVisitors ?? 0} secondary={stats ? `${stats.todayPageViews} pv` : undefined} />
+              <StatBox label="This Month" value={stats?.monthVisitors ?? 0} secondary={stats ? `${stats.monthPageViews.toLocaleString()} pv` : undefined} />
+              <StatBox label="All Time" value={stats?.allTimeVisitors ?? 0} secondary={stats ? `${stats.allTimePageViews.toLocaleString()} pv` : undefined} />
             </div>
+            {sourceTag && (
+              <p className="text-[9px] text-center text-[var(--text-tertiary)] opacity-50 mb-4">
+                Best of: {sourceTag}
+              </p>
+            )}
+
+            {/* Per-site today breakdown */}
+            {stats && stats.sitesToday.length > 0 && (
+              <div className="mb-4 space-y-1">
+                <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+                  Active Today
+                </p>
+                {stats.sitesToday.map(site => {
+                  const proj = projects.find(p => p.id === site.siteId);
+                  const maxVisitors = stats.sitesToday[0].visitors;
+                  const width = Math.max((site.visitors / maxVisitors) * 100, 4);
+                  return (
+                    <div key={site.siteId} className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[11px] text-[var(--text-secondary)] truncate">{site.name}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-1">
+                            <span className="text-[11px] font-medium text-[var(--text-primary)]">{site.visitors} visitors</span>
+                            <span className="text-[10px] text-[var(--text-tertiary)]">{site.pageViews} pv</span>
+                            {site.source && (
+                              <span className="text-[8px] text-[var(--text-tertiary)] opacity-50">{site.source}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-[var(--border-light)] overflow-hidden">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${width}%`, backgroundColor: proj?.color || site.color }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Chart */}
             {loading && !data ? (
@@ -196,11 +312,11 @@ export default function AllSitesStats() {
                   onCycleRange={cycleRange}
                 />
 
-                {/* Per-site breakdown */}
+                {/* Per-site breakdown from chart data */}
                 {data.perSite.length > 0 && (
                   <div className="mt-4 space-y-1.5">
                     <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                      By Site
+                      By Site ({RANGE_LABEL[chartRange]})
                     </p>
                     {data.perSite.map(site => (
                       <SiteBar key={site.siteId} site={site} max={data.perSite[0].pageViews} />
@@ -216,13 +332,13 @@ export default function AllSitesStats() {
   );
 }
 
-function StatBox({ label, value, gaSub }: { label: string; value: number; gaSub?: number }) {
+function StatBox({ label, value, secondary }: { label: string; value: number; secondary?: string }) {
   return (
     <div className="text-center">
       <p className="text-[18px] font-bold text-[var(--text-primary)]">{value.toLocaleString()}</p>
       <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</p>
-      {gaSub !== undefined && gaSub > 0 && (
-        <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 opacity-60">GA4: {gaSub.toLocaleString()}</p>
+      {secondary && (
+        <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 opacity-60">{secondary}</p>
       )}
     </div>
   );
@@ -370,7 +486,7 @@ function SiteBar({ site, max }: { site: PerSiteData; max: number }) {
           <div className="flex items-center gap-2 flex-shrink-0 ml-1">
             <span className="text-[11px] font-medium text-[var(--text-primary)]">{site.pageViews.toLocaleString()} views</span>
             {site.users > 0 && (
-              <span className="text-[10px] text-[var(--text-tertiary)]">GA4: {site.users.toLocaleString()}</span>
+              <span className="text-[10px] text-[var(--text-tertiary)]">{site.users.toLocaleString()} users</span>
             )}
           </div>
         </div>
