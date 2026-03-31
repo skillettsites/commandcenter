@@ -106,7 +106,7 @@ function findClosestRate(rateMap: Map<number, number>, timestamp: number): numbe
   return rateMap.get(closestTs) || 0.79;
 }
 
-// Store today's snapshot if it doesn't exist yet
+// Store or update today's snapshot with latest values
 async function storeTodaySnapshot(
   total: number,
   investments: number,
@@ -117,22 +117,16 @@ async function storeTodaySnapshot(
     const supabase = getServiceClient();
     const today = new Date().toISOString().split('T')[0];
 
-    // Check if today's snapshot exists
-    const { data: existing } = await supabase
-      .from('net_worth_snapshots')
-      .select('id')
-      .eq('date', today)
-      .maybeSingle();
-
-    if (!existing) {
-      await supabase.from('net_worth_snapshots').insert({
+    await supabase.from('net_worth_snapshots').upsert(
+      {
         date: today,
         total,
         investments,
         property_equity: propertyEquity,
         cash,
-      });
-    }
+      },
+      { onConflict: 'date' }
+    );
   } catch {
     // Don't fail the request if snapshot storage fails
   }
@@ -311,11 +305,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Ensure the last point is the current value
-  if (history.length > 0) {
-    history[history.length - 1].value = currentNetWorth;
-  }
-
   // For longer ranges, merge in stored snapshots where they exist
   // Stored snapshots override synthetic data for the same date
   if (range !== '1D' && storedSnapshots.length > 0) {
@@ -330,6 +319,12 @@ export async function GET(request: NextRequest) {
         history[i].value = snapshotMap.get(dateKey)!;
       }
     }
+  }
+
+  // Always ensure the last point matches the live current value
+  // This must come AFTER snapshot overrides so it takes precedence
+  if (history.length > 0) {
+    history[history.length - 1].value = currentNetWorth;
   }
 
   // Deduplicate by date (keep last occurrence)
