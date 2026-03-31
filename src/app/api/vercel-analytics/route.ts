@@ -26,7 +26,7 @@ async function fetchOverview(
   teamId: string,
 ): Promise<VercelOverview | null> {
   try {
-    const url = `https://vercel.com/api/web-analytics/overview?projectId=${projectId}&teamId=${teamId}&from=${from}&to=${to}&environment=production`;
+    const url = `https://vercel.com/api/web-analytics/overview?projectId=${projectId}&teamId=${teamId}&from=${from}&to=${to}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
       next: { revalidate: 0 },
