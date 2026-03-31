@@ -192,16 +192,18 @@ export async function GET(request: NextRequest) {
   const yahooParams = getYahooParams(range);
 
   // We use a blend of the user's stock holdings as a proxy for portfolio movement
-  // Main symbols with approximate portfolio weight
+  // Weights approximate each holding's share of total net worth (~£1.3M)
   const symbols = [
-    { symbol: 'NVDA', weight: 0.15 },
-    { symbol: 'GOOGL', weight: 0.10 },
-    { symbol: 'PLTR', weight: 0.05 },
-    { symbol: 'TSLA', weight: 0.05 },
+    { symbol: 'NVDA', weight: 0.03 },
+    { symbol: 'GOOGL', weight: 0.03 },
+    { symbol: 'AMZN', weight: 0.02 },
+    { symbol: 'ICE', weight: 0.10 },   // E*Trade (largest single stock)
+    { symbol: 'PLTR', weight: 0.02 },
+    { symbol: 'TSLA', weight: 0.02 },
   ];
-  // The rest (~65%) is funds/property/cash which we treat as roughly stable
+  // The rest (~78%) is property equity, funds, cash - roughly stable
 
-  const stableWeight = 0.65; // portion that doesn't move with stocks
+  const stableWeight = 0.78; // portion that doesn't move with stocks
 
   // Fetch stock histories and forex in parallel
   const [forexRates, ...stockHistories] = await Promise.all([
