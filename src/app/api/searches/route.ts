@@ -167,7 +167,8 @@ export async function GET(request: NextRequest) {
   const results: Record<string, {
     today: number;
     month: number;
-    recent: Array<{ search_query: string; result_found: boolean; created_at: string; geo_city: string | null; geo_region: string | null; geo_country: string | null }>;
+    avgDurationMs: number | null;
+    recent: Array<{ search_query: string; result_found: boolean; created_at: string; geo_city: string | null; geo_region: string | null; geo_country: string | null; duration_ms: number | null }>;
   }> = {};
 
   for (const siteId of sites) {
@@ -185,14 +186,27 @@ export async function GET(request: NextRequest) {
 
     const { data: recentRows } = await supabase
       .from('searches')
-      .select('search_query, result_found, created_at, geo_city, geo_region, geo_country')
+      .select('search_query, result_found, created_at, geo_city, geo_region, geo_country, duration_ms')
       .eq('site_id', siteId)
       .order('created_at', { ascending: false })
       .limit(20);
 
+    // Calculate average search duration for this site (last 100 searches with duration)
+    const { data: durationRows } = await supabase
+      .from('searches')
+      .select('duration_ms')
+      .eq('site_id', siteId)
+      .not('duration_ms', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    const durations = (durationRows ?? []).map((r: { duration_ms: number }) => r.duration_ms).filter((d: number) => d > 0);
+    const avgDuration = durations.length > 0 ? Math.round(durations.reduce((a: number, b: number) => a + b, 0) / durations.length) : null;
+
     results[siteId] = {
       today: todayCount ?? 0,
       month: monthCount ?? 0,
+      avgDurationMs: avgDuration,
       recent: recentRows ?? [],
     };
   }

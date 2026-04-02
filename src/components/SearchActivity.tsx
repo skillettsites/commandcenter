@@ -5,10 +5,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 interface SiteSearchData {
   today: number;
   month: number;
+  avgDurationMs?: number | null;
   recent: Array<{
     search_query: string;
     result_found: boolean;
     created_at: string;
+    duration_ms?: number | null;
   }>;
 }
 
@@ -388,6 +390,16 @@ export default function SearchActivity() {
                           </span>
                           <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">today</span>
                         </div>
+                        {siteData.avgDurationMs != null && (
+                          <div className="text-right">
+                            <span className="text-[13px] font-medium text-[var(--text-secondary)]">
+                              {siteData.avgDurationMs < 1000
+                                ? `${siteData.avgDurationMs}ms`
+                                : `${(siteData.avgDurationMs / 1000).toFixed(1)}s`}
+                            </span>
+                            <span className="text-[10px] text-[var(--text-tertiary)] ml-0.5">avg</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -422,6 +434,13 @@ export default function SearchActivity() {
                                 <span className="text-[12px] font-mono text-[var(--text-primary)] flex-1 min-w-0 truncate">
                                   {search.search_query}
                                 </span>
+                                {search.duration_ms != null && (
+                                  <span className="text-[10px] text-[var(--text-tertiary)] flex-shrink-0">
+                                    {search.duration_ms < 1000
+                                      ? `${search.duration_ms}ms`
+                                      : `${(search.duration_ms / 1000).toFixed(1)}s`}
+                                  </span>
+                                )}
                                 <span className="text-[10px] text-[var(--text-tertiary)] flex-shrink-0">
                                   {timeAgo(search.created_at)}
                                 </span>
