@@ -636,25 +636,36 @@ function DividendSection({ dividends, properties = [], projection }: { dividends
             {/* Year by year table */}
             <div className="space-y-0">
               <div className="flex text-[9px] text-[var(--text-tertiary)] font-medium border-b border-[var(--border-light)] pb-0.5 mb-0.5">
-                <span className="w-[36px]">Year</span>
+                <span className="w-[32px]">Year</span>
                 <span className="flex-1 text-right">ISA</span>
                 <span className="flex-1 text-right">F&S</span>
-                <span className="w-[70px] text-right">Monthly</span>
+                <span className="w-[62px] text-right">Gross</span>
+                <span className="w-[62px] text-right">Net</span>
+                <span className="w-[42px] text-right">Tax</span>
               </div>
               {milestones.map(y => {
                 const row = years[y];
                 const isTarget = y === hitTarget;
+                const grossMonthly = (row.isaIncome + row.fsIncomeGross) / 12;
+                const taxMonthly = grossMonthly - row.totalMonthly;
                 return (
                   <div key={y} className={`flex text-[10px] py-0.5 ${isTarget ? 'text-[var(--orange)] font-medium' : 'text-[var(--text-secondary)]'}`}>
-                    <span className="w-[36px]">{y === 0 ? 'Now' : `Yr ${y}`}</span>
+                    <span className="w-[32px]">{y === 0 ? 'Now' : `Yr ${y}`}</span>
                     <span className="flex-1 text-right">£{(row.isa / 1000).toFixed(0)}k</span>
                     <span className="flex-1 text-right">£{(row.fs / 1000).toFixed(0)}k</span>
-                    <span className={`w-[70px] text-right font-medium ${row.totalMonthly >= TARGET_MONTHLY ? 'text-[#22c55e]' : ''}`}>
-                      £{Math.round(row.totalMonthly).toLocaleString()}/mo
+                    <span className="w-[62px] text-right">£{Math.round(grossMonthly).toLocaleString()}</span>
+                    <span className={`w-[62px] text-right font-medium ${row.totalMonthly >= TARGET_MONTHLY ? 'text-[#22c55e]' : ''}`}>
+                      £{Math.round(row.totalMonthly).toLocaleString()}
+                    </span>
+                    <span className="w-[42px] text-right text-[#ef4444]">
+                      -£{Math.round(taxMonthly).toLocaleString()}
                     </span>
                   </div>
                 );
               })}
+            </div>
+            <div className="text-[9px] text-[var(--text-tertiary)] mt-1">
+              Gross = pre-tax total. Net = after 33.75% dividend tax on F&S (ISA is tax-free). Tax shrinks as more moves into ISA.
             </div>
 
             {hitTarget >= 0 && (
