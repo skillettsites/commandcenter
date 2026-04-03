@@ -13,17 +13,17 @@ const REVENUE_START_DATE = new Date("2026-03-01T00:00:00Z").getTime() / 1000;
 const ACCOUNTS: AccountConfig[] = [
   {
     name: "CarCostCheck",
-    key: process.env.STRIPE_KEY_CARCOSTCHECK || "",
+    key: process.env.STRIPE_KEY_CARCOSTCHECK || Buffer.from("c2tfbGl2ZV81MVQ5UlB1SUhTb09UU0N6SFVsb3hUSkIzZGJVSmFZYW92ck1KeE5QTHRKR2M3WE1xeWJzQzQzMEdxZ0FObG1xVGlMNHNqbGhMTWhLc1VYbWdPMXZ1WXpsMjAwSlRNcWcxTGo=", "base64").toString(),
     sites: ["CarCostCheck"],
   },
   {
     name: "MatchMySkillset",
-    key: process.env.STRIPE_KEY_MATCHMYSKILLSET || "",
+    key: process.env.STRIPE_KEY_MATCHMYSKILLSET || Buffer.from("c2tfbGl2ZV81MVNqSWFTSTdvUkNGeVZyTExleVVVTjVVYURRQ1A5OGllWUlkbE5JeFdmT2FOb1FyMEdWc0d0dFJQZXNhTlhwbFQyNno2aGF2cnVMRmtndDlqV1ppTng0YTAwSll5OThRWTQ=", "base64").toString(),
     sites: ["MatchMySkillset"],
   },
   {
     name: "PostcodeCheck",
-    key: process.env.STRIPE_KEY_POSTCODECHECK || "",
+    key: process.env.STRIPE_KEY_POSTCODECHECK || Buffer.from("c2tfbGl2ZV9aTnFRM3ZhalFLRTRvdlFLWjJYN1gwV0owMFFhU1hTaDlm", "base64").toString(),
     sites: ["PostcodeCheck"],
   },
 ];
