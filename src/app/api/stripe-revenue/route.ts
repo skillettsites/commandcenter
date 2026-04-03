@@ -97,7 +97,15 @@ export async function GET() {
         results.thisMonthRevenue += monthRevenue;
         results.thisMonthCharges += monthCharges.length;
       } catch (err) {
-        console.error(`[stripe] Error fetching ${account.name}:`, err);
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[stripe] Error fetching ${account.name}:`, errMsg);
+        results.accounts.push({
+          name: account.name + " (ERROR: " + errMsg.slice(0, 50) + ")",
+          sites: account.sites,
+          totalRevenue: 0,
+          chargeCount: 0,
+          recentCharges: [],
+        });
       }
     }
 
