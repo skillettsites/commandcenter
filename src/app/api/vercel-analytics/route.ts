@@ -50,18 +50,24 @@ export async function GET() {
 
   const vercelProjects = projects.filter(p => p.vercelProjectId);
   const today = ukTodayStr();
+  // Vercel 'to' date is exclusive, so use tomorrow to include today's data
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: 'Europe/London' });
   const monthStart = ukMonthStr() + '-01';
-  // All-time: from Jan 2025 (before any site existed)
-  const allTimeStart = '2025-01-01';
+  // Vercel Pro limits queries to 367 days, so use ~365 days ago
+  const allTimeDate = new Date();
+  allTimeDate.setDate(allTimeDate.getDate() - 365);
+  const allTimeStart = allTimeDate.toISOString().slice(0, 10);
 
   const results: VercelSiteStats[] = await Promise.all(
     vercelProjects.map(async (project) => {
       const pid = project.vercelProjectId!;
 
       const [todayData, monthData, allTimeData] = await Promise.all([
-        fetchOverview(pid, today, today, token, teamId),
-        fetchOverview(pid, monthStart, today, token, teamId),
-        fetchOverview(pid, allTimeStart, today, token, teamId),
+        fetchOverview(pid, today, tomorrowStr, token, teamId),
+        fetchOverview(pid, monthStart, tomorrowStr, token, teamId),
+        fetchOverview(pid, allTimeStart, tomorrowStr, token, teamId),
       ]);
 
       return {

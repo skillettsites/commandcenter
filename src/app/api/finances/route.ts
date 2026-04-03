@@ -240,8 +240,18 @@ async function generateDividendData(
       const year = d.getFullYear();
       const dateStr = `${year}-${String(month).padStart(2, '0')}`;
 
-      // Convert USD dividend to GBP
-      const totalGBP = div.amount * holding.shares * forexRate;
+      // Yahoo returns dividends in the stock's trading currency:
+      // .L stocks return pence, USD stocks return dollars
+      let totalGBP: number;
+      if (symbol.endsWith('.L')) {
+        // London-listed: dividend is in pence, convert to pounds
+        totalGBP = (div.amount / 100) * holding.shares;
+      } else if (holding.currency === 'GBP') {
+        totalGBP = div.amount * holding.shares;
+      } else {
+        // USD stocks: convert to GBP
+        totalGBP = div.amount * holding.shares * forexRate;
+      }
 
       payments.push({
         date: dateStr,
@@ -266,8 +276,11 @@ async function generateDividendData(
       const year = d.getFullYear();
       const dateStr = `${year}-${String(month).padStart(2, '0')}`;
 
-      // Fund divs are already in GBP (pence per unit from Yahoo for .L funds)
-      const totalGBP = div.amount * fund.units;
+      // .L fund divs from Yahoo are in pence per unit, convert to pounds
+      const isGBp = fund.symbol.endsWith('.L');
+      const totalGBP = isGBp
+        ? (div.amount / 100) * fund.units
+        : div.amount * fund.units;
 
       payments.push({
         date: dateStr,
@@ -471,19 +484,32 @@ export async function GET() {
     };
   });
 
+  // Fetch HL cached unit prices for funds (Yahoo doesn't have UK fund tickers)
+  const hlCache = await fetchHLDividendCache();
+
   const funds = fundHoldings.map((f, i) => {
     const priceData = fundPrices[i];
     // Yahoo Finance UK fund prices are in GBp (pence), convert to pounds
     const liveUnitPrice = priceData?.price ?? null;
     const currency = priceData?.currency ?? null;
-    const unitPriceGBP = liveUnitPrice !== null
+    let unitPriceGBP = liveUnitPrice !== null
       ? (currency === 'GBp' ? liveUnitPrice / 100 : liveUnitPrice)
       : null;
+
+    // Fallback to HL scraped unit price if Yahoo unavailable
+    if (unitPriceGBP === null) {
+      const hlData = hlCache.get(f.id);
+      if (hlData?.unit_price) {
+        unitPriceGBP = hlData.unit_price;
+      }
+    }
+
     const liveValue = unitPriceGBP !== null ? unitPriceGBP * f.units : null;
     const currentValue = liveValue !== null ? liveValue : f.currentValue;
     const gainLoss = currentValue - f.costBasis;
     const gainLossPercent = f.costBasis > 0 ? (gainLoss / f.costBasis) * 100 : 0;
     const isLive = liveValue !== null;
+    const priceSource = priceData?.price ? 'yahoo' : (unitPriceGBP !== null ? 'hl_cached' : 'static');
 
     return {
       ...f,
@@ -492,6 +518,7 @@ export async function GET() {
       gainLoss,
       gainLossPercent,
       isLive,
+      priceSource,
     };
   });
 
