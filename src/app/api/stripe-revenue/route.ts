@@ -7,12 +7,10 @@ interface AccountConfig {
   sites: string[];
 }
 
+// Only count revenue from March 2026 onwards (when we started tracking properly)
+const REVENUE_START_DATE = new Date("2026-03-01T00:00:00Z").getTime() / 1000;
+
 const ACCOUNTS: AccountConfig[] = [
-  {
-    name: "PostcodeCheck / FindYourStay",
-    key: process.env.STRIPE_KEY_POSTCODECHECK || "",
-    sites: ["PostcodeCheck", "FindYourStay"],
-  },
   {
     name: "CarCostCheck",
     key: process.env.STRIPE_KEY_CARCOSTCHECK || "",
@@ -22,6 +20,11 @@ const ACCOUNTS: AccountConfig[] = [
     name: "MatchMySkillset",
     key: process.env.STRIPE_KEY_MATCHMYSKILLSET || "",
     sites: ["MatchMySkillset"],
+  },
+  {
+    name: "PostcodeCheck",
+    key: process.env.STRIPE_KEY_POSTCODECHECK || "",
+    sites: ["PostcodeCheck"],
   },
 ];
 
@@ -63,7 +66,9 @@ export async function GET() {
       try {
         const stripe = new Stripe(account.key);
         const charges = await stripe.charges.list({ limit: 100 });
-        const paid = charges.data.filter((c) => c.paid && !c.refunded);
+        const paid = charges.data.filter(
+          (c) => c.paid && !c.refunded && c.created >= REVENUE_START_DATE
+        );
 
         const totalRevenue = paid.reduce((s, c) => s + c.amount, 0);
         const monthCharges = paid.filter((c) => c.created >= monthStart);
