@@ -6,6 +6,7 @@ import GeoAnalytics from '@/components/GeoAnalytics';
 import AutoResearch from '@/components/AutoResearch';
 import AffiliateClicks from '@/components/AffiliateClicks';
 import BetPositions from '@/components/BetPositions';
+import MatchMySkillsetStats from '@/components/MatchMySkillsetStats';
 import EmailList from '@/components/EmailList';
 import TaskList from '@/components/TaskList';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -20,6 +21,7 @@ export default function Home() {
           <AllSitesStats />
           <SiteGrid />
           <TaskList />
+          <MatchMySkillsetStats />
           <SearchActivity />
           <GeoAnalytics />
           <AutoResearch />
