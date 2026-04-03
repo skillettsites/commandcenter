@@ -9,7 +9,7 @@ interface AccountConfig {
 
 const ACCOUNTS: AccountConfig[] = [
   {
-    name: "PostcodeCheck / FYS",
+    name: "PostcodeCheck / FindYourStay",
     key: process.env.STRIPE_KEY_POSTCODECHECK || "",
     sites: ["PostcodeCheck", "FindYourStay"],
   },
@@ -22,11 +22,6 @@ const ACCOUNTS: AccountConfig[] = [
     name: "MatchMySkillset",
     key: process.env.STRIPE_KEY_MATCHMYSKILLSET || "",
     sites: ["MatchMySkillset"],
-  },
-  {
-    name: "AskYourStay",
-    key: process.env.STRIPE_KEY_ASKYOURSTAY || "",
-    sites: ["AskYourStay"],
   },
 ];
 
