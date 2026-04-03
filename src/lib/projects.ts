@@ -17,6 +17,7 @@ export const projects: Project[] = [
   { id: 'askyourstay', name: 'AskYourStay', url: 'https://askyourstay.com', color: '#0EA5E9', gaPropertyId: '529406812', gscSiteUrl: 'sc-domain:askyourstay.com', bingSiteUrl: 'https://askyourstay.com/', vercelProjectId: 'prj_2szm324AhjVC4ZjJcvaEWP3FKSch' },
   { id: 'aicareerswap', name: 'AICareerSwap', url: 'https://aicareerswap.com', color: '#F472B6', gaPropertyId: '529412747', gscSiteUrl: 'sc-domain:aicareerswap.com', bingSiteUrl: 'https://aicareerswap.com/', vercelProjectId: 'prj_TZuApKxU8LDTxcfiOEZtKFNcUC6U' },
   { id: 'briefmynews', name: 'BriefMyNews', url: 'https://briefmynews.com', color: '#DC2626', gaPropertyId: '52972611', gscSiteUrl: 'sc-domain:briefmynews.com', bingSiteUrl: 'https://briefmynews.com/', vercelProjectId: 'prj_3RDFkNldAbtqOp6jj8XUvQvIFuGh' },
+  { id: 'matchmyskillset', name: 'MatchMySkillset', url: 'https://matchmyskillset.com', color: '#4F46E5', gaPropertyId: '14307356064', gscSiteUrl: 'sc-domain:matchmyskillset.com', vercelProjectId: 'prj_GeOW445HV8MIakXU1HCCIaFrh6Wn' },
   { id: 'dashboard', name: 'Dashboard', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316', vercelProjectId: 'prj_xClnwXdYweoHob0satdZL2g1tJqI' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
 ];
