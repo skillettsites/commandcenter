@@ -26,8 +26,8 @@ const FUND_CONFIGS = [
   },
 ];
 
-// Cache validity: 7 days in milliseconds
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Cache validity: 1 day in milliseconds (fund prices update daily)
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface Distribution {
   date: string;
@@ -78,6 +78,26 @@ async function fetchFundPage(config: typeof FUND_CONFIGS[0]): Promise<string | n
     console.error(`HL fetch error for ${config.id}:`, err);
     return null;
   }
+}
+
+// Quick regex extraction of sell price and yield from HL HTML (no AI needed)
+function extractFromHL(html: string, fundId: string): { unit_price: number | null; yield_percent: number | null } {
+  let unit_price: number | null = null;
+  let yield_percent: number | null = null;
+
+  // Sell price: look for bid price pattern like "33.55p" or "83.29p"
+  const bidMatch = html.match(/class="bid[^"]*"[^>]*>(\d+\.?\d*)p/);
+  if (bidMatch) {
+    unit_price = parseFloat(bidMatch[1]) / 100; // pence to pounds
+  }
+
+  // Yield: look for distribution yield percentage
+  const yieldMatch = html.match(/(?:Historic|Distribution)\s*[Yy]ield[^<]*<[^>]*>(\d+\.?\d*)%/);
+  if (yieldMatch) {
+    yield_percent = parseFloat(yieldMatch[1]);
+  }
+
+  return { unit_price, yield_percent };
 }
 
 // Use Claude Haiku to parse dividend data from the HTML
@@ -263,15 +283,50 @@ export async function GET(request: Request) {
   if (fundsToFetch.length > 0) {
     const fetchResults = await Promise.all(
       fundsToFetch.map(async (config) => {
+        // Always fetch HL page directly for reliable price/yield extraction
+        let hlHtml: string | null = null;
+        try {
+          const res = await fetch(config.hlUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              Accept: 'text/html',
+              'Accept-Language': 'en-GB,en;q=0.9',
+            },
+          });
+          if (res.ok) hlHtml = await res.text();
+        } catch { /* ignore */ }
+
+        // Try the full page (Trustnet then HL) for Claude AI parsing
         const html = await fetchFundPage(config);
-        if (!html) {
-          // HL down; keep cached data if available
-          return cachedMap.get(config.id) || null;
+
+        // Try Claude AI parse first
+        let parsed = html ? await parseWithClaude(html, config.id) : null;
+
+        // If Claude failed or returned nulls, use regex extraction from HL HTML
+        if (hlHtml) {
+          const extracted = extractFromHL(hlHtml, config.id);
+          if (!parsed) {
+            parsed = {
+              fund_id: config.id,
+              fund_name: config.id,
+              yield_percent: extracted.yield_percent,
+              unit_price: extracted.unit_price,
+              distributions: [],
+              ex_dividend_dates: [],
+              fetched_at: new Date().toISOString(),
+            };
+          } else {
+            // Fill in any gaps from the regex extraction
+            if (parsed.unit_price === null && extracted.unit_price !== null) {
+              parsed.unit_price = extracted.unit_price;
+            }
+            if (parsed.yield_percent === null && extracted.yield_percent !== null) {
+              parsed.yield_percent = extracted.yield_percent;
+            }
+          }
         }
 
-        const parsed = await parseWithClaude(html, config.id);
         if (!parsed) {
-          // Claude failed; keep cached data if available
           return cachedMap.get(config.id) || null;
         }
 
