@@ -441,7 +441,13 @@ function DividendChart({ dividends, range, rentalNet = 0 }: { dividends: Dividen
   );
 }
 
-function DividendSection({ dividends, properties = [] }: { dividends: DividendData; properties?: PropertyData[] }) {
+interface ProjectionInput {
+  isaTotal: number;
+  fsTotal: number;
+  fsCash: number;
+}
+
+function DividendSection({ dividends, properties = [], projection }: { dividends: DividendData; properties?: PropertyData[]; projection?: ProjectionInput }) {
   const [range, setRange] = useState<DividendRange>('year');
   const [showBreakdown, setShowBreakdown] = useState(false);
 
@@ -545,25 +551,120 @@ function DividendSection({ dividends, properties = [] }: { dividends: DividendDa
         </div>
       </div>
 
-      {/* JEPQ target note */}
-      <div className="p-2 rounded-lg bg-[var(--bg-elevated)] mb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-medium text-[var(--orange)]">Target: {dividends.jepqTarget.name}</span>
-            <span className="text-[10px] text-[var(--text-tertiary)] ml-2">
-              {dividends.jepqTarget.yield}% yield, monthly
-            </span>
+      {/* Income fund projection */}
+      {(() => {
+        // Current ISA income fund values (Fidelity, UBS, Aegon)
+        const BLENDED_YIELD = 0.0734; // weighted avg: Fidelity 7.54%, UBS 7.2%, Aegon 7.27%
+        const ISA_ANNUAL_LIMIT = 20000;
+        const DIV_TAX_RATE = 0.3375; // higher rate dividend tax
+        const DIV_ALLOWANCE = 1000;
+        const TARGET_MONTHLY = 5000;
+        const TARGET_ANNUAL = TARGET_MONTHLY * 12;
+        const PROPERTY_NET_PROCEEDS = 393479; // net after mortgages
+
+        // Current ISA total (all would convert to income funds)
+        const currentISA = projection?.isaTotal ?? 0;
+        // Current F&S total + property sale proceeds
+        const currentFS = (projection?.fsTotal ?? 0) + (projection?.fsCash ?? 0) + PROPERTY_NET_PROCEEDS;
+
+        // Project year by year: reinvest dividends, shift £20k/year from F&S to ISA
+        const years: Array<{
+          year: number; isa: number; fs: number;
+          isaIncome: number; fsIncomeGross: number; fsIncomeNet: number;
+          totalMonthly: number;
+        }> = [];
+
+        let isa = currentISA;
+        let fs = currentFS;
+        let hitTarget = -1;
+
+        for (let y = 0; y <= 15; y++) {
+          const isaIncome = isa * BLENDED_YIELD;
+          const fsIncomeGross = fs * BLENDED_YIELD;
+          const taxable = Math.max(0, fsIncomeGross - DIV_ALLOWANCE);
+          const fsIncomeNet = fsIncomeGross - (taxable * DIV_TAX_RATE);
+          const totalMonthly = (isaIncome + fsIncomeNet) / 12;
+
+          years.push({ year: y, isa, fs, isaIncome, fsIncomeGross, fsIncomeNet, totalMonthly });
+
+          if (totalMonthly >= TARGET_MONTHLY && hitTarget === -1) hitTarget = y;
+
+          // Next year: reinvest all dividends, shift £20k from F&S to ISA
+          const shift = Math.min(ISA_ANNUAL_LIMIT, fs);
+          isa = isa + isaIncome + shift;
+          fs = fs + fsIncomeGross - shift; // reinvest F&S divs too, minus shift
+        }
+
+        // Show key milestones: years 0, 1, 2, 3, 5, 7, 10, 15 (or when target hit)
+        const milestones = [0, 1, 2, 3, 5, 7, 10, 15].filter(y => y < years.length);
+        if (hitTarget > 0 && !milestones.includes(hitTarget)) {
+          milestones.push(hitTarget);
+          milestones.sort((a, b) => a - b);
+        }
+
+        return (
+          <div className="p-2 rounded-lg bg-[var(--bg-elevated)] mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-medium text-[var(--orange)]">
+                £5k/mo Income Projection (income funds only)
+              </span>
+              <span className="text-[10px] text-[var(--text-tertiary)]">
+                {(BLENDED_YIELD * 100).toFixed(1)}% blended yield
+              </span>
+            </div>
+            <div className="text-[9px] text-[var(--text-tertiary)] mb-2">
+              Assumes: sell growth stocks into income funds, reinvest dividends, max ISA £20k/yr from F&S, property sales add £{(PROPERTY_NET_PROCEEDS/1000).toFixed(0)}k to F&S
+            </div>
+
+            {/* Progress bar to target */}
+            {(() => {
+              const currentMonthly = years[0]?.totalMonthly ?? 0;
+              const pct = Math.min(100, (currentMonthly / TARGET_MONTHLY) * 100);
+              return (
+                <div className="mb-2">
+                  <div className="flex justify-between text-[10px] mb-0.5">
+                    <span className="text-[var(--text-secondary)]">Now: £{Math.round(currentMonthly).toLocaleString()}/mo</span>
+                    <span className="text-[var(--orange)]">Target: £{TARGET_MONTHLY.toLocaleString()}/mo</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[var(--bg-card)] overflow-hidden">
+                    <div className="h-full rounded-full bg-[var(--orange)] transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Year by year table */}
+            <div className="space-y-0">
+              <div className="flex text-[9px] text-[var(--text-tertiary)] font-medium border-b border-[var(--border-light)] pb-0.5 mb-0.5">
+                <span className="w-[36px]">Year</span>
+                <span className="flex-1 text-right">ISA</span>
+                <span className="flex-1 text-right">F&S</span>
+                <span className="w-[70px] text-right">Monthly</span>
+              </div>
+              {milestones.map(y => {
+                const row = years[y];
+                const isTarget = y === hitTarget;
+                return (
+                  <div key={y} className={`flex text-[10px] py-0.5 ${isTarget ? 'text-[var(--orange)] font-medium' : 'text-[var(--text-secondary)]'}`}>
+                    <span className="w-[36px]">{y === 0 ? 'Now' : `Yr ${y}`}</span>
+                    <span className="flex-1 text-right">£{(row.isa / 1000).toFixed(0)}k</span>
+                    <span className="flex-1 text-right">£{(row.fs / 1000).toFixed(0)}k</span>
+                    <span className={`w-[70px] text-right font-medium ${row.totalMonthly >= TARGET_MONTHLY ? 'text-[#22c55e]' : ''}`}>
+                      £{Math.round(row.totalMonthly).toLocaleString()}/mo
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {hitTarget >= 0 && (
+              <div className="text-[10px] text-[#22c55e] font-medium mt-1.5 text-center">
+                £5k/mo target reached in year {hitTarget} ({2026 + hitTarget})
+              </div>
+            )}
           </div>
-          <div className="text-right">
-            <span className="text-[12px] font-medium text-[var(--orange)]">
-              ~£{dividends.jepqTarget.monthlyIncome.toLocaleString()}/mo
-            </span>
-          </div>
-        </div>
-        <div className="text-[9px] text-[var(--text-tertiary)] mt-0.5">
-          Deploying ~£{(dividends.jepqTarget.capital / 1000).toFixed(0)}k after property sales + stock consolidation
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Expandable breakdown */}
       <div>
@@ -998,7 +1099,17 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
               </div>
 
               {expandedSection === 'dividends' && data.dividends && (
-                <DividendSection dividends={data.dividends} properties={keepingProperties} />
+                <DividendSection
+                  dividends={data.dividends}
+                  properties={keepingProperties}
+                  projection={{
+                    isaTotal: data.stocks.filter(s => s.account === 'ISA').reduce((s, st) => s + (st.currentValue ?? 0), 0)
+                      + data.funds.reduce((s, f) => s + f.currentValue, 0)
+                      + (data.cashInvestmentAccounts?.find((c: { account: string; balance: number }) => c.account === 'ISA Cash')?.balance ?? 0),
+                    fsTotal: data.stocks.filter(s => s.account === 'F&S').reduce((s, st) => s + (st.currentValue ?? 0), 0),
+                    fsCash: data.cashInvestmentAccounts?.find((c: { account: string; balance: number }) => c.account === 'F&S Cash')?.balance ?? 0,
+                  }}
+                />
               )}
             </div>
 
