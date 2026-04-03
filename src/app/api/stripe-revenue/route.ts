@@ -60,6 +60,9 @@ export async function GET() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000;
 
+    const keysFound = ACCOUNTS.map(a => `${a.name}:${a.key ? 'yes' : 'no'}`).join(', ');
+    console.log('[stripe-revenue] Keys:', keysFound);
+
     for (const account of ACCOUNTS) {
       if (!account.key) continue;
 
