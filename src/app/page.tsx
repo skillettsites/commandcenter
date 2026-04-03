@@ -7,6 +7,7 @@ import AutoResearch from '@/components/AutoResearch';
 import AffiliateClicks from '@/components/AffiliateClicks';
 import BetPositions from '@/components/BetPositions';
 import MatchMySkillsetStats from '@/components/MatchMySkillsetStats';
+import StripeRevenue from '@/components/StripeRevenue';
 import EmailList from '@/components/EmailList';
 import TaskList from '@/components/TaskList';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -19,6 +20,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 pb-24">
           <DashboardHeader />
           <AllSitesStats />
+          <StripeRevenue />
           <SiteGrid />
           <TaskList />
           <MatchMySkillsetStats />
