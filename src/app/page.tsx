@@ -5,6 +5,7 @@ import SearchActivity from '@/components/SearchActivity';
 import GeoAnalytics from '@/components/GeoAnalytics';
 import AutoResearch from '@/components/AutoResearch';
 import AffiliateClicks from '@/components/AffiliateClicks';
+import ChecklistDownloads from '@/components/ChecklistDownloads';
 import BetPositions from '@/components/BetPositions';
 import MatchMySkillsetStats from '@/components/MatchMySkillsetStats';
 import StripeRevenue from '@/components/StripeRevenue';
@@ -27,6 +28,7 @@ export default function Home() {
           <SearchActivity />
           <GeoAnalytics />
           <AutoResearch />
+          <ChecklistDownloads />
           <AffiliateClicks />
           <BetPositions />
           <EmailList />
