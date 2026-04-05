@@ -18,6 +18,8 @@ export const projects: Project[] = [
   { id: 'aicareerswap', name: 'AICareerSwap', url: 'https://aicareerswap.com', color: '#F472B6', gaPropertyId: '529412747', gscSiteUrl: 'sc-domain:aicareerswap.com', bingSiteUrl: 'https://aicareerswap.com/', vercelProjectId: 'prj_TZuApKxU8LDTxcfiOEZtKFNcUC6U' },
   { id: 'briefmynews', name: 'BriefMyNews', url: 'https://briefmynews.com', color: '#DC2626', gaPropertyId: '52972611', gscSiteUrl: 'sc-domain:briefmynews.com', bingSiteUrl: 'https://briefmynews.com/', vercelProjectId: 'prj_3RDFkNldAbtqOp6jj8XUvQvIFuGh' },
   { id: 'matchmyskillset', name: 'MatchMySkillset', url: 'https://matchmyskillset.com', color: '#4F46E5', gaPropertyId: '14307356064', gscSiteUrl: 'sc-domain:matchmyskillset.com', vercelProjectId: 'prj_GeOW445HV8MIakXU1HCCIaFrh6Wn' },
+  { id: 'appealafine', name: 'Appeal a Fine', url: 'https://appealafine.co.uk', color: '#0D9488', gscSiteUrl: 'sc-domain:appealafine.co.uk', bingSiteUrl: 'https://appealafine.co.uk/', vercelProjectId: 'prj_NQamBcJT9Nneev1Sy17Pm1Vk8USx' },
+  { id: 'rentercheck', name: 'RenterCheck', url: 'https://rentercheck.vercel.app', color: '#2563EB', gscSiteUrl: 'sc-domain:rentercheck.vercel.app', bingSiteUrl: 'https://rentercheck.vercel.app/', vercelProjectId: 'prj_RenterCheck' },
   { id: 'dashboard', name: 'Dashboard', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316', vercelProjectId: 'prj_xClnwXdYweoHob0satdZL2g1tJqI' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
 ];
