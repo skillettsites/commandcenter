@@ -20,7 +20,7 @@ export const projects: Project[] = [
   { id: 'matchmyskillset', name: 'MatchMySkillset', url: 'https://matchmyskillset.com', color: '#4F46E5', gaPropertyId: '14307356064', gscSiteUrl: 'sc-domain:matchmyskillset.com', vercelProjectId: 'prj_GeOW445HV8MIakXU1HCCIaFrh6Wn' },
   { id: 'appealafine', name: 'Appeal a Fine', url: 'https://appealafine.co.uk', color: '#0D9488', gscSiteUrl: 'sc-domain:appealafine.co.uk', bingSiteUrl: 'https://appealafine.co.uk/', vercelProjectId: 'prj_CRxxZpdM0F9Ru5FEngCF8nZPHwB4' },
   { id: 'rentercheck', name: 'RenterCheck', url: 'https://rentercheck.vercel.app', color: '#2563EB', gscSiteUrl: 'sc-domain:rentercheck.vercel.app', bingSiteUrl: 'https://rentercheck.vercel.app/', vercelProjectId: 'prj_QWRnvzsAdSpPbRkpDe2Q3Yuh667i' },
-  { id: 'prscheck', name: 'PRS Check', url: 'https://prscheck.vercel.app', color: '#7C3AED', vercelProjectId: 'prj_MDk7vvzTBIDQ20iIEeEPXbzCH22C' },
+  { id: 'prscheck', name: 'PRS Check', url: 'https://prscheck.co.uk', color: '#7C3AED', gscSiteUrl: 'sc-domain:prscheck.co.uk', bingSiteUrl: 'https://prscheck.co.uk/', vercelProjectId: 'prj_MDk7vvzTBIDQ20iIEeEPXbzCH22C' },
   { id: 'dashboard', name: 'Dashboard', url: 'https://commandcenter-mocha.vercel.app', color: '#F97316', vercelProjectId: 'prj_xClnwXdYweoHob0satdZL2g1tJqI' },
   { id: 'general', name: 'General', url: '', color: '#6B7280' },
 ];
