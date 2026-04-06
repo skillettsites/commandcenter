@@ -11,6 +11,7 @@ interface SiteSearchData {
     result_found: boolean;
     created_at: string;
     duration_ms?: number | null;
+    search_type?: string | null;
   }>;
 }
 
@@ -434,6 +435,12 @@ export default function SearchActivity() {
                                 <span className="text-[12px] font-mono text-[var(--text-primary)] flex-1 min-w-0 truncate">
                                   {search.search_query}
                                 </span>
+                                {search.search_type === 'trade_premium' && (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/15 text-blue-400 font-bold flex-shrink-0">Trade Premium</span>
+                                )}
+                                {search.search_type === 'trade_free' && (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/15 text-green-400 font-bold flex-shrink-0">Trade Free</span>
+                                )}
                                 {search.duration_ms != null && (
                                   <span className="text-[10px] text-[var(--text-tertiary)] flex-shrink-0">
                                     {search.duration_ms < 1000

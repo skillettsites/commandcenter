@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
     today: number;
     month: number;
     avgDurationMs: number | null;
-    recent: Array<{ search_query: string; result_found: boolean; created_at: string; geo_city: string | null; geo_region: string | null; geo_country: string | null; duration_ms: number | null }>;
+    recent: Array<{ search_query: string; result_found: boolean; created_at: string; geo_city: string | null; geo_region: string | null; geo_country: string | null; duration_ms: number | null; search_type: string | null }>;
   }> = {};
 
   for (const siteId of sites) {
@@ -186,7 +186,7 @@ export async function GET(request: NextRequest) {
 
     const { data: recentRows } = await supabase
       .from('searches')
-      .select('search_query, result_found, created_at, geo_city, geo_region, geo_country, duration_ms')
+      .select('search_query, result_found, created_at, geo_city, geo_region, geo_country, duration_ms, search_type')
       .eq('site_id', siteId)
       .order('created_at', { ascending: false })
       .limit(20);
