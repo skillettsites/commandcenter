@@ -435,6 +435,9 @@ export default function SearchActivity() {
                                 <span className="text-[12px] font-mono text-[var(--text-primary)] flex-1 min-w-0 truncate">
                                   {search.search_query}
                                 </span>
+                                {search.search_type === 'premium' && (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold flex-shrink-0">Premium</span>
+                                )}
                                 {search.search_type === 'trade_premium' && (
                                   <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/15 text-blue-400 font-bold flex-shrink-0">Trade Premium</span>
                                 )}
