@@ -614,10 +614,11 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
                   )}
 
                   {/* Per-site detail cards */}
-                  <div className="space-y-3">
+                  <div className="space-y-1">
                     {allIndexing.map(site => (
                       <IndexingRow
                         key={site.siteId}
+                        siteId={site.siteId}
                         site={site.name}
                         color={site.color}
                         gsc={site.gsc}
@@ -729,29 +730,79 @@ function FunnelChart({ steps }: { steps: Array<{ label: string; value: number }>
   );
 }
 
+interface DailyPoint { date: string; clicks: number; impressions: number; pages?: number }
+interface DailyData { google: DailyPoint[]; bing: DailyPoint[] }
+
 function IndexingRow({
+  siteId,
   site,
   color,
   gsc,
   bing,
 }: {
+  siteId: string;
   site: string;
   color: string;
   gsc: GscSiteData | null;
   bing: BingSiteData | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [daily, setDaily] = useState<DailyData | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
   const inSearch = gsc?.pagesInSearch ?? 0;
   const submitted = gsc?.pagesSubmitted ?? 0;
   const bingIndexed = bing?.pagesInIndex ?? 0;
-  const hasData = gsc || bing;
 
-  if (!hasData) return null;
+  const handleToggle = async () => {
+    const willOpen = !open;
+    setOpen(willOpen);
+    if (willOpen && !daily) {
+      setDailyLoading(true);
+      const data = await safeFetch<DailyData>(`/api/gsc/${siteId}/daily`);
+      setDaily(data);
+      setDailyLoading(false);
+    }
+  };
+
+  // Merge Google + Bing daily data for chart
+  const chartData = (() => {
+    if (!daily) return [];
+    const map = new Map<string, { date: string; label: string; gClicks: number; gImpressions: number; gPages: number; bClicks: number; bImpressions: number }>();
+    for (const g of daily.google) {
+      map.set(g.date, {
+        date: g.date,
+        label: g.date.slice(5), // MM-DD
+        gClicks: g.clicks,
+        gImpressions: g.impressions,
+        gPages: g.pages ?? 0,
+        bClicks: 0,
+        bImpressions: 0,
+      });
+    }
+    for (const b of daily.bing) {
+      const existing = map.get(b.date);
+      if (existing) {
+        existing.bClicks = b.clicks;
+        existing.bImpressions = b.impressions;
+      } else {
+        map.set(b.date, {
+          date: b.date,
+          label: b.date.slice(5),
+          gClicks: 0,
+          gImpressions: 0,
+          gPages: 0,
+          bClicks: b.clicks,
+          bImpressions: b.impressions,
+        });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  })();
 
   return (
     <div>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
         className="w-full flex items-center justify-between py-1.5 text-left"
       >
         <div className="flex items-center gap-2">
@@ -759,12 +810,9 @@ function IndexingRow({
           <span className="text-[12px] font-medium text-[var(--text-primary)]">{site}</span>
         </div>
         <div className="flex items-center gap-3">
-          {(inSearch > 0 || bingIndexed > 0) && (
-            <span className="text-[10px] text-[var(--text-tertiary)]">
-              G:{inSearch} B:{bingIndexed}
-            </span>
-          )}
-          {gsc && (
+          <span className="text-[9px] text-blue-400">G:{inSearch}</span>
+          <span className="text-[9px] text-cyan-400">B:{bingIndexed}</span>
+          {gsc && gsc.clicks > 0 && (
             <span className="text-[10px] font-medium text-[var(--text-primary)]">
               {gsc.clicks} clicks
             </span>
@@ -775,49 +823,115 @@ function IndexingRow({
         </div>
       </button>
       {open && (
-        <div className="grid grid-cols-2 gap-2 ml-3 mt-1 mb-2">
-          <div className="bg-[var(--bg-primary)] rounded-lg p-2">
-            <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Google</p>
-            {gsc ? (
-              <div className="space-y-0.5">
-                <MetricLine label="In Search" value={String(inSearch)} />
-                {gsc.pagesGained != null && (
-                  <MetricLine label="Change" value={`${gsc.pagesGained > 0 ? '+' : ''}${gsc.pagesGained}`} />
-                )}
-                {submitted > 0 && (
-                  <>
-                    <MetricLine label="Submitted" value={submitted.toLocaleString()} />
-                    <div className="h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden my-1">
-                      <div className="h-full rounded-full" style={{ width: `${Math.max(submitted > 0 ? Math.round((inSearch / submitted) * 100) : 0, 1)}%`, backgroundColor: color }} />
-                    </div>
-                    <MetricLine label="Remaining" value={`${(submitted - inSearch).toLocaleString()}`} />
-                  </>
-                )}
-                <MetricLine label="Clicks (7d)" value={gsc.clicks.toLocaleString()} />
-                <MetricLine label="Impressions" value={gsc.impressions.toLocaleString()} />
-                <MetricLine label="CTR" value={`${(gsc.ctr * 100).toFixed(1)}%`} />
-                <MetricLine label="Avg Pos" value={gsc.position > 0 ? gsc.position.toFixed(1) : 'N/A'} />
-              </div>
-            ) : (
-              <p className="text-[10px] text-[var(--text-tertiary)]">No data</p>
-            )}
+        <div className="ml-3 mt-1 mb-3 space-y-3">
+          {/* Summary metrics */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[var(--bg-primary)] rounded-lg p-2">
+              <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Google</p>
+              {gsc ? (
+                <div className="space-y-0.5">
+                  <MetricLine label="In Search" value={String(inSearch)} />
+                  {gsc.pagesGained != null && (
+                    <MetricLine label="vs Last Month" value={`${gsc.pagesGained > 0 ? '+' : ''}${gsc.pagesGained}`} />
+                  )}
+                  {submitted > 0 && <MetricLine label="Submitted" value={submitted.toLocaleString()} />}
+                  <MetricLine label="Clicks (7d)" value={gsc.clicks.toLocaleString()} />
+                  <MetricLine label="Impressions" value={gsc.impressions.toLocaleString()} />
+                  <MetricLine label="CTR" value={`${(gsc.ctr * 100).toFixed(1)}%`} />
+                </div>
+              ) : (
+                <p className="text-[10px] text-[var(--text-tertiary)]">No data yet</p>
+              )}
+            </div>
+            <div className="bg-[var(--bg-primary)] rounded-lg p-2">
+              <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Bing</p>
+              {bing ? (
+                <div className="space-y-0.5">
+                  {bing.pagesInIndex != null && <MetricLine label="Indexed" value={bing.pagesInIndex.toLocaleString()} />}
+                  <MetricLine label="Clicks (7d)" value={bing.clicks.toLocaleString()} />
+                  <MetricLine label="Impressions" value={bing.impressions.toLocaleString()} />
+                  <MetricLine label="CTR" value={`${(bing.ctr * 100).toFixed(1)}%`} />
+                </div>
+              ) : (
+                <p className="text-[10px] text-[var(--text-tertiary)]">No data yet</p>
+              )}
+            </div>
           </div>
-          <div className="bg-[var(--bg-primary)] rounded-lg p-2">
-            <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Bing</p>
-            {bing ? (
-              <div className="space-y-0.5">
-                {bing.pagesInIndex != null && (
-                  <MetricLine label="Indexed" value={bing.pagesInIndex.toLocaleString()} />
-                )}
-                <MetricLine label="Clicks (7d)" value={bing.clicks.toLocaleString()} />
-                <MetricLine label="Impressions" value={bing.impressions.toLocaleString()} />
-                <MetricLine label="CTR" value={`${(bing.ctr * 100).toFixed(1)}%`} />
-                <MetricLine label="Avg Pos" value={bing.position > 0 ? bing.position.toFixed(1) : 'N/A'} />
+
+          {/* Daily chart */}
+          {dailyLoading && <p className="text-[10px] text-[var(--text-tertiary)] text-center py-4">Loading daily data...</p>}
+          {chartData.length > 0 && (
+            <div>
+              <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Daily Clicks (28 days)</p>
+              <div className="h-32 bg-[var(--bg-primary)] rounded-lg p-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <XAxis dataKey="label" tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} interval={6} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} width={24} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8, fontSize: 10 }}
+                      labelStyle={{ color: '#999', fontSize: 9 }}
+                    />
+                    <Area type="monotone" dataKey="gClicks" name="Google" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.15} strokeWidth={1.5} dot={false} />
+                    <Area type="monotone" dataKey="bClicks" name="Bing" stroke="#06B6D4" fill="#06B6D4" fillOpacity={0.15} strokeWidth={1.5} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-            ) : (
-              <p className="text-[10px] text-[var(--text-tertiary)]">No data</p>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Daily pages in search chart */}
+          {chartData.length > 0 && chartData.some(d => d.gPages > 0) && (
+            <div>
+              <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Pages Appearing in Google Search (daily)</p>
+              <div className="h-24 bg-[var(--bg-primary)] rounded-lg p-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <XAxis dataKey="label" tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} interval={6} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} width={30} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8, fontSize: 10 }}
+                      labelStyle={{ color: '#999', fontSize: 9 }}
+                    />
+                    <Area type="monotone" dataKey="gPages" name="Pages" stroke={color} fill={color} fillOpacity={0.2} strokeWidth={1.5} dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* Daily data table */}
+          {chartData.length > 0 && (
+            <div>
+              <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Daily Breakdown</p>
+              <div className="bg-[var(--bg-primary)] rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                <table className="w-full text-[9px]">
+                  <thead>
+                    <tr className="text-[var(--text-tertiary)] border-b border-[var(--border-light)]">
+                      <th className="text-left py-1 px-2 font-medium">Date</th>
+                      <th className="text-right py-1 px-1 font-medium text-blue-400">G Clicks</th>
+                      <th className="text-right py-1 px-1 font-medium text-blue-400">G Impr</th>
+                      <th className="text-right py-1 px-1 font-medium text-blue-400">G Pages</th>
+                      <th className="text-right py-1 px-1 font-medium text-cyan-400">B Clicks</th>
+                      <th className="text-right py-1 px-2 font-medium text-cyan-400">B Impr</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...chartData].reverse().map(row => (
+                      <tr key={row.date} className="border-b border-[var(--border-light)] last:border-0">
+                        <td className="py-1 px-2 text-[var(--text-secondary)]">{row.label}</td>
+                        <td className="py-1 px-1 text-right text-[var(--text-primary)]">{row.gClicks}</td>
+                        <td className="py-1 px-1 text-right text-[var(--text-tertiary)]">{row.gImpressions}</td>
+                        <td className="py-1 px-1 text-right text-[var(--text-primary)]">{row.gPages}</td>
+                        <td className="py-1 px-1 text-right text-[var(--text-primary)]">{row.bClicks}</td>
+                        <td className="py-1 px-2 text-right text-[var(--text-tertiary)]">{row.bImpressions}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
