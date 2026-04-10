@@ -77,6 +77,14 @@ interface BingSiteData {
   position: number;
 }
 
+interface SiteIndexing {
+  siteId: string;
+  name: string;
+  color: string;
+  gsc: GscSiteData | null;
+  bing: BingSiteData | null;
+}
+
 interface AISummary {
   working: string[];
   not_working: string[];
@@ -151,37 +159,59 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
   const [stripeData, setStripeData] = useState<StripeData | null>(null);
   const [conversions, setConversions] = useState<ConversionData | null>(null);
   const [pageviews, setPageviews] = useState<PageviewSummary | null>(null);
-  const [gscCcc, setGscCcc] = useState<GscSiteData | null>(null);
-  const [gscPcc, setGscPcc] = useState<GscSiteData | null>(null);
-  const [bingCcc, setBingCcc] = useState<BingSiteData | null>(null);
-  const [bingPcc, setBingPcc] = useState<BingSiteData | null>(null);
+  const [allIndexing, setAllIndexing] = useState<SiteIndexing[]>([]);
   const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const INDEXING_SITES = [
+    { id: 'carcostcheck', name: 'CarCostCheck', color: '#3B82F6' },
+    { id: 'postcodecheck', name: 'PostcodeCheck', color: '#10B981' },
+    { id: 'findyourstay', name: 'FindYourStay', color: '#F59E0B' },
+    { id: 'helpafterloss', name: 'HelpAfterLoss', color: '#EC4899' },
+    { id: 'helpafterlife', name: 'HelpAfterLife', color: '#D946EF' },
+    { id: 'aibetfinder', name: 'AI Bet Finder', color: '#F43F5E' },
+    { id: 'bestlondontours', name: 'BestLondonTours', color: '#E11D48' },
+    { id: 'thebesttours', name: 'TheBestTours', color: '#14B8A6' },
+    { id: 'daveknowsai', name: 'DaveKnowsAI', color: '#A855F7' },
+    { id: 'aicareerswap', name: 'AICareerSwap', color: '#F472B6' },
+    { id: 'askyourstay', name: 'AskYourStay', color: '#0EA5E9' },
+    { id: 'prscheck', name: 'PRS Check', color: '#7C3AED' },
+    { id: 'appealafine', name: 'Appeal a Fine', color: '#0D9488' },
+    { id: 'briefmynews', name: 'BriefMyNews', color: '#DC2626' },
+    { id: 'matchmyskillset', name: 'MatchMySkillset', color: '#4F46E5' },
+    { id: 'davidskillett', name: 'DavidSkillett', color: '#6366F1' },
+    { id: 'rentercheck', name: 'RenterCheck', color: '#2563EB' },
+  ];
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const [sc, td, sd, cv, pv, gc, gp, bc, bp] = await Promise.all([
+    const [sc, td, sd, cv, pv] = await Promise.all([
       safeFetch<SearchChartData>('/api/searches?range=1m'),
       safeFetch<CombinedData>('/api/analytics/combined?range=1m'),
       safeFetch<StripeData>('/api/stripe-revenue'),
       safeFetch<ConversionData>('/api/conversions?range=1m'),
       safeFetch<PageviewSummary>('/api/pageviews?view=summary'),
-      safeFetch<GscSiteData>('/api/gsc/carcostcheck'),
-      safeFetch<GscSiteData>('/api/gsc/postcodecheck'),
-      safeFetch<BingSiteData>('/api/bing/carcostcheck'),
-      safeFetch<BingSiteData>('/api/bing/postcodecheck'),
     ]);
     setSearchChart(sc);
     setTrafficData(td);
     setStripeData(sd);
     setConversions(cv);
     setPageviews(pv);
-    setGscCcc(gc);
-    setGscPcc(gp);
-    setBingCcc(bc);
-    setBingPcc(bp);
+
+    // Fetch GSC + Bing for all sites in parallel
+    const indexingResults = await Promise.all(
+      INDEXING_SITES.map(async (site) => {
+        const [gsc, bing] = await Promise.all([
+          safeFetch<GscSiteData>(`/api/gsc/${site.id}`),
+          safeFetch<BingSiteData>(`/api/bing/${site.id}`),
+        ]);
+        return { siteId: site.id, name: site.name, color: site.color, gsc, bing };
+      })
+    );
+    setAllIndexing(indexingResults);
     setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -511,21 +541,82 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
                   />
                 </Section>
 
-                {/* 5. Indexing Health */}
+                {/* 5. Indexing Health - All Sites */}
                 <Section title="Indexing Health">
+                  {/* Summary bar chart */}
+                  {allIndexing.length > 0 && (
+                    <div className="mb-4">
+                      <div className="bg-[var(--bg-primary)] rounded-xl p-3 mb-3">
+                        <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                          Google: Pages Indexed / Submitted
+                        </p>
+                        <div className="space-y-2">
+                          {allIndexing
+                            .filter(s => s.gsc && s.gsc.pagesSubmitted && s.gsc.pagesSubmitted > 0)
+                            .sort((a, b) => (b.gsc?.pagesSubmitted ?? 0) - (a.gsc?.pagesSubmitted ?? 0))
+                            .map(site => {
+                              const indexed = site.gsc?.pagesIndexed ?? 0;
+                              const submitted = site.gsc?.pagesSubmitted ?? 1;
+                              const pct = Math.round((indexed / submitted) * 100);
+                              const remaining = submitted - indexed;
+                              return (
+                                <div key={site.siteId}>
+                                  <div className="flex items-center justify-between mb-0.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: site.color }} />
+                                      <span className="text-[10px] text-[var(--text-secondary)]">{site.name}</span>
+                                    </div>
+                                    <span className="text-[10px] font-medium text-[var(--text-primary)]">
+                                      {indexed.toLocaleString()} / {submitted.toLocaleString()} <span className="text-[var(--text-tertiary)]">({pct}%)</span>
+                                    </span>
+                                  </div>
+                                  <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full transition-all"
+                                      style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: site.color }}
+                                    />
+                                  </div>
+                                  {remaining > 0 && (
+                                    <p className="text-[9px] text-[var(--text-tertiary)] mt-0.5 ml-3">
+                                      {remaining.toLocaleString()} pages still to index
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          {allIndexing.filter(s => s.gsc && s.gsc.pagesSubmitted && s.gsc.pagesSubmitted > 0).length === 0 && (
+                            <p className="text-[10px] text-[var(--text-tertiary)]">No sitemap data available</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Totals */}
+                      {(() => {
+                        const totalIndexed = allIndexing.reduce((sum, s) => sum + (s.gsc?.pagesIndexed ?? 0), 0);
+                        const totalSubmitted = allIndexing.reduce((sum, s) => sum + (s.gsc?.pagesSubmitted ?? 0), 0);
+                        const totalPct = totalSubmitted > 0 ? Math.round((totalIndexed / totalSubmitted) * 100) : 0;
+                        return totalSubmitted > 0 ? (
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            <MetricBox label="Total Indexed" value={totalIndexed.toLocaleString()} color="text-green-400" />
+                            <MetricBox label="Total Submitted" value={totalSubmitted.toLocaleString()} color="text-[var(--text-primary)]" />
+                            <MetricBox label="Coverage" value={`${totalPct}%`} color={totalPct > 50 ? 'text-green-400' : totalPct > 20 ? 'text-yellow-400' : 'text-red-400'} />
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Per-site detail cards */}
                   <div className="space-y-3">
-                    <IndexingRow
-                      site="CarCostCheck"
-                      color={SITE_COLORS.carcostcheck.color}
-                      gsc={gscCcc}
-                      bing={bingCcc}
-                    />
-                    <IndexingRow
-                      site="PostcodeCheck"
-                      color={SITE_COLORS.postcodecheck.color}
-                      gsc={gscPcc}
-                      bing={bingPcc}
-                    />
+                    {allIndexing.map(site => (
+                      <IndexingRow
+                        key={site.siteId}
+                        site={site.name}
+                        color={site.color}
+                        gsc={site.gsc}
+                        bing={site.bing}
+                      />
+                    ))}
                   </div>
                 </Section>
               </>
@@ -642,43 +733,80 @@ function IndexingRow({
   gsc: GscSiteData | null;
   bing: BingSiteData | null;
 }) {
+  const [open, setOpen] = useState(false);
+  const indexed = gsc?.pagesIndexed ?? 0;
+  const submitted = gsc?.pagesSubmitted ?? 0;
+  const inSearch = gsc?.pagesInSearch ?? 0;
+  const hasData = gsc || bing;
+
+  if (!hasData) return null;
+
   return (
     <div>
-      <div className="flex items-center gap-2 mb-1.5">
-        <span className="w-1 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-        <span className="text-[12px] font-medium text-[var(--text-primary)]">{site}</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 ml-3">
-        {/* Google */}
-        <div className="bg-[var(--bg-primary)] rounded-lg p-2">
-          <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Google</p>
-          {gsc ? (
-            <div className="space-y-0.5">
-              <MetricLine label="Indexed" value={gsc.pagesIndexed != null ? String(gsc.pagesIndexed) : 'Unknown'} />
-              <MetricLine label="Clicks (7d)" value={gsc.clicks.toLocaleString()} />
-              <MetricLine label="Impressions" value={gsc.impressions.toLocaleString()} />
-              <MetricLine label="CTR" value={`${(gsc.ctr * 100).toFixed(1)}%`} />
-              <MetricLine label="Avg Pos" value={gsc.position?.toFixed(1) ?? 'N/A'} />
-            </div>
-          ) : (
-            <p className="text-[10px] text-[var(--text-tertiary)]">Data unavailable</p>
-          )}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between py-1.5 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-1.5 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+          <span className="text-[12px] font-medium text-[var(--text-primary)]">{site}</span>
         </div>
-        {/* Bing */}
-        <div className="bg-[var(--bg-primary)] rounded-lg p-2">
-          <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Bing</p>
-          {bing ? (
-            <div className="space-y-0.5">
-              <MetricLine label="Clicks (7d)" value={bing.clicks.toLocaleString()} />
-              <MetricLine label="Impressions" value={bing.impressions.toLocaleString()} />
-              <MetricLine label="CTR" value={`${(bing.ctr * 100).toFixed(1)}%`} />
-              <MetricLine label="Avg Pos" value={bing.position?.toFixed(1) ?? 'N/A'} />
-            </div>
-          ) : (
-            <p className="text-[10px] text-[var(--text-tertiary)]">Data unavailable</p>
+        <div className="flex items-center gap-3">
+          {gsc && submitted > 0 && (
+            <span className="text-[10px] text-[var(--text-tertiary)]">
+              {indexed}/{submitted} indexed
+            </span>
           )}
+          {gsc && (
+            <span className="text-[10px] font-medium text-[var(--text-primary)]">
+              {gsc.clicks} clicks
+            </span>
+          )}
+          <svg className={`w-3 h-3 text-[var(--text-tertiary)] transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
-      </div>
+      </button>
+      {open && (
+        <div className="grid grid-cols-2 gap-2 ml-3 mt-1 mb-2">
+          <div className="bg-[var(--bg-primary)] rounded-lg p-2">
+            <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Google</p>
+            {gsc ? (
+              <div className="space-y-0.5">
+                {submitted > 0 && (
+                  <>
+                    <MetricLine label="Indexed" value={`${indexed} / ${submitted}`} />
+                    <div className="h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden my-1">
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(Math.round((indexed / submitted) * 100), 1)}%`, backgroundColor: color }} />
+                    </div>
+                    <MetricLine label="Remaining" value={`${(submitted - indexed).toLocaleString()}`} />
+                  </>
+                )}
+                <MetricLine label="In Search" value={String(inSearch)} />
+                <MetricLine label="Clicks (7d)" value={gsc.clicks.toLocaleString()} />
+                <MetricLine label="Impressions" value={gsc.impressions.toLocaleString()} />
+                <MetricLine label="CTR" value={`${(gsc.ctr * 100).toFixed(1)}%`} />
+                <MetricLine label="Avg Pos" value={gsc.position > 0 ? gsc.position.toFixed(1) : 'N/A'} />
+              </div>
+            ) : (
+              <p className="text-[10px] text-[var(--text-tertiary)]">No data</p>
+            )}
+          </div>
+          <div className="bg-[var(--bg-primary)] rounded-lg p-2">
+            <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Bing</p>
+            {bing ? (
+              <div className="space-y-0.5">
+                <MetricLine label="Clicks (7d)" value={bing.clicks.toLocaleString()} />
+                <MetricLine label="Impressions" value={bing.impressions.toLocaleString()} />
+                <MetricLine label="CTR" value={`${(bing.ctr * 100).toFixed(1)}%`} />
+                <MetricLine label="Avg Pos" value={bing.position > 0 ? bing.position.toFixed(1) : 'N/A'} />
+              </div>
+            ) : (
+              <p className="text-[10px] text-[var(--text-tertiary)]">No data</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
