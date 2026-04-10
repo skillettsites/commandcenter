@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { projects } from '@/lib/projects';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -68,6 +69,7 @@ interface GscSiteData {
   pagesIndexed: number | null;
   pagesSubmitted: number | null;
   pagesInSearch: number | null;
+  pagesGained: number | null;
 }
 
 interface BingSiteData {
@@ -165,25 +167,11 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
   const [aiLoading, setAiLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const INDEXING_SITES = [
-    { id: 'carcostcheck', name: 'CarCostCheck', color: '#3B82F6' },
-    { id: 'postcodecheck', name: 'PostcodeCheck', color: '#10B981' },
-    { id: 'findyourstay', name: 'FindYourStay', color: '#F59E0B' },
-    { id: 'helpafterloss', name: 'HelpAfterLoss', color: '#EC4899' },
-    { id: 'helpafterlife', name: 'HelpAfterLife', color: '#D946EF' },
-    { id: 'aibetfinder', name: 'AI Bet Finder', color: '#F43F5E' },
-    { id: 'bestlondontours', name: 'BestLondonTours', color: '#E11D48' },
-    { id: 'thebesttours', name: 'TheBestTours', color: '#14B8A6' },
-    { id: 'daveknowsai', name: 'DaveKnowsAI', color: '#A855F7' },
-    { id: 'aicareerswap', name: 'AICareerSwap', color: '#F472B6' },
-    { id: 'askyourstay', name: 'AskYourStay', color: '#0EA5E9' },
-    { id: 'prscheck', name: 'PRS Check', color: '#7C3AED' },
-    { id: 'appealafine', name: 'Appeal a Fine', color: '#0D9488' },
-    { id: 'briefmynews', name: 'BriefMyNews', color: '#DC2626' },
-    { id: 'matchmyskillset', name: 'MatchMySkillset', color: '#4F46E5' },
-    { id: 'davidskillett', name: 'DavidSkillett', color: '#6366F1' },
-    { id: 'rentercheck', name: 'RenterCheck', color: '#2563EB' },
-  ];
+  // All sites that have GSC or Bing configured
+  const INDEXING_SITES = projects
+    .filter(p => p.gscSiteUrl || p.bingSiteUrl)
+    .filter(p => p.id !== 'dashboard')
+    .map(p => ({ id: p.id, name: p.name, color: p.color }));
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -605,11 +593,18 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
                                       />
                                     </div>
                                   )}
-                                  {submitted > 0 && pct < 100 && (
-                                    <p className="text-[9px] text-[var(--text-tertiary)] mt-0.5">
-                                      {(submitted - bestIndexed).toLocaleString()} pages still to index ({pct}% coverage)
-                                    </p>
-                                  )}
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    {site.gsc?.pagesGained != null && site.gsc.pagesGained !== 0 && (
+                                      <span className={`text-[9px] font-medium ${site.gsc.pagesGained > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {site.gsc.pagesGained > 0 ? '+' : ''}{site.gsc.pagesGained} pages vs last month
+                                      </span>
+                                    )}
+                                    {submitted > 0 && pct < 100 && (
+                                      <span className="text-[9px] text-[var(--text-tertiary)]">
+                                        {(submitted - bestIndexed).toLocaleString()} to go ({pct}%)
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })}
@@ -786,6 +781,9 @@ function IndexingRow({
             {gsc ? (
               <div className="space-y-0.5">
                 <MetricLine label="In Search" value={String(inSearch)} />
+                {gsc.pagesGained != null && (
+                  <MetricLine label="Change" value={`${gsc.pagesGained > 0 ? '+' : ''}${gsc.pagesGained}`} />
+                )}
                 {submitted > 0 && (
                   <>
                     <MetricLine label="Submitted" value={submitted.toLocaleString()} />

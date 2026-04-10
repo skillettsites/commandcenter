@@ -28,6 +28,7 @@ export interface GscData {
   pagesIndexed: number | null;
   pagesSubmitted: number | null;
   pagesInSearch: number | null;
+  pagesGained: number | null;
   topPages: { page: string; clicks: number; impressions: number }[];
   topQueries: { query: string; clicks: number; impressions: number; position: number }[];
 }

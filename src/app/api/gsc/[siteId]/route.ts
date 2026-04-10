@@ -47,8 +47,8 @@ export async function GET(
       'Content-Type': 'application/json',
     };
 
-    // Fetch search analytics (7d aggregate + 28d by page + 28d by query) and sitemaps in parallel
-    const [searchRes, pageRes, queryRes, sitemapRes] = await Promise.all([
+    // Fetch search analytics (7d aggregate + 28d by page + 28d by query + previous 28d by page for comparison) and sitemaps in parallel
+    const [searchRes, pageRes, queryRes, sitemapRes, prevPageRes] = await Promise.all([
       fetch(
         `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
         {
@@ -70,7 +70,7 @@ export async function GET(
             startDate: getDateString(-28),
             endDate: getDateString(-1),
             dimensions: ['page'],
-            rowLimit: 1000,
+            rowLimit: 25000,
           }),
         }
       ),
@@ -90,6 +90,20 @@ export async function GET(
       fetch(
         `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/sitemaps`,
         { headers }
+      ),
+      // Previous 28-day period by page (for comparison / growth tracking)
+      fetch(
+        `https://www.googleapis.com/webmasters/v3/sites/${encodedSiteUrl}/searchAnalytics/query`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            startDate: getDateString(-56),
+            endDate: getDateString(-29),
+            dimensions: ['page'],
+            rowLimit: 25000,
+          }),
+        }
       ),
     ]);
 
@@ -165,7 +179,18 @@ export async function GET(
       console.error(`GSC sitemap error for ${siteId}: ${sitemapRes.status}`);
     }
 
-    const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted, pagesInSearch, topPages, topQueries };
+    // Calculate pages gained (current 28d vs previous 28d)
+    let pagesGained: number | null = null;
+    if (prevPageRes.ok) {
+      const prevPageData = await prevPageRes.json();
+      const prevRows = prevPageData.rows ?? [];
+      const prevCount = prevRows.length;
+      if (pagesInSearch != null) {
+        pagesGained = pagesInSearch - prevCount;
+      }
+    }
+
+    const result: GscData = { clicks, impressions, ctr, position, pagesIndexed, pagesSubmitted, pagesInSearch, pagesGained, topPages, topQueries };
     return NextResponse.json(result);
   } catch (err) {
     console.error(`GSC error for ${siteId}:`, err);
