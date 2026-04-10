@@ -1,6 +1,5 @@
 import DashboardHeader from '@/components/DashboardHeader';
 import AllSitesStats from '@/components/AllSitesStats';
-import GrowthAnalytics from '@/components/GrowthAnalytics';
 import SiteGrid from '@/components/SiteGrid';
 import SearchActivity from '@/components/SearchActivity';
 import GeoAnalytics from '@/components/GeoAnalytics';
@@ -22,7 +21,6 @@ export default function Home() {
         <div className="max-w-2xl mx-auto px-3 py-4 space-y-4 pb-24">
           <DashboardHeader />
           <AllSitesStats />
-          <GrowthAnalytics />
           <StripeRevenue />
           <SiteGrid />
           <TaskList />

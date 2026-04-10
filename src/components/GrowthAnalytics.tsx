@@ -144,8 +144,8 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
 
 // ── Main component ─────────────────────────────────────────────────
 
-export default function GrowthAnalytics() {
-  const [expanded, setExpanded] = useState(false);
+export default function GrowthAnalytics({ startExpanded = false }: { startExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(startExpanded);
   const [searchChart, setSearchChart] = useState<SearchChartData | null>(null);
   const [trafficData, setTrafficData] = useState<CombinedData | null>(null);
   const [stripeData, setStripeData] = useState<StripeData | null>(null);
