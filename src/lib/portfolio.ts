@@ -1,5 +1,5 @@
 // Portfolio configuration - update values here when data changes
-// Last manual update: 2026-03-31 (from HL account summaries)
+// Last manual update: 2026-04-10 (from HL account summaries)
 
 export interface StockHolding {
   symbol: string;
@@ -110,8 +110,8 @@ export const stockHoldings: StockHolding[] = [
   { symbol: 'AMZN', name: 'Amazon', shares: 143, costBasis: 22338, account: 'ISA', currency: 'USD' },
   { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800, account: 'ISA', currency: 'GBP' },
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281, account: 'ISA', currency: 'USD' },
+  { symbol: 'TS2X.L', name: '2x Tesla ETP', shares: 126, costBasis: 9953, account: 'ISA', currency: 'GBP' },
   // Fund & Share holdings
-  { symbol: 'TS2X.L', name: '2x Tesla ETP', shares: 104, costBasis: 9909, account: 'F&S', currency: 'GBP' },
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4463, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15089, account: 'F&S', currency: 'USD' },
 ];
@@ -123,7 +123,7 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'B1N9DY5',
     yahooSymbol: '0P0000HDPV.L',
     units: 10848.34,
-    currentValue: 9749,
+    currentValue: 9794,
     costBasis: 9961,
     account: 'ISA',
   },
@@ -133,7 +133,7 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'BYSYZP1',
     yahooSymbol: '0P0000XMHQ.L',
     units: 63333.31,
-    currentValue: 52750,
+    currentValue: 53783,
     costBasis: 49260,
     account: 'ISA',
   },
@@ -143,15 +143,15 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'BL0RSP8',
     yahooSymbol: '0P00012V5G.L',
     units: 118798.032,
-    currentValue: 39358,
+    currentValue: 40843,
     costBasis: 38221,
     account: 'ISA',
   },
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 20919.34 },
-  { account: 'F&S Cash', balance: 9921.94 },
+  { account: 'ISA Cash', balance: 30946.89 },
+  { account: 'F&S Cash', balance: 18090.51 },
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
@@ -184,7 +184,6 @@ export const propertyHoldings: PropertyHolding[] = [
     postcode: 'E1W 3AR',
     premium: 'upper',
     premiumNotes: 'Studio with massive terrace, south-facing, top floor, premium building',
-    mortgagePayment: 1566,
   },
   {
     id: 'cordage',
@@ -197,9 +196,7 @@ export const propertyHoldings: PropertyHolding[] = [
     postcode: 'E1W 3AS',
     premium: 'upper',
     premiumNotes: 'Studio, high floor, nice view',
-    rentalIncome: 1400,
-    mortgagePayment: 553,
-    serviceCharge: 250,
+    rentalIncome: 300,
   },
   { id: 'didcot', name: '9 Fen Violet, Didcot', value: 400000, mortgage: 268270, type: 'selling' },
   { id: 'newbury', name: '6 Hennessey, Newbury', value: 482500, mortgage: 342248, type: 'selling' },

@@ -509,12 +509,10 @@ function DividendSection({ dividends, properties = [], projection }: { dividends
           <span>Dividends</span>
           <span>£{dividends.monthlyAverage.toLocaleString()}/mo</span>
         </div>
-        {netRental !== 0 && (
+        {totalRent > 0 && (
           <div className="flex items-center justify-between text-[var(--text-tertiary)]">
-            <span>Rental net (£{totalRent.toLocaleString()} - £{(totalMortgagePay + totalService).toLocaleString()} costs)</span>
-            <span className={netRental >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}>
-              {netRental >= 0 ? '+' : ''}£{netRental.toFixed(0)}/mo
-            </span>
+            <span>Rental income (Cordage House)</span>
+            <span className="text-[var(--green)]">+£{totalRent.toFixed(0)}/mo</span>
           </div>
         )}
       </div>
