@@ -37,6 +37,7 @@ export interface BingData {
   impressions: number;
   ctr: number;
   position: number;
+  pagesInIndex: number | null;
   topPages: { page: string; clicks: number; impressions: number }[];
   topQueries: { query: string; clicks: number; impressions: number; position: number }[];
 }

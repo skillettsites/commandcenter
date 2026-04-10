@@ -24,10 +24,11 @@ export async function GET(
   const encodedSiteUrl = encodeURIComponent(project.bingSiteUrl);
 
   try {
-    const [trafficRes, queryRes, pageRes] = await Promise.all([
+    const [trafficRes, queryRes, pageRes, indexRes] = await Promise.all([
       fetch(`${BING_API_BASE}/GetRankAndTrafficStats?siteUrl=${encodedSiteUrl}&apikey=${apiKey}`),
       fetch(`${BING_API_BASE}/GetQueryStats?siteUrl=${encodedSiteUrl}&apikey=${apiKey}`),
       fetch(`${BING_API_BASE}/GetPageStats?siteUrl=${encodedSiteUrl}&apikey=${apiKey}`),
+      fetch(`${BING_API_BASE}/GetCrawlStats?siteUrl=${encodedSiteUrl}&apikey=${apiKey}`).catch(() => null),
     ]);
 
     if (!trafficRes.ok) {
@@ -111,7 +112,27 @@ export async function GET(
       }
     }
 
-    const result: BingData = { clicks, impressions, ctr, position: avgPosition, topPages, topQueries };
+    // Parse crawl/index stats
+    let pagesInIndex: number | null = null;
+    if (indexRes && indexRes.ok) {
+      try {
+        const indexData = await indexRes.json();
+        const rows = indexData.d ?? indexData ?? [];
+        if (Array.isArray(rows) && rows.length > 0) {
+          // Sum InIndex from crawl stats, or take the latest
+          const latest = rows[rows.length - 1];
+          pagesInIndex = latest.InIndex ?? latest.CrawledPages ?? null;
+        }
+      } catch {
+        // silently fail
+      }
+    }
+    // Fallback: count unique pages in page stats as a proxy for indexed pages
+    if (pagesInIndex == null && topPages.length > 0) {
+      pagesInIndex = topPages.length;
+    }
+
+    const result: BingData = { clicks, impressions, ctr, position: avgPosition, pagesInIndex, topPages, topQueries };
     return NextResponse.json(result);
   } catch (err) {
     console.error(`Bing error for ${siteId}:`, err);

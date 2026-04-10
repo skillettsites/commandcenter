@@ -75,6 +75,7 @@ interface BingSiteData {
   impressions: number;
   ctr: number;
   position: number;
+  pagesInIndex: number | null;
 }
 
 interface SiteIndexing {
@@ -543,22 +544,38 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
 
                 {/* 5. Indexing Health - All Sites */}
                 <Section title="Indexing Health">
-                  {/* Summary bar chart */}
+                  {/* Summary: per-site Google + Bing indexed counts */}
                   {allIndexing.length > 0 && (
                     <div className="mb-4">
-                      <div className="bg-[var(--bg-primary)] rounded-xl p-3 mb-3">
+                      {/* Totals */}
+                      {(() => {
+                        const totalGoogle = allIndexing.reduce((sum, s) => sum + (s.gsc?.pagesInSearch ?? 0), 0);
+                        const totalBing = allIndexing.reduce((sum, s) => sum + (s.bing?.pagesInIndex ?? 0), 0);
+                        const totalSubmitted = allIndexing.reduce((sum, s) => sum + (s.gsc?.pagesSubmitted ?? 0), 0);
+                        return (
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            <MetricBox label="Google (in search)" value={totalGoogle.toLocaleString()} color="text-blue-400" />
+                            <MetricBox label="Bing (indexed)" value={totalBing.toLocaleString()} color="text-cyan-400" />
+                            <MetricBox label="Submitted" value={totalSubmitted.toLocaleString()} color="text-[var(--text-primary)]" />
+                          </div>
+                        );
+                      })()}
+
+                      {/* Per-site progress bars */}
+                      <div className="bg-[var(--bg-primary)] rounded-xl p-3">
                         <p className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                          Google: Pages Indexed / Submitted
+                          Pages Found in Search / Submitted in Sitemap
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-2.5">
                           {allIndexing
-                            .filter(s => s.gsc && s.gsc.pagesSubmitted && s.gsc.pagesSubmitted > 0)
+                            .filter(s => (s.gsc?.pagesInSearch ?? 0) > 0 || (s.gsc?.pagesSubmitted ?? 0) > 0 || (s.bing?.pagesInIndex ?? 0) > 0)
                             .sort((a, b) => (b.gsc?.pagesSubmitted ?? 0) - (a.gsc?.pagesSubmitted ?? 0))
                             .map(site => {
-                              const indexed = site.gsc?.pagesIndexed ?? 0;
-                              const submitted = site.gsc?.pagesSubmitted ?? 1;
-                              const pct = Math.round((indexed / submitted) * 100);
-                              const remaining = submitted - indexed;
+                              const googleInSearch = site.gsc?.pagesInSearch ?? 0;
+                              const bingIndexed = site.bing?.pagesInIndex ?? 0;
+                              const submitted = site.gsc?.pagesSubmitted ?? 0;
+                              const bestIndexed = Math.max(googleInSearch, bingIndexed);
+                              const pct = submitted > 0 ? Math.round((bestIndexed / submitted) * 100) : 0;
                               return (
                                 <div key={site.siteId}>
                                   <div className="flex items-center justify-between mb-0.5">
@@ -566,43 +583,38 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
                                       <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: site.color }} />
                                       <span className="text-[10px] text-[var(--text-secondary)]">{site.name}</span>
                                     </div>
-                                    <span className="text-[10px] font-medium text-[var(--text-primary)]">
-                                      {indexed.toLocaleString()} / {submitted.toLocaleString()} <span className="text-[var(--text-tertiary)]">({pct}%)</span>
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[9px] text-blue-400">G:{googleInSearch}</span>
+                                      <span className="text-[9px] text-cyan-400">B:{bingIndexed}</span>
+                                      {submitted > 0 && (
+                                        <span className="text-[9px] text-[var(--text-tertiary)]">/ {submitted.toLocaleString()}</span>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full rounded-full transition-all"
-                                      style={{ width: `${Math.max(pct, 1)}%`, backgroundColor: site.color }}
-                                    />
-                                  </div>
-                                  {remaining > 0 && (
-                                    <p className="text-[9px] text-[var(--text-tertiary)] mt-0.5 ml-3">
-                                      {remaining.toLocaleString()} pages still to index
+                                  {submitted > 0 && (
+                                    <div className="h-2 bg-[var(--bg-card)] rounded-full overflow-hidden relative">
+                                      {/* Bing bar (behind) */}
+                                      <div
+                                        className="absolute inset-y-0 left-0 rounded-full opacity-40"
+                                        style={{ width: `${Math.max(Math.round((bingIndexed / submitted) * 100), 0)}%`, backgroundColor: '#06b6d4' }}
+                                      />
+                                      {/* Google bar (front) */}
+                                      <div
+                                        className="absolute inset-y-0 left-0 rounded-full"
+                                        style={{ width: `${Math.max(Math.round((googleInSearch / submitted) * 100), 0)}%`, backgroundColor: site.color }}
+                                      />
+                                    </div>
+                                  )}
+                                  {submitted > 0 && pct < 100 && (
+                                    <p className="text-[9px] text-[var(--text-tertiary)] mt-0.5">
+                                      {(submitted - bestIndexed).toLocaleString()} pages still to index ({pct}% coverage)
                                     </p>
                                   )}
                                 </div>
                               );
                             })}
-                          {allIndexing.filter(s => s.gsc && s.gsc.pagesSubmitted && s.gsc.pagesSubmitted > 0).length === 0 && (
-                            <p className="text-[10px] text-[var(--text-tertiary)]">No sitemap data available</p>
-                          )}
                         </div>
                       </div>
-
-                      {/* Totals */}
-                      {(() => {
-                        const totalIndexed = allIndexing.reduce((sum, s) => sum + (s.gsc?.pagesIndexed ?? 0), 0);
-                        const totalSubmitted = allIndexing.reduce((sum, s) => sum + (s.gsc?.pagesSubmitted ?? 0), 0);
-                        const totalPct = totalSubmitted > 0 ? Math.round((totalIndexed / totalSubmitted) * 100) : 0;
-                        return totalSubmitted > 0 ? (
-                          <div className="grid grid-cols-3 gap-2 mb-3">
-                            <MetricBox label="Total Indexed" value={totalIndexed.toLocaleString()} color="text-green-400" />
-                            <MetricBox label="Total Submitted" value={totalSubmitted.toLocaleString()} color="text-[var(--text-primary)]" />
-                            <MetricBox label="Coverage" value={`${totalPct}%`} color={totalPct > 50 ? 'text-green-400' : totalPct > 20 ? 'text-yellow-400' : 'text-red-400'} />
-                          </div>
-                        ) : null;
-                      })()}
                     </div>
                   )}
 
@@ -734,9 +746,9 @@ function IndexingRow({
   bing: BingSiteData | null;
 }) {
   const [open, setOpen] = useState(false);
-  const indexed = gsc?.pagesIndexed ?? 0;
-  const submitted = gsc?.pagesSubmitted ?? 0;
   const inSearch = gsc?.pagesInSearch ?? 0;
+  const submitted = gsc?.pagesSubmitted ?? 0;
+  const bingIndexed = bing?.pagesInIndex ?? 0;
   const hasData = gsc || bing;
 
   if (!hasData) return null;
@@ -752,9 +764,9 @@ function IndexingRow({
           <span className="text-[12px] font-medium text-[var(--text-primary)]">{site}</span>
         </div>
         <div className="flex items-center gap-3">
-          {gsc && submitted > 0 && (
+          {(inSearch > 0 || bingIndexed > 0) && (
             <span className="text-[10px] text-[var(--text-tertiary)]">
-              {indexed}/{submitted} indexed
+              G:{inSearch} B:{bingIndexed}
             </span>
           )}
           {gsc && (
@@ -773,16 +785,16 @@ function IndexingRow({
             <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Google</p>
             {gsc ? (
               <div className="space-y-0.5">
+                <MetricLine label="In Search" value={String(inSearch)} />
                 {submitted > 0 && (
                   <>
-                    <MetricLine label="Indexed" value={`${indexed} / ${submitted}`} />
+                    <MetricLine label="Submitted" value={submitted.toLocaleString()} />
                     <div className="h-1.5 bg-[var(--bg-card)] rounded-full overflow-hidden my-1">
-                      <div className="h-full rounded-full" style={{ width: `${Math.max(Math.round((indexed / submitted) * 100), 1)}%`, backgroundColor: color }} />
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(submitted > 0 ? Math.round((inSearch / submitted) * 100) : 0, 1)}%`, backgroundColor: color }} />
                     </div>
-                    <MetricLine label="Remaining" value={`${(submitted - indexed).toLocaleString()}`} />
+                    <MetricLine label="Remaining" value={`${(submitted - inSearch).toLocaleString()}`} />
                   </>
                 )}
-                <MetricLine label="In Search" value={String(inSearch)} />
                 <MetricLine label="Clicks (7d)" value={gsc.clicks.toLocaleString()} />
                 <MetricLine label="Impressions" value={gsc.impressions.toLocaleString()} />
                 <MetricLine label="CTR" value={`${(gsc.ctr * 100).toFixed(1)}%`} />
@@ -796,6 +808,9 @@ function IndexingRow({
             <p className="text-[9px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-1">Bing</p>
             {bing ? (
               <div className="space-y-0.5">
+                {bing.pagesInIndex != null && (
+                  <MetricLine label="Indexed" value={bing.pagesInIndex.toLocaleString()} />
+                )}
                 <MetricLine label="Clicks (7d)" value={bing.clicks.toLocaleString()} />
                 <MetricLine label="Impressions" value={bing.impressions.toLocaleString()} />
                 <MetricLine label="CTR" value={`${(bing.ctr * 100).toFixed(1)}%`} />
