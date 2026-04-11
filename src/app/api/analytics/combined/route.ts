@@ -6,12 +6,9 @@ import { ukTodayStr, ukMonthStr } from '@/lib/uk-time';
 
 export const dynamic = 'force-dynamic';
 
-const ALL_SITES = [
-  'findyourstay', 'postcodecheck', 'carcostcheck', 'bestlondontours',
-  'thebesttours', 'daveknowsai', 'aicareerswap', 'helpafterloss',
-  'helpafterlife', 'aibetfinder', 'guardmybusiness', 'briefmynews',
-  'davidskillett', 'skicrowdchecker', 'askyourstay',
-];
+const ALL_SITES = projects
+  .filter(p => p.url && p.id !== 'dashboard' && p.id !== 'general' && p.id !== 'personal')
+  .map(p => p.id);
 
 let _client: BetaAnalyticsDataClient | null = null;
 
