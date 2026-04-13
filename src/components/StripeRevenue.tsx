@@ -153,7 +153,7 @@ export default function StripeRevenue() {
           onClick={() => toggleView('today')}
           className={`${cardBase} ${chartView === 'today' ? cardActive : cardIdle}`}
         >
-          <div className="text-lg font-bold text-sky-400">
+          <div className="font-bold text-sky-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">
             £{(data.todayRevenue / 100).toFixed(2)}
           </div>
           <div className="text-[10px] text-[var(--text-secondary)]">Today</div>
@@ -163,7 +163,7 @@ export default function StripeRevenue() {
           onClick={() => toggleView('month')}
           className={`${cardBase} ${chartView === 'month' ? cardActive : cardIdle}`}
         >
-          <div className="text-lg font-bold text-emerald-400">
+          <div className="font-bold text-emerald-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">
             £{(data.thisMonthRevenue / 100).toFixed(2)}
           </div>
           <div className="text-[10px] text-[var(--text-secondary)]">This Month</div>
@@ -173,13 +173,13 @@ export default function StripeRevenue() {
           onClick={() => toggleView('total')}
           className={`${cardBase} ${chartView === 'total' ? cardActive : cardIdle}`}
         >
-          <div className="text-lg font-bold text-green-400">
+          <div className="font-bold text-green-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">
             £{(data.totalRevenue / 100).toFixed(2)}
           </div>
-          <div className="text-[10px] text-[var(--text-secondary)]">Total Revenue</div>
+          <div className="text-[10px] text-[var(--text-secondary)]">Revenue</div>
         </button>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-amber-400">{data.totalCharges}</div>
+          <div className="font-bold text-amber-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{data.totalCharges}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">Total Sales</div>
         </div>
       </div>
