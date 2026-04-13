@@ -37,13 +37,30 @@ interface StripeCharge {
 
 async function fetchCharges(key: string): Promise<StripeCharge[]> {
   const auth = Buffer.from(key + ":").toString("base64");
-  const res = await fetch("https://api.stripe.com/v1/charges?limit=100", {
-    headers: { Authorization: `Basic ${auth}` },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`Stripe HTTP ${res.status}`);
-  const data = await res.json();
-  return data.data || [];
+  const all: StripeCharge[] = [];
+  let starting_after: string | undefined;
+  // Paginate until we hit charges older than the revenue start, max 5 pages
+  for (let page = 0; page < 5; page++) {
+    const url = new URL("https://api.stripe.com/v1/charges");
+    url.searchParams.set("limit", "100");
+    if (starting_after) url.searchParams.set("starting_after", starting_after);
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Basic ${auth}` },
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Stripe HTTP ${res.status}`);
+    const data = await res.json();
+    const batch: (StripeCharge & { id: string })[] = data.data || [];
+    all.push(...batch);
+    if (!data.has_more || batch.length === 0) break;
+    if (batch[batch.length - 1].created < REVENUE_START_DATE) break;
+    starting_after = batch[batch.length - 1].id;
+  }
+  return all;
+}
+
+function utcDateKey(ts: number): string {
+  return new Date(ts * 1000).toISOString().slice(0, 10);
 }
 
 export async function GET() {
@@ -60,10 +77,26 @@ export async function GET() {
       totalCharges: 0,
       thisMonthRevenue: 0,
       thisMonthCharges: 0,
+      todayRevenue: 0,
+      todayCharges: 0,
+      dailySeries: [] as Array<{ date: string; revenue: number; charges: number }>,
     };
 
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000;
+    const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1) / 1000;
+    const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000;
+
+    // Prefill daily buckets from revenue start to today (UTC)
+    const buckets = new Map<string, { revenue: number; charges: number }>();
+    const startDay = new Date(REVENUE_START_DATE * 1000);
+    const endDay = new Date(todayStart * 1000);
+    for (
+      let d = Date.UTC(startDay.getUTCFullYear(), startDay.getUTCMonth(), startDay.getUTCDate());
+      d <= endDay.getTime();
+      d += 86400000
+    ) {
+      buckets.set(new Date(d).toISOString().slice(0, 10), { revenue: 0, charges: 0 });
+    }
 
     for (const account of ACCOUNTS) {
       if (!account.key) continue;
@@ -77,6 +110,17 @@ export async function GET() {
         const totalRevenue = paid.reduce((s, c) => s + c.amount, 0);
         const monthCharges = paid.filter((c) => c.created >= monthStart);
         const monthRevenue = monthCharges.reduce((s, c) => s + c.amount, 0);
+        const todayChargesList = paid.filter((c) => c.created >= todayStart);
+        const todayRevenue = todayChargesList.reduce((s, c) => s + c.amount, 0);
+
+        for (const c of paid) {
+          const key = utcDateKey(c.created);
+          const bucket = buckets.get(key);
+          if (bucket) {
+            bucket.revenue += c.amount;
+            bucket.charges += 1;
+          }
+        }
 
         const recentCharges = paid.slice(0, 5).map((c) => ({
           amount: c.amount,
@@ -97,11 +141,17 @@ export async function GET() {
         results.totalCharges += paid.length;
         results.thisMonthRevenue += monthRevenue;
         results.thisMonthCharges += monthCharges.length;
+        results.todayRevenue += todayRevenue;
+        results.todayCharges += todayChargesList.length;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.error(`[stripe] ${account.name}:`, errMsg);
       }
     }
+
+    results.dailySeries = Array.from(buckets.entries())
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges }));
 
     return NextResponse.json(results);
   } catch (error) {
