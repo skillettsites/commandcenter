@@ -694,15 +694,15 @@ export default function AutoResearch() {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
                       <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">Needs Work</p>
-                      <p className="text-[14px] font-semibold text-[#EF4444] mt-0.5">{auditData.summary.needsWork}</p>
+                      <p className="font-semibold text-[#EF4444] mt-0.5 whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)]">{auditData.summary.needsWork}</p>
                     </div>
                     <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
                       <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">Optimized</p>
-                      <p className="text-[14px] font-semibold text-[#10B981] mt-0.5">{auditData.summary.optimized}</p>
+                      <p className="font-semibold text-[#10B981] mt-0.5 whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)]">{auditData.summary.optimized}</p>
                     </div>
                     <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
                       <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">Total Issues</p>
-                      <p className="text-[14px] font-semibold text-[#F59E0B] mt-0.5">{auditData.summary.totalIssues}</p>
+                      <p className="font-semibold text-[#F59E0B] mt-0.5 whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)]">{auditData.summary.totalIssues}</p>
                     </div>
                   </div>
                 </div>
@@ -897,7 +897,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-lg px-2.5 py-2 bg-[var(--bg-elevated)]">
       <p className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</p>
-      <p className="text-[14px] font-semibold text-[var(--text-primary)] mt-0.5">{display}</p>
+      <p className="font-semibold text-[var(--text-primary)] mt-0.5 whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)]">{display}</p>
     </div>
   );
 }

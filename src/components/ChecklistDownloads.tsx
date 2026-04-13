@@ -90,19 +90,19 @@ export default function ChecklistDownloads() {
       {/* Summary stats */}
       <div className="grid grid-cols-4 gap-2 mt-3">
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-pink-400">{data.today}</div>
+          <div className="font-bold text-pink-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{data.today}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">Today</div>
         </div>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-pink-400">{data.week}</div>
+          <div className="font-bold text-pink-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{data.week}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">This Week</div>
         </div>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-pink-400">{data.month}</div>
+          <div className="font-bold text-pink-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{data.month}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">This Month</div>
         </div>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-pink-400">{data.total}</div>
+          <div className="font-bold text-pink-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{data.total}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">All Time</div>
         </div>
       </div>

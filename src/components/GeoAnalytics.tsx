@@ -354,7 +354,7 @@ export default function GeoAnalytics() {
                                 {c.region}
                               </p>
                             )}
-                            <p className="text-[13px] font-semibold text-[var(--text-primary)] mt-0.5">
+                            <p className="font-semibold text-[var(--text-primary)] mt-0.5 whitespace-nowrap text-[clamp(0.7rem,3vw,0.8125rem)]">
                               {c.count.toLocaleString()}
                             </p>
                           </div>

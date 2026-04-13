@@ -299,7 +299,7 @@ export default function AllSitesStats() {
 function StatBox({ label, value, secondary }: { label: string; value: number; secondary?: string }) {
   return (
     <div className="text-center">
-      <p className="text-[18px] font-bold text-[var(--text-primary)]">{value.toLocaleString()}</p>
+      <p className="font-bold text-[var(--text-primary)] whitespace-nowrap text-[clamp(0.75rem,3.4vw,1.125rem)]">{value.toLocaleString()}</p>
       <p className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</p>
       {secondary && (
         <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5 opacity-60">{secondary}</p>

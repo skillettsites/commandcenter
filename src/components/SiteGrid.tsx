@@ -704,19 +704,19 @@ function GscStats({ gsc }: { gsc: GscData }) {
       </h4>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div>
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{gsc.clicks}</div>
+          <div className="font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] text-[var(--text-primary)]">{gsc.clicks}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Clicks</div>
         </div>
         <div>
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{gsc.impressions.toLocaleString()}</div>
+          <div className="font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] text-[var(--text-primary)]">{gsc.impressions.toLocaleString()}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Impressions</div>
         </div>
         <div>
-          <div className={`text-[14px] font-semibold ${positionColor}`}>{gsc.position > 0 ? gsc.position.toFixed(1) : '-'}</div>
+          <div className={`font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] ${positionColor}`}>{gsc.position > 0 ? gsc.position.toFixed(1) : '-'}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Avg Position</div>
         </div>
         <div>
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{(gsc.ctr * 100).toFixed(1)}%</div>
+          <div className="font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] text-[var(--text-primary)]">{(gsc.ctr * 100).toFixed(1)}%</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">CTR</div>
         </div>
       </div>
@@ -725,7 +725,7 @@ function GscStats({ gsc }: { gsc: GscData }) {
       {inSearch > 0 && (
         <div className="mt-2 pt-2 border-t border-[var(--border-light)]">
           <div className="flex items-center gap-2">
-            <div className="text-[13px] font-semibold text-[var(--green)]">{inSearch.toLocaleString()}</div>
+            <div className="font-semibold text-[var(--green)] whitespace-nowrap text-[clamp(0.7rem,3vw,0.8125rem)]">{inSearch.toLocaleString()}</div>
             <div className="text-[9px] text-[var(--text-tertiary)]">pages appeared in search (28d)</div>
           </div>
         </div>
@@ -793,19 +793,19 @@ function BingStats({ bing }: { bing: BingData }) {
       </h4>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div>
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{bing.clicks}</div>
+          <div className="font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] text-[var(--text-primary)]">{bing.clicks}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Clicks</div>
         </div>
         <div>
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{bing.impressions.toLocaleString()}</div>
+          <div className="font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] text-[var(--text-primary)]">{bing.impressions.toLocaleString()}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Impressions</div>
         </div>
         <div>
-          <div className={`text-[14px] font-semibold ${positionColor}`}>{bing.position > 0 ? bing.position.toFixed(1) : '-'}</div>
+          <div className={`font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] ${positionColor}`}>{bing.position > 0 ? bing.position.toFixed(1) : '-'}</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">Avg Position</div>
         </div>
         <div>
-          <div className="text-[14px] font-semibold text-[var(--text-primary)]">{(bing.ctr * 100).toFixed(1)}%</div>
+          <div className="font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.875rem)] text-[var(--text-primary)]">{(bing.ctr * 100).toFixed(1)}%</div>
           <div className="text-[9px] text-[var(--text-tertiary)]">CTR</div>
         </div>
       </div>

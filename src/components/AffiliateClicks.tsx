@@ -238,7 +238,7 @@ export default function AffiliateClicks() {
                 { label: 'All Time', value: data.total, highlight: false },
               ].map((stat) => (
                 <div key={stat.label} className="text-center py-1.5 rounded-lg bg-[var(--bg-elevated)]">
-                  <div className={`text-[15px] font-semibold ${stat.highlight ? 'text-[var(--green)]' : 'text-[var(--text-primary)]'}`}>
+                  <div className={`font-semibold whitespace-nowrap text-[clamp(0.7rem,3.2vw,0.9375rem)] ${stat.highlight ? 'text-[var(--green)]' : 'text-[var(--text-primary)]'}`}>
                     {stat.value.toLocaleString()}
                   </div>
                   <div className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider">

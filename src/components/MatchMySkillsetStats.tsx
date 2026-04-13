@@ -74,19 +74,19 @@ export default function MatchMySkillsetStats() {
       {/* Summary row - always visible */}
       <div className="grid grid-cols-4 gap-2 mt-3">
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-indigo-400">{stats.totalLeads}</div>
+          <div className="font-bold text-indigo-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{stats.totalLeads}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">CVs Loaded</div>
         </div>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-green-400">{stats.totalAssessments}</div>
+          <div className="font-bold text-green-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{stats.totalAssessments}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">Assessments</div>
         </div>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-amber-400">{totalClicksAllSources}</div>
+          <div className="font-bold text-amber-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{totalClicksAllSources}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">Job Clicks</div>
         </div>
         <div className="bg-[var(--bg-primary)] rounded-xl p-2.5 text-center">
-          <div className="text-lg font-bold text-purple-400">{stats.totalSearches}</div>
+          <div className="font-bold text-purple-400 whitespace-nowrap text-[clamp(0.7rem,3.2vw,1.125rem)]">{stats.totalSearches}</div>
           <div className="text-[10px] text-[var(--text-secondary)]">Searches</div>
         </div>
       </div>
