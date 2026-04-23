@@ -23,8 +23,18 @@ interface AccountData {
   sites: string[];
   totalRevenue: number;
   chargeCount: number;
+  todayRevenue: number;
+  todayCharges: number;
+  thisMonthRevenue: number;
+  thisMonthCharges: number;
   recentCharges: ChargeInfo[];
 }
+
+const ACCOUNT_SHORT: Record<string, string> = {
+  CarCostCheck: 'CCC',
+  PostcodeCheck: 'PCC',
+  MatchMySkillset: 'MMS',
+};
 
 interface DailyPoint {
   date: string;
@@ -183,6 +193,56 @@ export default function StripeRevenue() {
           <div className="text-[10px] text-[var(--text-secondary)]">Total Sales</div>
         </div>
       </div>
+
+      {/* Per-account split: always visible, shows today / month / total per site */}
+      {data.accounts.some((a) => a.chargeCount > 0) && (
+        <div className="mt-3 bg-[var(--bg-primary)] rounded-xl p-2.5">
+          <div className="grid grid-cols-[auto_1fr_1fr_1fr] gap-x-3 gap-y-1 items-center">
+            <div className="text-[10px] text-[var(--text-secondary)]"></div>
+            <div className="text-[10px] text-sky-400 text-right">Today</div>
+            <div className="text-[10px] text-emerald-400 text-right">Month</div>
+            <div className="text-[10px] text-green-400 text-right">Total</div>
+
+            {data.accounts
+              .filter((a) => a.chargeCount > 0)
+              .map((a) => (
+                <div key={a.name} className="contents">
+                  <div className="text-[11px] font-semibold text-[var(--text-primary)]">
+                    {ACCOUNT_SHORT[a.name] || a.name}
+                  </div>
+                  <div className="text-[11px] text-right text-[var(--text-primary)]">
+                    £{(a.todayRevenue / 100).toFixed(2)}
+                    <span className="text-[9px] text-[var(--text-secondary)]"> ({a.todayCharges})</span>
+                  </div>
+                  <div className="text-[11px] text-right text-[var(--text-primary)]">
+                    £{(a.thisMonthRevenue / 100).toFixed(2)}
+                    <span className="text-[9px] text-[var(--text-secondary)]"> ({a.thisMonthCharges})</span>
+                  </div>
+                  <div className="text-[11px] text-right text-[var(--text-primary)]">
+                    £{(a.totalRevenue / 100).toFixed(2)}
+                    <span className="text-[9px] text-[var(--text-secondary)]"> ({a.chargeCount})</span>
+                  </div>
+                </div>
+              ))}
+
+            <div className="text-[11px] font-bold text-[var(--text-primary)] border-t border-[var(--border)] pt-1">
+              Total
+            </div>
+            <div className="text-[11px] text-right font-bold text-sky-400 border-t border-[var(--border)] pt-1">
+              £{(data.todayRevenue / 100).toFixed(2)}
+              <span className="text-[9px] text-[var(--text-secondary)] font-normal"> ({data.todayCharges})</span>
+            </div>
+            <div className="text-[11px] text-right font-bold text-emerald-400 border-t border-[var(--border)] pt-1">
+              £{(data.thisMonthRevenue / 100).toFixed(2)}
+              <span className="text-[9px] text-[var(--text-secondary)] font-normal"> ({data.thisMonthCharges})</span>
+            </div>
+            <div className="text-[11px] text-right font-bold text-green-400 border-t border-[var(--border)] pt-1">
+              £{(data.totalRevenue / 100).toFixed(2)}
+              <span className="text-[9px] text-[var(--text-secondary)] font-normal"> ({data.totalCharges})</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chart */}
       {chartView && chartData.length > 0 && (

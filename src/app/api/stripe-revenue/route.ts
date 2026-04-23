@@ -71,6 +71,10 @@ export async function GET() {
         sites: string[];
         totalRevenue: number;
         chargeCount: number;
+        todayRevenue: number;
+        todayCharges: number;
+        thisMonthRevenue: number;
+        thisMonthCharges: number;
         recentCharges: Array<{ amount: number; site: string; email: string; date: string }>;
       }>,
       totalRevenue: 0,
@@ -134,6 +138,10 @@ export async function GET() {
           sites: account.sites,
           totalRevenue,
           chargeCount: paid.length,
+          todayRevenue,
+          todayCharges: todayChargesList.length,
+          thisMonthRevenue: monthRevenue,
+          thisMonthCharges: monthCharges.length,
           recentCharges,
         });
 
