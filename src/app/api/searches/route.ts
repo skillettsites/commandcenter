@@ -4,6 +4,10 @@ import { ukTodayStart, ukMonthStart } from '@/lib/uk-time';
 
 export const dynamic = 'force-dynamic';
 
+// Drop pre-cutoff data (early scraping spikes) so charts reflect real traffic.
+const SEARCHES_CUTOFF = '2026-04-11T00:00:00Z';
+const floor = (iso: string) => (iso < SEARCHES_CUTOFF ? SEARCHES_CUTOFF : iso);
+
 // GET /api/searches?site_id=carcostcheck&range=today|24h|1m|all&view=top
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest) {
         .from('searches')
         .select('search_query, result_found, created_at')
         .eq('site_id', siteId)
-        .gte('created_at', fromDate)
+        .gte('created_at', floor(fromDate))
         .order('created_at', { ascending: false });
 
       const grouped = new Map<string, { count: number; resultFound: boolean; lastSearched: string }>();
@@ -99,7 +103,7 @@ export async function GET(request: NextRequest) {
         .from('searches')
         .select('created_at')
         .eq('site_id', siteId)
-        .gte('created_at', fromDate.toISOString())
+        .gte('created_at', floor(fromDate.toISOString()))
         .order('created_at', { ascending: true });
 
       const buckets = new Map<string, number>();
@@ -122,8 +126,10 @@ export async function GET(request: NextRequest) {
           }
         }
       } else if (range === '1m') {
+        const cutoffMs = new Date(SEARCHES_CUTOFF).getTime();
         for (let d = 29; d >= 0; d--) {
           const bucketTime = new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
+          if (bucketTime.getTime() < cutoffMs) continue;
           const key = `${bucketTime.getUTCFullYear()}-${String(bucketTime.getUTCMonth() + 1).padStart(2, '0')}-${String(bucketTime.getUTCDate()).padStart(2, '0')}`;
           buckets.set(key, 0);
         }
@@ -135,7 +141,8 @@ export async function GET(request: NextRequest) {
           }
         }
       } else {
-        const startOfWeek = new Date(fromDate);
+        const effectiveFrom = new Date(floor(fromDate.toISOString()));
+        const startOfWeek = new Date(effectiveFrom);
         startOfWeek.setUTCDate(startOfWeek.getUTCDate() - startOfWeek.getUTCDay() + 1);
         const cursor = new Date(startOfWeek);
         while (cursor <= now) {
