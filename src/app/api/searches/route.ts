@@ -104,7 +104,8 @@ export async function GET(request: NextRequest) {
         .select('created_at')
         .eq('site_id', siteId)
         .gte('created_at', floor(fromDate.toISOString()))
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(100000);
 
       const buckets = new Map<string, number>();
 
