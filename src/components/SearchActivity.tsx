@@ -22,9 +22,36 @@ interface ChartPoint {
   count: number;
 }
 
-type ChartData = Record<string, ChartPoint[]>;
+interface Prediction {
+  todaySearches: number;
+  todayPurchases: number;
+  predictedTotal: number;
+  predictedLow: number;
+  predictedHigh: number;
+  signals: {
+    paceProjection: number;
+    searchProjection: number;
+    dowBaseline: number;
+    completionFactor: number;
+    dowConversionRate: number;
+    trendFactor: number;
+    sampleDays: number;
+    hour: number;
+    dow: number;
+  };
+}
+
+interface SiteChart {
+  searches: ChartPoint[];
+  purchases?: ChartPoint[];
+  prediction?: Prediction;
+}
+
+type ChartData = Record<string, SiteChart>;
 
 type TimeRange = '24h' | '1m' | 'all';
+
+const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const SITE_LABELS: Record<string, { name: string; color: string }> = {
   carcostcheck: { name: 'CarCostCheck', color: '#f59e0b' },
@@ -77,9 +104,11 @@ interface LineChartProps {
   data: ChartPoint[];
   color: string;
   range: TimeRange;
+  purchases?: ChartPoint[];
+  prediction?: Prediction;
 }
 
-function LineChart({ data, color, range }: LineChartProps) {
+function LineChart({ data, color, range, purchases, prediction }: LineChartProps) {
   const chartHeight = 120;
   const chartWidth = 300;
   const padding = { top: 8, right: 8, bottom: 22, left: 8 };
@@ -87,19 +116,44 @@ function LineChart({ data, color, range }: LineChartProps) {
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
 
-  const maxCount = useMemo(() => {
+  // Searches dominate the y-axis — purchases get their own scale so the
+  // smaller line is still legible without dwarfing the searches line.
+  const maxSearches = useMemo(() => {
     const m = Math.max(...data.map((d) => d.count));
     return m > 0 ? m : 1;
   }, [data]);
+
+  const maxPurchases = useMemo(() => {
+    const all: number[] = [];
+    if (purchases) for (const p of purchases) all.push(p.count);
+    if (prediction) all.push(prediction.predictedHigh);
+    const m = all.length > 0 ? Math.max(...all) : 0;
+    return m > 0 ? m : 1;
+  }, [purchases, prediction]);
 
   const points = useMemo(() => {
     if (data.length === 0) return [];
     return data.map((d, i) => ({
       x: padding.left + (data.length === 1 ? innerWidth / 2 : (i / (data.length - 1)) * innerWidth),
-      y: padding.top + innerHeight - (d.count / maxCount) * innerHeight,
+      y: padding.top + innerHeight - (d.count / maxSearches) * innerHeight,
       ...d,
     }));
-  }, [data, maxCount, innerWidth, innerHeight, padding.left, padding.top]);
+  }, [data, maxSearches, innerWidth, innerHeight, padding.left, padding.top]);
+
+  const purchasePoints = useMemo(() => {
+    if (!purchases || data.length === 0) return [];
+    // Align purchases to the same x positions as searches by index.
+    const byPeriod = new Map(purchases.map((p) => [p.period, p.count]));
+    return data.map((d, i) => {
+      const count = byPeriod.get(d.period) ?? 0;
+      return {
+        x: padding.left + (data.length === 1 ? innerWidth / 2 : (i / (data.length - 1)) * innerWidth),
+        y: padding.top + innerHeight - (count / maxPurchases) * innerHeight,
+        period: d.period,
+        count,
+      };
+    });
+  }, [purchases, data, maxPurchases, innerWidth, innerHeight, padding.left, padding.top]);
 
   const linePath = useMemo(() => {
     if (points.length === 0) return '';
@@ -107,6 +161,22 @@ function LineChart({ data, color, range }: LineChartProps) {
       .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`)
       .join(' ');
   }, [points]);
+
+  const purchaseLinePath = useMemo(() => {
+    if (purchasePoints.length === 0) return '';
+    return purchasePoints
+      .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`)
+      .join(' ');
+  }, [purchasePoints]);
+
+  const predictionMarker = useMemo(() => {
+    if (!prediction || purchasePoints.length === 0) return null;
+    const last = purchasePoints[purchasePoints.length - 1];
+    const yPredicted = padding.top + innerHeight - (prediction.predictedTotal / maxPurchases) * innerHeight;
+    const yLow = padding.top + innerHeight - (prediction.predictedLow / maxPurchases) * innerHeight;
+    const yHigh = padding.top + innerHeight - (prediction.predictedHigh / maxPurchases) * innerHeight;
+    return { x: last.x, yPredicted, yLow, yHigh, fromY: last.y };
+  }, [prediction, purchasePoints, maxPurchases, innerHeight, padding.top]);
 
   const areaPath = useMemo(() => {
     if (points.length === 0) return '';
@@ -191,6 +261,67 @@ function LineChart({ data, color, range }: LineChartProps) {
             opacity={p.count > 0 ? 1 : 0.3}
           />
         ))}
+
+      {/* Purchases line (white, thinner) */}
+      {purchaseLinePath && (
+        <path
+          d={purchaseLinePath}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.85}
+        />
+      )}
+
+      {/* Purchase point dots */}
+      {purchasePoints.length <= 30 &&
+        purchasePoints.map((p, i) => (
+          <circle
+            key={`p-${i}`}
+            cx={p.x}
+            cy={p.y}
+            r={1.8}
+            fill="#ffffff"
+            opacity={p.count > 0 ? 0.95 : 0.25}
+          />
+        ))}
+
+      {/* Prediction marker for today: dashed segment from actual to predicted,
+          with confidence band as a vertical line. */}
+      {predictionMarker && (
+        <g>
+          <line
+            x1={predictionMarker.x}
+            y1={predictionMarker.yLow}
+            x2={predictionMarker.x}
+            y2={predictionMarker.yHigh}
+            stroke="#22d3ee"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            opacity={0.6}
+          />
+          <line
+            x1={predictionMarker.x}
+            y1={predictionMarker.fromY}
+            x2={predictionMarker.x}
+            y2={predictionMarker.yPredicted}
+            stroke="#22d3ee"
+            strokeWidth={1.5}
+            strokeDasharray="2 2"
+            opacity={0.9}
+          />
+          <circle
+            cx={predictionMarker.x}
+            cy={predictionMarker.yPredicted}
+            r={3}
+            fill="#22d3ee"
+            stroke="#0e1118"
+            strokeWidth={1}
+          />
+        </g>
+      )}
 
       {/* X axis labels */}
       {axisLabels.map((label, i) => (
@@ -361,7 +492,10 @@ export default function SearchActivity() {
               const site = SITE_LABELS[siteId];
               if (!site) return null;
               const isExpanded = expandedSite === siteId;
-              const siteChartPoints = chartData?.[siteId] ?? [];
+              const siteChart = chartData?.[siteId];
+              const searchPoints = siteChart?.searches ?? [];
+              const purchasePoints = siteChart?.purchases;
+              const prediction = siteChart?.prediction;
 
               return (
                 <div key={siteId}>
@@ -404,13 +538,35 @@ export default function SearchActivity() {
                       </div>
                     </div>
 
+                    {/* Purchases + prediction strip (CCC only — sites without
+                        purchase data simply omit this row). */}
+                    {prediction && (
+                      <div className="ml-3 mb-1.5 flex items-center gap-3 flex-wrap text-[11px]">
+                        <span className="flex items-center gap-1 text-[var(--text-secondary)]">
+                          <span className="w-2 h-0.5 bg-white inline-block" />
+                          <span className="font-semibold text-white">{prediction.todayPurchases}</span>
+                          <span className="text-[var(--text-tertiary)]">purchases today</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-[var(--text-secondary)]">
+                          <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block" />
+                          <span className="font-semibold text-cyan-300">~{prediction.predictedTotal}</span>
+                          <span className="text-[var(--text-tertiary)]">predicted ({prediction.predictedLow}–{prediction.predictedHigh})</span>
+                        </span>
+                        <span className="text-[10px] text-[var(--text-tertiary)]">
+                          £{(prediction.predictedTotal * 4.99).toFixed(0)} fcst &middot; {DOW_NAMES[prediction.signals.dow]} avg {prediction.signals.dowBaseline}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Line chart */}
-                    {siteChartPoints.length > 0 && (
+                    {searchPoints.length > 0 && (
                       <div className="ml-3">
                         <LineChart
-                          data={siteChartPoints}
+                          data={searchPoints}
                           color={site.color}
                           range={timeRange}
+                          purchases={purchasePoints}
+                          prediction={prediction}
                         />
                       </div>
                     )}
