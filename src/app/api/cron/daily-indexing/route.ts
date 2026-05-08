@@ -132,8 +132,14 @@ function pathOf(url: string): string {
   }
 }
 
-function prioritise(entries: SitemapEntry[], siteId: string): SitemapEntry[] {
+function prioritise(
+  entries: SitemapEntry[],
+  siteId: string,
+  recentlyDiscovered: Set<string>,
+  firstSeenMap: Map<string, string>
+): SitemapEntry[] {
   const pinned: SitemapEntry[] = [];
+  const newly: SitemapEntry[] = [];
   const fresh: SitemapEntry[] = [];
   const home: SitemapEntry[] = [];
   const articles: SitemapEntry[] = [];
@@ -145,6 +151,8 @@ function prioritise(entries: SitemapEntry[], siteId: string): SitemapEntry[] {
       pinned.push(e);
     } else if (siteId === 'appealafine' && APPEALAFINE_PRIORITY_PATHS.has(path)) {
       pinned.push(e);
+    } else if (recentlyDiscovered.has(e.url)) {
+      newly.push(e);
     } else if (isFresh(e.lastmod)) {
       fresh.push(e);
     } else if (path === '/' || path === '') {
@@ -156,13 +164,67 @@ function prioritise(entries: SitemapEntry[], siteId: string): SitemapEntry[] {
     }
   }
 
+  // Newly discovered: sort by first_seen_at desc so the most-recently-created page
+  // is always at the head of the queue.
+  newly.sort((a, b) => {
+    const aSeen = firstSeenMap.get(a.url) || '1970';
+    const bSeen = firstSeenMap.get(b.url) || '1970';
+    return Date.parse(bSeen) - Date.parse(aSeen);
+  });
+
   const byNewest = (a: SitemapEntry, b: SitemapEntry) =>
     Date.parse(b.lastmod || '1970') - Date.parse(a.lastmod || '1970');
   fresh.sort(byNewest);
   articles.sort(byNewest);
   rest.sort(byNewest);
 
-  return [...pinned, ...fresh, ...home, ...articles, ...rest];
+  return [...pinned, ...newly, ...fresh, ...home, ...articles, ...rest];
+}
+
+const DISCOVERY_WINDOW_HOURS = 48;
+const SITEMAP_UPSERT_CHUNK = 1000;
+
+async function trackSitemapDiscovery(
+  sb: NonNullable<ReturnType<typeof getSupabase>>,
+  siteId: string,
+  entries: SitemapEntry[]
+): Promise<{ recentlyDiscovered: Set<string>; firstSeenMap: Map<string, string>; error?: string }> {
+  const recentlyDiscovered = new Set<string>();
+  const firstSeenMap = new Map<string, string>();
+  if (entries.length === 0) return { recentlyDiscovered, firstSeenMap };
+
+  // Insert every sitemap URL with ON CONFLICT DO NOTHING — first sighting
+  // captures first_seen_at = now(), repeat sightings preserve original.
+  const now = new Date().toISOString();
+  for (let i = 0; i < entries.length; i += SITEMAP_UPSERT_CHUNK) {
+    const rows = entries.slice(i, i + SITEMAP_UPSERT_CHUNK).map((e) => ({
+      site_id: siteId,
+      url: e.url,
+      first_seen_at: now,
+    }));
+    const { error } = await sb
+      .from('sitemap_urls')
+      .upsert(rows, { onConflict: 'site_id,url', ignoreDuplicates: true });
+    if (error) {
+      return { recentlyDiscovered, firstSeenMap, error: error.message.slice(0, 120) };
+    }
+  }
+
+  const cutoff = new Date(Date.now() - DISCOVERY_WINDOW_HOURS * 3600_000).toISOString();
+  const { data, error } = await sb
+    .from('sitemap_urls')
+    .select('url, first_seen_at')
+    .eq('site_id', siteId)
+    .gte('first_seen_at', cutoff)
+    .limit(50000);
+  if (error) {
+    return { recentlyDiscovered, firstSeenMap, error: error.message.slice(0, 120) };
+  }
+  for (const row of (data || []) as Array<{ url: string; first_seen_at: string }>) {
+    recentlyDiscovered.add(row.url);
+    firstSeenMap.set(row.url, row.first_seen_at);
+  }
+  return { recentlyDiscovered, firstSeenMap };
 }
 
 async function getBingQuota(siteUrl: string, apiKey: string): Promise<{ daily: number; monthly: number } | null> {
@@ -273,6 +335,7 @@ interface SiteResult {
   sitemapTotal: number;
   newCount: number;
   freshCount: number;
+  newlyDiscoveredCount: number;
   bingSubmitted: number;
   bingQuotaRemaining: number | null;
   bingError?: string;
@@ -295,6 +358,7 @@ async function processSite(
     sitemapTotal: 0,
     newCount: 0,
     freshCount: 0,
+    newlyDiscoveredCount: 0,
     bingSubmitted: 0,
     bingQuotaRemaining: null,
     indexNowStatus: null,
@@ -360,6 +424,18 @@ async function processSite(
     const newEntries = entries.filter((e) => !submittedSet.has(e.url));
     result.newCount = newEntries.length;
 
+    // Track sitemap discovery so newly-created pages bubble to the top
+    // even on sites whose sitemap doesn't emit per-page lastmod (CCC etc).
+    let recentlyDiscovered = new Set<string>();
+    let firstSeenMap = new Map<string, string>();
+    if (opts.supabase) {
+      const disc = await trackSitemapDiscovery(opts.supabase, p.id, entries);
+      recentlyDiscovered = disc.recentlyDiscovered;
+      firstSeenMap = disc.firstSeenMap;
+      if (disc.error) result.errors.push(`discovery: ${disc.error}`);
+    }
+    result.newlyDiscoveredCount = newEntries.filter((e) => recentlyDiscovered.has(e.url)).length;
+
     // IndexNow first — pings ALL sitemap URLs (cheap, deduped server-side)
     const allUrls = entries.map((e) => e.url);
     const host = (() => {
@@ -380,7 +456,7 @@ async function processSite(
         result.bingError = 'quota exhausted';
       } else {
         const limit = Math.min(BING_CAP_PER_SITE, dailyLeft, newEntries.length);
-        const prioritised = prioritise(newEntries, p.id).slice(0, limit);
+        const prioritised = prioritise(newEntries, p.id, recentlyDiscovered, firstSeenMap).slice(0, limit);
         const out = await submitBingBatch(
           p.bingSiteUrl,
           prioritised.map((e) => e.url),
@@ -424,6 +500,7 @@ function buildMessage(rows: SiteResult[], doSubmit: boolean): string {
   const totalSubmitted = rows.reduce((s, r) => s + r.bingSubmitted, 0);
   const totalFresh = rows.reduce((s, r) => s + r.freshCount, 0);
   const totalNew = rows.reduce((s, r) => s + r.newCount, 0);
+  const totalNewlyDiscovered = rows.reduce((s, r) => s + r.newlyDiscoveredCount, 0);
 
   const parts: string[] = [];
   parts.push(`<b>🔍 Indexing health · ${escapeHtml(dateLabel)}</b>`);
@@ -434,7 +511,9 @@ function buildMessage(rows: SiteResult[], doSubmit: boolean): string {
   parts.push(`• GSC impressions: <b>${totalImpr.toLocaleString('en-GB')}</b>`);
   parts.push(`• Bing indexed: <b>${totalBing.toLocaleString('en-GB')}</b>`);
   if (doSubmit) {
-    parts.push(`• Submitted to Bing today: <b>${totalSubmitted}</b> (of ${totalNew} new, ${totalFresh} fresh)`);
+    parts.push(
+      `• Submitted to Bing today: <b>${totalSubmitted}</b> (of ${totalNew} new · 🆕 ${totalNewlyDiscovered} pages added in last 48h)`
+    );
   }
   parts.push('');
 
@@ -450,18 +529,23 @@ function buildMessage(rows: SiteResult[], doSubmit: boolean): string {
   }
 
   if (doSubmit) {
-    const submitters = [...rows].filter((r) => r.bingSubmitted > 0 || r.freshCount > 0 || r.bingError);
+    const submitters = [...rows].filter(
+      (r) => r.bingSubmitted > 0 || r.newlyDiscoveredCount > 0 || r.freshCount > 0 || r.bingError
+    );
     if (submitters.length > 0) {
       parts.push('<b>Submissions</b>');
       submitters
-        .sort((a, b) => b.bingSubmitted - a.bingSubmitted)
+        .sort((a, b) => b.newlyDiscoveredCount - a.newlyDiscoveredCount || b.bingSubmitted - a.bingSubmitted)
         .slice(0, 12)
         .forEach((r) => {
           const submitPart = r.bingError
             ? `❌ Bing: ${r.bingError}`
-            : `Bing ${r.bingSubmitted}${r.bingQuotaRemaining !== null ? `/${r.bingQuotaRemaining}` : ''} (${r.freshCount} fresh)`;
+            : `Bing ${r.bingSubmitted}${r.bingQuotaRemaining !== null ? `/${r.bingQuotaRemaining}` : ''}`;
+          const newPart = r.newlyDiscoveredCount > 0 ? ` · 🆕 ${r.newlyDiscoveredCount}` : '';
           const inowPart = r.indexNowOk ? `IndexNow ✓` : r.indexNowStatus !== null ? `IndexNow ${r.indexNowStatus}` : '';
-          parts.push(`• ${escapeHtml(r.label)}: ${escapeHtml(submitPart)} · ${escapeHtml(inowPart)}`);
+          parts.push(
+            `• ${escapeHtml(r.label)}: ${escapeHtml(submitPart)}${escapeHtml(newPart)} · ${escapeHtml(inowPart)}`
+          );
         });
       parts.push('');
     }
