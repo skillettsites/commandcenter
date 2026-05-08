@@ -211,18 +211,26 @@ async function trackSitemapDiscovery(
   }
 
   const cutoff = new Date(Date.now() - DISCOVERY_WINDOW_HOURS * 3600_000).toISOString();
-  const { data, error } = await sb
-    .from('sitemap_urls')
-    .select('url, first_seen_at')
-    .eq('site_id', siteId)
-    .gte('first_seen_at', cutoff)
-    .limit(50000);
-  if (error) {
-    return { recentlyDiscovered, firstSeenMap, error: error.message.slice(0, 120) };
-  }
-  for (const row of (data || []) as Array<{ url: string; first_seen_at: string }>) {
-    recentlyDiscovered.add(row.url);
-    firstSeenMap.set(row.url, row.first_seen_at);
+  const PAGE = 1000;
+  let offset = 0;
+  while (true) {
+    const { data, error } = await sb
+      .from('sitemap_urls')
+      .select('url, first_seen_at')
+      .eq('site_id', siteId)
+      .gte('first_seen_at', cutoff)
+      .order('first_seen_at', { ascending: false })
+      .range(offset, offset + PAGE - 1);
+    if (error) {
+      return { recentlyDiscovered, firstSeenMap, error: error.message.slice(0, 120) };
+    }
+    const rows = (data || []) as Array<{ url: string; first_seen_at: string }>;
+    for (const row of rows) {
+      recentlyDiscovered.add(row.url);
+      firstSeenMap.set(row.url, row.first_seen_at);
+    }
+    if (rows.length < PAGE) break;
+    offset += PAGE;
   }
   return { recentlyDiscovered, firstSeenMap };
 }
