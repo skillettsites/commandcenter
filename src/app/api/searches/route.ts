@@ -61,9 +61,16 @@ function ukParts(d: Date): { dateKey: string; hour: number; dow: number } {
 interface PredictionInput {
   date: string;
   dow: number;
+  dom: number; // day of month, 1..31
   searches: number;
   purchases: number;
   hourlyPurchases: number[]; // 24 buckets
+}
+
+// UK payday window: most salaries land 25th–end-of-month, so the day-of-month
+// effect peaks in that window through the first few days of the next month.
+function isPaydayWeek(dom: number): boolean {
+  return dom >= 25 || dom <= 3;
 }
 
 interface PredictionResult {
@@ -79,9 +86,12 @@ interface PredictionResult {
     completionFactor: number;
     dowConversionRate: number;
     trendFactor: number;
+    paydayMultiplier: number;
+    isPaydayWeek: boolean;
     sampleDays: number;
     hour: number;
     dow: number;
+    dom: number;
   };
 }
 
@@ -111,6 +121,22 @@ function predictTodayPurchases(history: PredictionInput[]): PredictionResult | n
   const dowPurchaseAvg = avg(sameDow, (h) => h.purchases);
   const dowConversion = dowSearchAvg > 0 ? dowPurchaseAvg / dowSearchAvg : 0;
 
+  // Payday-week multiplier: avg daily purchases on payday-week days vs other
+  // days. Smoothed by 0.5 (i.e. half-pull toward 1.0) when sample sizes are
+  // tiny so a couple of fluky days can't dominate.
+  const paydayDays = past.filter((h) => isPaydayWeek(h.dom));
+  const nonPaydayDays = past.filter((h) => !isPaydayWeek(h.dom));
+  const paydayAvg = avg(paydayDays, (h) => h.purchases);
+  const nonPaydayAvg = avg(nonPaydayDays, (h) => h.purchases);
+  let rawMultiplier = nonPaydayAvg > 0 ? paydayAvg / nonPaydayAvg : 1;
+  // Cap to a sensible band so noise doesn't blow predictions up/down.
+  rawMultiplier = Math.max(0.7, Math.min(1.6, rawMultiplier));
+  const minSamples = Math.min(paydayDays.length, nonPaydayDays.length);
+  const smoothing = Math.min(1, minSamples / 5); // full weight at 5+ samples per side
+  const dayOfMonthMultiplier = isPaydayWeek(today.dom)
+    ? 1 + (rawMultiplier - 1) * smoothing
+    : 1; // Only lift on payday days; non-payday gets the baseline.
+
   // Hour-of-day completion: on past same-DOW days, what fraction of daily
   // purchases had landed by `todayHour` (inclusive)?
   let totalUpToHour = 0;
@@ -124,10 +150,11 @@ function predictTodayPurchases(history: PredictionInput[]): PredictionResult | n
     ? Math.min(1, Math.max(0.05, totalUpToHour / totalAllDay))
     : 0.5;
 
-  // Three independent projections
+  // Three independent projections, each adjusted by the payday-week multiplier
+  // (pace projection skips the lift because today's pace already reflects it).
   const paceProjection = today.purchases / completionFactor;
-  const searchProjection = today.searches * dowConversion * trendFactor;
-  const dowBaselineProjection = dowPurchaseAvg * trendFactor;
+  const searchProjection = today.searches * dowConversion * trendFactor * dayOfMonthMultiplier;
+  const dowBaselineProjection = dowPurchaseAvg * trendFactor * dayOfMonthMultiplier;
 
   // Weight: pace gets more credit as the day fills up; otherwise lean on
   // search-to-conversion + DOW baseline.
@@ -157,9 +184,12 @@ function predictTodayPurchases(history: PredictionInput[]): PredictionResult | n
       completionFactor: Math.round(completionFactor * 100) / 100,
       dowConversionRate: Math.round(dowConversion * 10000) / 10000,
       trendFactor: Math.round(trendFactor * 100) / 100,
+      paydayMultiplier: Math.round(dayOfMonthMultiplier * 100) / 100,
+      isPaydayWeek: isPaydayWeek(today.dom),
       sampleDays: sameDow.length,
       hour: todayHour,
       dow: today.dow,
+      dom: today.dom,
     },
   };
 }
@@ -368,6 +398,7 @@ export async function GET(request: NextRequest) {
             dailyMap.set(date, {
               date,
               dow: ukParts(d).dow,
+              dom: parseInt(date.slice(8, 10), 10),
               searches: searchBuckets.get(date) ?? 0,
               purchases: purchaseBuckets.get(date) ?? 0,
               hourlyPurchases: new Array(24).fill(0),
@@ -386,6 +417,7 @@ export async function GET(request: NextRequest) {
             sorted.push({
               date: todayKey,
               dow: ukParts(new Date()).dow,
+              dom: parseInt(todayKey.slice(8, 10), 10),
               searches: 0,
               purchases: 0,
               hourlyPurchases: new Array(24).fill(0),
