@@ -99,13 +99,37 @@ export async function GET(request: NextRequest) {
         fromDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
       }
 
-      const { data: rows } = await supabase
-        .from('searches')
-        .select('created_at')
-        .eq('site_id', siteId)
-        .gte('created_at', floor(fromDate.toISOString()))
-        .order('created_at', { ascending: true })
-        .limit(100000);
+      // Paginate through Supabase's 1000-row server cap. We build the query
+      // fresh each iteration with the cursor filter applied BEFORE order/limit,
+      // because the previous version (filter applied after limit on a reused
+      // builder) silently dropped the second page and the chart flatlined
+      // after the first 1000 rows.
+      const rows: Array<{ created_at: string }> = [];
+      let cursor = floor(fromDate.toISOString());
+      let useGt = false;
+      const PAGE_SIZE = 1000;
+      const MAX_PAGES = 30;
+      for (let pageNum = 0; pageNum < MAX_PAGES; pageNum++) {
+        let q = supabase
+          .from('searches')
+          .select('created_at')
+          .eq('site_id', siteId);
+        q = useGt
+          ? q.gt('created_at', cursor)
+          : q.gte('created_at', cursor);
+        const { data: page, error } = await q
+          .order('created_at', { ascending: true })
+          .limit(PAGE_SIZE);
+        if (error) {
+          console.error(`searches pagination error for ${siteId}:`, error.message);
+          break;
+        }
+        if (!page || page.length === 0) break;
+        rows.push(...page);
+        if (page.length < PAGE_SIZE) break;
+        cursor = page[page.length - 1].created_at;
+        useGt = true;
+      }
 
       const buckets = new Map<string, number>();
 
