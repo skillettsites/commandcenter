@@ -56,6 +56,7 @@ const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SITE_LABELS: Record<string, { name: string; color: string }> = {
   carcostcheck: { name: 'CarCostCheck', color: '#f59e0b' },
   postcodecheck: { name: 'PostcodeCheck', color: '#3b82f6' },
+  homebuyercheck: { name: 'HomeBuyerCheck', color: '#16a34a' },
 };
 
 const RANGE_LABELS: Record<TimeRange, string> = {
@@ -591,6 +592,9 @@ export default function SearchActivity() {
                                 <span className="text-[12px] font-mono text-[var(--text-primary)] flex-1 min-w-0 truncate">
                                   {search.search_query}
                                 </span>
+                                {search.search_type === 'address' && (
+                                  <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold flex-shrink-0">Address</span>
+                                )}
                                 {search.search_type === 'premium' && (
                                   <span className="text-[9px] px-1 py-0.5 rounded bg-purple-500/15 text-purple-400 font-bold flex-shrink-0">Premium</span>
                                 )}
