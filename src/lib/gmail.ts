@@ -378,6 +378,106 @@ export async function getEmailBody(emailId: string): Promise<{ body: string; con
   }
 }
 
+export interface GmailMessageDetail {
+  id: string;
+  subject: string;
+  from: string;
+  snippet: string;
+  body: string;
+  bodyType: 'html' | 'text';
+}
+
+// Returns the subject, sender, snippet and decoded body in a single full fetch.
+export async function getMessageDetail(id: string): Promise<GmailMessageDetail | null> {
+  const token = await getValidToken();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) return null;
+
+    const msg = await res.json();
+    const headers = msg.payload?.headers || [];
+    const getHeader = (name: string) =>
+      headers.find(
+        (h: { name: string; value: string }) => h.name.toLowerCase() === name.toLowerCase()
+      )?.value || '';
+
+    function findBody(part: Record<string, unknown>): { data: string; mimeType: string } | null {
+      const mimeType = part.mimeType as string;
+      const body = part.body as { data?: string } | undefined;
+      const parts = part.parts as Record<string, unknown>[] | undefined;
+
+      if ((mimeType === 'text/html' || mimeType === 'text/plain') && body?.data) {
+        return { data: body.data, mimeType };
+      }
+      if (parts) {
+        let plainText: { data: string; mimeType: string } | null = null;
+        for (const p of parts) {
+          const result = findBody(p);
+          if (result?.mimeType === 'text/html') return result;
+          if (result?.mimeType === 'text/plain') plainText = result;
+        }
+        return plainText;
+      }
+      return null;
+    }
+
+    const found = msg.payload ? findBody(msg.payload) : null;
+    const body = found
+      ? Buffer.from(found.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf-8')
+      : '';
+
+    return {
+      id,
+      subject: getHeader('Subject'),
+      from: getHeader('From'),
+      snippet: msg.snippet || '',
+      body,
+      bodyType: found?.mimeType === 'text/html' ? 'html' : 'text',
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Finds a user label by exact name, creating it if it doesn't exist. Returns its id.
+export async function findOrCreateLabel(name: string): Promise<string | null> {
+  const token = await getValidToken();
+  if (!token) return null;
+
+  try {
+    const listRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (listRes.ok) {
+      const data = await listRes.json();
+      const existing = (data.labels || []).find(
+        (l: { id: string; name: string }) => l.name === name
+      );
+      if (existing) return existing.id;
+    }
+
+    const createRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/labels', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        labelListVisibility: 'labelShow',
+        messageListVisibility: 'show',
+      }),
+    });
+    if (!createRes.ok) return null;
+    const created = await createRes.json();
+    return created.id || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getImportantEmails(maxResults = 20): Promise<{ emails: GmailMessage[]; connected: boolean }> {
   const token = await getValidToken();
   if (!token) return { emails: [], connected: false };

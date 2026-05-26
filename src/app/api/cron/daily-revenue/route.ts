@@ -268,6 +268,17 @@ async function handle(request: Request) {
   }
 
   const tg = await sendTelegram(message);
+
+  // Piggyback the daily Amazon invitation-to-buy check here to stay within the
+  // Vercel Hobby cron limits (separate Telegram message, sent only when an invite lands).
+  let amazonInvite: unknown = null;
+  try {
+    const { checkAmazonInvites } = await import('@/lib/amazon-invite');
+    amazonInvite = await checkAmazonInvites();
+  } catch (err) {
+    amazonInvite = { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
   return NextResponse.json(
     {
       ok: tg.ok,
@@ -275,6 +286,7 @@ async function handle(request: Request) {
       telegramError: tg.error,
       accountResults,
       purchaseCount: purchases.length,
+      amazonInvite,
     },
     { status: tg.ok ? 200 : 500 }
   );
