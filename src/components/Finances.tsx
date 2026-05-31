@@ -556,8 +556,8 @@ function DividendSection({ dividends, properties = [], projection }: { dividends
 
       {/* Income fund projection */}
       {(() => {
-        // Current ISA income fund values (Fidelity, UBS, Aegon)
-        const BLENDED_YIELD = 0.0734; // weighted avg: Fidelity 7.54%, UBS 7.2%, Aegon 7.27%
+        // Current ISA income fund values (Fidelity, UBS — Aegon sold May 2026)
+        const BLENDED_YIELD = 0.0742; // value-weighted: Fidelity 7.54% (£96k), UBS 7.2% (£53.5k)
         const ISA_ANNUAL_LIMIT = 20000;
         const DIV_TAX_RATE = 0.3375; // higher rate dividend tax
         const DIV_ALLOWANCE = 1000;
