@@ -51,8 +51,8 @@ export interface UpcomingMoney {
 }
 
 export const upcomingMoney: UpcomingMoney[] = [
+  // Mum (probate) £100k RECEIVED 31 May 2026 — now in cash (NatWest), removed from upcoming
   { id: 'sister-loan', source: 'Sister (loan repayment)', amount: 40000, notes: 'Owed to me', status: 'confirmed' },
-  { id: 'mum-probate', source: 'Mum (probate)', amount: 100000, notes: 'From estate', status: 'expected' },
   { id: 'house-sale-mine', source: 'House sale (my share)', amount: 300000, notes: 'When mum sells house', status: 'pending' },
   { id: 'house-sale-sister', source: 'Sister (from house sale)', amount: 100000, notes: 'Sister giving her share', status: 'pending' },
 ];
@@ -194,11 +194,11 @@ export const propertyHoldings: PropertyHolding[] = [
 ];
 
 export const cashHoldings: CashHolding[] = [
-  { account: 'NatWest 3775', balance: 12949 },
+  { account: 'NatWest (personal)', balance: 100000 }, // incl. £100k mum probate received 31 May 2026
   { account: 'NatWest 8002', balance: 2154 },
   { account: 'Revolut', balance: 1941 },
   { account: 'Premium Bonds', balance: 26000 },
-  { account: 'DRS Real Estate Ltd', balance: 19489 },
+  { account: 'DRS Real Estate Ltd', balance: 22000 },
 ];
 
 // Dividend/income schedules for all holdings
