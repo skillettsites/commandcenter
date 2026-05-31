@@ -1,5 +1,5 @@
 // Portfolio configuration - update values here when data changes
-// Last manual update: 2026-04-10 (from HL account summaries)
+// Last manual update: 2026-05-31 (from HL app screenshots)
 
 export interface StockHolding {
   symbol: string;
@@ -106,35 +106,25 @@ export interface DividendSchedule {
 
 export const stockHoldings: StockHolding[] = [
   // ISA holdings
-  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 198, costBasis: 19965, account: 'ISA', currency: 'USD' },
-  { symbol: 'AMZN', name: 'Amazon', shares: 143, costBasis: 22338, account: 'ISA', currency: 'USD' },
-  { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800, account: 'ISA', currency: 'GBP' },
-  { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281, account: 'ISA', currency: 'USD' },
-  { symbol: 'TS2X.L', name: '2x Tesla ETP', shares: 126, costBasis: 9953, account: 'ISA', currency: 'GBP' },
+  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 198, costBasis: 19965.32, account: 'ISA', currency: 'USD' },
+  { symbol: 'AMZN', name: 'Amazon', shares: 143, costBasis: 22338.02, account: 'ISA', currency: 'USD' },
+  { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800.38, account: 'ISA', currency: 'GBP' },
+  { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281.38, account: 'ISA', currency: 'USD' },
+  { symbol: '2TSL.L', name: '2x Tesla ETP', shares: 75, costBasis: 5924.18, account: 'ISA', currency: 'GBP' },
   // Fund & Share holdings
-  { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4463, account: 'F&S', currency: 'USD' },
-  { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15089, account: 'F&S', currency: 'USD' },
+  { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4462.60, account: 'F&S', currency: 'USD' },
+  { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15088.75, account: 'F&S', currency: 'USD' },
 ];
 
 export const fundHoldings: FundHolding[] = [
-  {
-    id: 'aegon-high-yield',
-    name: 'Aegon High Yield Bond',
-    sedol: 'B1N9DY5',
-    yahooSymbol: '0P0000HDPV.L',
-    units: 10848.34,
-    currentValue: 9794,
-    costBasis: 9961,
-    account: 'ISA',
-  },
   {
     id: 'fidelity-enhanced',
     name: 'Fidelity Enhanced Income',
     sedol: 'BYSYZP1',
     yahooSymbol: '0P0000XMHQ.L',
-    units: 63333.31,
-    currentValue: 53783,
-    costBasis: 49260,
+    units: 108130.87,
+    currentValue: 96000, // fallback; live value via HL unit-price cache. Reconciled from ISA total 31 May 2026
+    costBasis: 87396.11,
     account: 'ISA',
   },
   {
@@ -142,16 +132,16 @@ export const fundHoldings: FundHolding[] = [
     name: 'UBS Global Enhanced Eq Income',
     sedol: 'BL0RSP8',
     yahooSymbol: '0P00012V5G.L',
-    units: 118798.032,
-    currentValue: 40843,
-    costBasis: 38221,
+    units: 147233.897,
+    currentValue: 53546, // fallback; live value via HL unit-price cache. Reconciled from ISA total 31 May 2026
+    costBasis: 48172.72,
     account: 'ISA',
   },
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 30946.89 },
-  { account: 'F&S Cash', balance: 18090.51 },
+  { account: 'ISA Cash', balance: 11.40 },
+  { account: 'F&S Cash', balance: 38109.27 },
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
@@ -232,16 +222,6 @@ export const dividendSchedules: DividendSchedule[] = [
     paysDividend: true,
     paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     expectedPayDay: 28,
-  },
-  {
-    holdingId: 'aegon-high-yield',
-    holdingName: 'Aegon High Yield Bond',
-    holdingType: 'fund',
-    annualYieldPercent: 7.27,
-    frequency: 'monthly',
-    paysDividend: true,
-    paymentMonths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-    expectedPayDay: 14,
   },
   {
     holdingId: 'NVDA',
