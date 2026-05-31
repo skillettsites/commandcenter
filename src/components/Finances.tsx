@@ -3,6 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import NetWorthChart from './NetWorthChart';
 import ShareDetail from './ShareDetail';
+import { upcomingMoney } from '@/lib/portfolio';
+
+// Single source of truth for pending money (drives the net-worth banner + the
+// Upcoming list below). Reads from portfolio.ts so it never drifts from config.
+const upcomingTotal = upcomingMoney.reduce((sum, m) => sum + m.amount, 0);
 
 interface StockData {
   symbol: string;
@@ -853,7 +858,7 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
               <div className="flex items-center justify-center gap-1.5 mt-1">
                 <span className="w-4 border-t border-dashed border-[var(--orange)]" />
                 <span className="text-[11px] text-[var(--orange)]">
-                  {formatGBP(data.totals.netWorth + 540000)} inc. pending £540k
+                  {formatGBP(data.totals.netWorth + upcomingTotal)} inc. pending £{Math.round(upcomingTotal / 1000)}k
                 </span>
               </div>
             </div>
@@ -1291,16 +1296,11 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                   {/* Upcoming money */}
                   <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
                     <div className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                      Upcoming (£{(40000 + 100000 + 300000 + 100000).toLocaleString()})
+                      Upcoming (£{upcomingTotal.toLocaleString()})
                     </div>
                     <div className="space-y-1.5">
-                      {[
-                        { source: 'Sister (loan repayment)', amount: 40000, status: 'confirmed' },
-                        { source: 'Mum (probate)', amount: 100000, status: 'expected' },
-                        { source: 'House sale (my share)', amount: 300000, status: 'pending' },
-                        { source: 'Sister (from house sale)', amount: 100000, status: 'pending' },
-                      ].map((item) => (
-                        <div key={item.source} className="flex items-center justify-between py-0.5">
+                      {upcomingMoney.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between py-0.5">
                           <div className="flex items-center gap-2">
                             <span className={`w-1.5 h-1.5 rounded-full ${
                               item.status === 'confirmed' ? 'bg-[var(--green)]' :
