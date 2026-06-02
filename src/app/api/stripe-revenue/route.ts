@@ -2,8 +2,18 @@ import { NextResponse } from "next/server";
 
 interface AccountConfig {
   name: string;
-  key: string;
   sites: string[];
+  // "stripe": pull charges from the Stripe API using the env-var secret key.
+  // "supabase": pull purchases from the shared Supabase `reports` table (used for
+  //   sites whose Stripe key is marked Sensitive in Vercel and can't be read back,
+  //   e.g. HomeBuyerCheck).
+  source: "stripe" | "supabase";
+  envVar?: string;
+  // Legacy base64 fallback used only when the env-var key is unset/stale. SECURITY: these
+  // live keys are already in this public repo's git history — they should be ROTATED, after
+  // which both these literals and the matching env vars must be updated. Do NOT add new keys
+  // here; new accounts (e.g. AppealAFine) use env vars only.
+  fallbackB64?: string;
 }
 
 // Only count revenue from March 2026 onwards
@@ -12,20 +22,38 @@ const REVENUE_START_DATE = new Date("2026-03-01T00:00:00Z").getTime() / 1000;
 const ACCOUNTS: AccountConfig[] = [
   {
     name: "CarCostCheck",
-    key: process.env.STRIPE_KEY_CARCOSTCHECK || Buffer.from("c2tfbGl2ZV81MVQ5UlB1SUhTb09UU0N6SFVsb3hUSkIzZGJVSmFZYW92ck1KeE5QTHRKR2M3WE1xeWJzQzQzMEdxZ0FObG1xVGlMNHNqbGhMTWhLc1VYbWdPMXZ1WXpsMjAwSlRNcWcxTGo=", "base64").toString(),
+    source: "stripe",
+    envVar: "STRIPE_KEY_CARCOSTCHECK",
+    fallbackB64: "c2tfbGl2ZV81MVQ5UlB1SUhTb09UU0N6SFVsb3hUSkIzZGJVSmFZYW92ck1KeE5QTHRKR2M3WE1xeWJzQzQzMEdxZ0FObG1xVGlMNHNqbGhMTWhLc1VYbWdPMXZ1WXpsMjAwSlRNcWcxTGo=",
     sites: ["CarCostCheck"],
   },
   {
-    name: "MatchMySkillset",
-    key: process.env.STRIPE_KEY_MATCHMYSKILLSET || Buffer.from("c2tfbGl2ZV81MVNqSWFTSTdvUkNGeVZyTExleVVVTjVVYURRQ1A5OGllWUlkbE5JeFdmT2FOb1FyMEdWc0d0dFJQZXNhTlhwbFQyNno2aGF2cnVMRmtndDlqV1ppTng0YTAwSll5OThRWTQ=", "base64").toString(),
-    sites: ["MatchMySkillset"],
+    name: "AppealAFine",
+    source: "stripe",
+    envVar: "STRIPE_KEY_APPEALAFINE",
+    sites: ["AppealAFine"],
   },
   {
     name: "PostcodeCheck",
-    key: process.env.STRIPE_KEY_POSTCODECHECK || Buffer.from("c2tfbGl2ZV9aTnFRM3ZhalFLRTRvdlFLWjJYN1gwV0owMFFhU1hTaDlm", "base64").toString(),
+    source: "stripe",
+    envVar: "STRIPE_KEY_POSTCODECHECK",
+    fallbackB64: "c2tfbGl2ZV9aTnFRM3ZhalFLRTRvdlFLWjJYN1gwV0owMFFhU1hTaDlm",
     sites: ["PostcodeCheck"],
   },
+  {
+    name: "MatchMySkillset",
+    source: "stripe",
+    envVar: "STRIPE_KEY_MATCHMYSKILLSET",
+    fallbackB64: "c2tfbGl2ZV81MVNqSWFTSTdvUkNGeVZyTExleVVVTjVVYURRQ1A5OGllWUlkbE5JeFdmT2FOb1FyMEdWc0d0dFJQZXNhTlhwbFQyNno2aGF2cnVMRmtndDlqV1ppTng0YTAwSll5OThRWTQ=",
+    sites: ["MatchMySkillset"],
+  },
+  { name: "HomeBuyerCheck", source: "supabase", sites: ["HomeBuyerCheck"] },
 ];
+
+// env values pulled from local .env files sometimes carry a trailing literal "\n".
+function cleanEnv(v: string | undefined): string {
+  return (v || "").replace(/\\n$/, "").trim();
+}
 
 interface StripeCharge {
   amount: number;
@@ -33,6 +61,33 @@ interface StripeCharge {
   refunded: boolean;
   created: number;
   billing_details?: { email?: string };
+}
+
+// HomeBuyerCheck's Stripe key is Sensitive in Vercel, so its authoritative purchase
+// record is the Supabase `reports` table (the Stripe webhook writes a row per paid
+// order). Real customer orders carry a live session id (cs_live_*); QA rows use
+// qa_test_*/qatest* and are excluded by the like filter. amount_paid is in pence.
+async function fetchSupabaseCharges(): Promise<StripeCharge[]> {
+  const base = cleanEnv(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL);
+  const key = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  if (!base || !key) throw new Error("Supabase URL/service-role key not set");
+  const q =
+    "reports?select=created_at,amount_paid,customer_email,stripe_session_id" +
+    "&stripe_session_id=like.cs_live*&order=created_at.desc&limit=1000";
+  const res = await fetch(`${base}/rest/v1/${q}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`Supabase HTTP ${res.status}`);
+  const rows: Array<{ created_at: string; amount_paid: number | null; customer_email: string | null }> =
+    await res.json();
+  return rows.map((r) => ({
+    amount: r.amount_paid ?? 0,
+    paid: true,
+    refunded: false,
+    created: Math.floor(new Date(r.created_at).getTime() / 1000),
+    billing_details: { email: r.customer_email || "Unknown" },
+  }));
 }
 
 async function fetchCharges(key: string): Promise<StripeCharge[]> {
@@ -103,10 +158,17 @@ export async function GET() {
     }
 
     for (const account of ACCOUNTS) {
-      if (!account.key) continue;
-
       try {
-        const allCharges = await fetchCharges(account.key);
+        let allCharges: StripeCharge[];
+        if (account.source === "supabase") {
+          allCharges = await fetchSupabaseCharges();
+        } else {
+          const key =
+            cleanEnv(process.env[account.envVar!]) ||
+            (account.fallbackB64 ? Buffer.from(account.fallbackB64, "base64").toString() : "");
+          if (!key) continue;
+          allCharges = await fetchCharges(key);
+        }
         const paid = allCharges.filter(
           (c) => c.paid && !c.refunded && c.created >= REVENUE_START_DATE
         );

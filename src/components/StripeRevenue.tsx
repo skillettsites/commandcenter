@@ -34,6 +34,8 @@ const ACCOUNT_SHORT: Record<string, string> = {
   CarCostCheck: 'CCC',
   PostcodeCheck: 'PCC',
   MatchMySkillset: 'MMS',
+  AppealAFine: 'AAF',
+  HomeBuyerCheck: 'HBC',
 };
 
 interface DailyPoint {
