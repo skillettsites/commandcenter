@@ -167,7 +167,7 @@ export const propertyHoldings: PropertyHolding[] = [
     id: 'binnacle',
     name: '604 Binnacle House',
     value: 500000,
-    mortgage: 270000,
+    mortgage: 273000, // confirmed by Dave 10 Jun 2026
     type: 'keeping',
     autoValue: true,
     address: '604 Binnacle House, 10 Cobblestone Square, London E1W 3AR',
@@ -179,7 +179,7 @@ export const propertyHoldings: PropertyHolding[] = [
     id: 'cordage',
     name: '505 Cordage',
     value: 350000,
-    mortgage: 165000,
+    mortgage: 255000, // confirmed by Dave 10 Jun 2026 (matches DRS RE Ltd accounts, Foundation Homes loan ~£256k)
     type: 'keeping',
     autoValue: true,
     address: '505 Cordage House, 21 Cobblestone Square, London E1W 3AQ',
