@@ -76,8 +76,7 @@ export async function POST(req: Request) {
   const when = Number.isFinite(tsSec) ? formatLondonTime(tsSec) : '';
 
   const lines = [
-    '🎉 <b>New signup</b>',
-    `🌐 <b>${escapeHtml(site)}</b>`,
+    `🎉 <b>New signup: ${escapeHtml(site)}</b>`,
     detail ? `📝 ${escapeHtml(detail)}` : '',
     `📧 ${escapeHtml(email)}`,
     `🔑 via ${escapeHtml(provider)}`,
