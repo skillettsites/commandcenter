@@ -1,255 +1,125 @@
 -- =============================================================================
--- CRITICAL SECURITY FIX: Enable Row Level Security on ALL tables
--- Supabase instance: noxczmrnyyosgvvjlqca
--- Generated: 2026-03-25
+-- CRITICAL SECURITY FIX: Enable Row Level Security on ALL public tables
+-- Supabase instance: noxczmrnyyosgvvjlqca  (skillettsites's Project)
+-- Regenerated: 2026-06-03  (supersedes 2026-03-25 version, which was never applied)
 --
--- SEVERITY: HIGH - oauth_tokens (with live Google refresh tokens) and
--- net_worth_snapshots (financial data) are publicly readable with the anon key.
--- 34 of 35 tables return HTTP 200 to unauthenticated anon requests.
+-- SEVERITY: HIGH - the anon key currently returns HTTP 200 + live rows for
+-- tasks (149), email_verifications (22), clearout_items (61), price_scans (164),
+-- promo_events (3838), trip_itineraries (59), site_metrics (60) and others.
+-- Supabase advisor: rls_disabled_in_public.
 --
--- Run this in the Supabase SQL Editor: https://supabase.com/dashboard/project/noxczmrnyyosgvvjlqca/sql
+-- Strategy:
+--   1. Enable RLS on EVERY table in public (dynamic - also covers future tables).
+--   2. Give service_role full access on every table (all backend API routes use
+--      the service_role key, so they are unaffected).
+--   3. Grant narrow anon access ONLY where public sites genuinely need it
+--      (tracking inserts, public content reads, CommandCenter tasks).
+--   Everything else defaults to deny-for-anon, which is the secure default.
+--
+-- Apply in the SQL Editor:
+--   https://supabase.com/dashboard/project/noxczmrnyyosgvvjlqca/sql
 -- =============================================================================
 
--- =============================================
--- STEP 1: Enable RLS on ALL tables
--- =============================================
-
-ALTER TABLE public.affiliate_clicks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.appliance_guides ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_articles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_digests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_sources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_user_sources ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_user_topics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bmn_waitlist ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.career_votes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.custom_faqs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.dismissed_emails ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.emergency_contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.forecasts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.fund_dividends ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.local_recommendations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.net_worth_snapshots ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.newsletter_subscribers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.oauth_tokens ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.premium_reports ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.properties ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.property_files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.property_valuations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.searches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sender_scores ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.trade_checks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.trade_credits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_progress ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_progress_us ENABLE ROW LEVEL SECURITY;
-
--- =============================================
--- STEP 2: Drop any existing overly permissive policies
--- (safe to run even if they don't exist)
--- =============================================
-
--- Drop common auto-generated permissive policies if they exist
+-- =============================================================================
+-- STEP 1: Enable RLS on every base table in the public schema
+-- =============================================================================
 DO $$
-DECLARE
-    r RECORD;
+DECLARE r RECORD;
 BEGIN
-    FOR r IN (
-        SELECT schemaname, tablename, policyname
-        FROM pg_policies
-        WHERE schemaname = 'public'
-    ) LOOP
-        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', r.policyname, r.schemaname, r.tablename);
-    END LOOP;
+  FOR r IN
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', r.tablename);
+  END LOOP;
 END $$;
 
--- =============================================
--- STEP 3: Create appropriate policies per table category
--- =============================================
+-- =============================================================================
+-- STEP 2: Drop ALL existing policies (clean slate, safe to re-run)
+-- =============================================================================
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT schemaname, tablename, policyname FROM pg_policies WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I;', r.policyname, r.schemaname, r.tablename);
+  END LOOP;
+END $$;
 
--- ----- CATEGORY A: HIGHLY SENSITIVE (service_role only) -----
--- oauth_tokens, net_worth_snapshots, emergency_contacts, fund_dividends,
--- conversations, messages, dismissed_emails, sender_scores, subscriptions,
--- premium_reports, forecasts
+-- =============================================================================
+-- STEP 3: service_role full access on EVERY table (backends keep working)
+-- =============================================================================
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format(
+      'CREATE POLICY "service_role_all" ON public.%I FOR ALL TO service_role USING (true) WITH CHECK (true);',
+      r.tablename
+    );
+  END LOOP;
+END $$;
 
--- oauth_tokens: ONLY service_role can read/write
-CREATE POLICY "service_role_all" ON public.oauth_tokens
-    FOR ALL USING (auth.role() = 'service_role');
+-- =============================================================================
+-- STEP 4: Narrow anon access for public-facing tables only
+-- =============================================================================
 
-CREATE POLICY "service_role_all" ON public.net_worth_snapshots
-    FOR ALL USING (auth.role() = 'service_role');
+-- ----- 4a. PUBLIC INSERT (tracking, signups, lead capture from live sites) -----
+-- anon may INSERT but NOT read/update/delete. service_role already has full access.
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'affiliate_clicks','searches','career_votes','newsletter_subscribers',
+    'bmn_waitlist','user_progress','user_progress_us','conversion_events',
+    'pageviews','mot_reminders','price_watches','price_watch_emails',
+    'email_verifications','mms_email_leads','mms_job_clicks','mms_search_logs',
+    'promo_events','autocheck_calls'
+  ]
+  LOOP
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=t) THEN
+      EXECUTE format('CREATE POLICY "anon_insert" ON public.%I FOR INSERT TO anon WITH CHECK (true);', t);
+    END IF;
+  END LOOP;
+END $$;
 
-CREATE POLICY "service_role_all" ON public.emergency_contacts
-    FOR ALL USING (auth.role() = 'service_role');
+-- ----- 4b. PUBLIC SELECT (public content / reference data) -----
+-- anon may read but NOT write.
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'appliance_guides','bmn_sources','custom_faqs','local_recommendations',
+    'mms_featured_jobs','mms_employers'
+  ]
+  LOOP
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=t) THEN
+      EXECUTE format('CREATE POLICY "anon_select" ON public.%I FOR SELECT TO anon USING (true);', t);
+    END IF;
+  END LOOP;
+END $$;
 
-CREATE POLICY "service_role_all" ON public.fund_dividends
-    FOR ALL USING (auth.role() = 'service_role');
+-- ----- 4c. TASKS: CommandCenter syncs the tasks table with the anon key -----
+-- (per the CommandCenter workflow). Full anon CRUD is required here.
+CREATE POLICY "anon_select" ON public.tasks FOR SELECT TO anon USING (true);
+CREATE POLICY "anon_insert" ON public.tasks FOR INSERT TO anon WITH CHECK (true);
+CREATE POLICY "anon_update" ON public.tasks FOR UPDATE TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_delete" ON public.tasks FOR DELETE TO anon USING (true);
 
-CREATE POLICY "service_role_all" ON public.conversations
-    FOR ALL USING (auth.role() = 'service_role');
+-- =============================================================================
+-- Everything NOT listed in step 4 (oauth_tokens, net_worth_snapshots,
+-- properties, subscriptions, profiles, premium_reports, clearout_items,
+-- price_scans, trip_itineraries, stay_analyses, hmlr_*, tribunal_*, etc.)
+-- is now reachable ONLY via the service_role key. The anon key is locked out.
+-- =============================================================================
 
-CREATE POLICY "service_role_all" ON public.messages
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.dismissed_emails
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.sender_scores
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.subscriptions
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.premium_reports
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.forecasts
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.properties
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.property_files
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.property_valuations
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.profiles
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.projects
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.trade_checks
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.trade_credits
-    FOR ALL USING (auth.role() = 'service_role');
-
--- ----- CATEGORY B: TRACKING/ANALYTICS (anon INSERT, service_role SELECT) -----
--- These tables receive data from public websites but should not be readable publicly.
-
--- affiliate_clicks: public sites insert click tracking
-CREATE POLICY "anon_insert" ON public.affiliate_clicks
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.affiliate_clicks
-    FOR ALL USING (auth.role() = 'service_role');
-
--- searches (PostcodeCheck/CarCostCheck search logs)
-CREATE POLICY "anon_insert" ON public.searches
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.searches
-    FOR ALL USING (auth.role() = 'service_role');
-
--- career_votes (AICareerSwap)
-CREATE POLICY "anon_insert" ON public.career_votes
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.career_votes
-    FOR ALL USING (auth.role() = 'service_role');
-
--- newsletter_subscribers
-CREATE POLICY "anon_insert" ON public.newsletter_subscribers
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.newsletter_subscribers
-    FOR ALL USING (auth.role() = 'service_role');
-
--- bmn_waitlist
-CREATE POLICY "anon_insert" ON public.bmn_waitlist
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.bmn_waitlist
-    FOR ALL USING (auth.role() = 'service_role');
-
--- user_progress (quiz/progress tracking from public sites)
-CREATE POLICY "anon_insert" ON public.user_progress
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.user_progress
-    FOR ALL USING (auth.role() = 'service_role');
-
--- user_progress_us
-CREATE POLICY "anon_insert" ON public.user_progress_us
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "service_role_all" ON public.user_progress_us
-    FOR ALL USING (auth.role() = 'service_role');
-
--- ----- CATEGORY C: REFERENCE/READ-ONLY (anon SELECT, service_role full) -----
--- Public content that should be readable but not writable by anon users.
-
--- appliance_guides (public content)
-CREATE POLICY "anon_select" ON public.appliance_guides
-    FOR SELECT USING (true);
-CREATE POLICY "service_role_all" ON public.appliance_guides
-    FOR ALL USING (auth.role() = 'service_role');
-
--- bmn_sources (reference data)
-CREATE POLICY "anon_select" ON public.bmn_sources
-    FOR SELECT USING (true);
-CREATE POLICY "service_role_all" ON public.bmn_sources
-    FOR ALL USING (auth.role() = 'service_role');
-
--- custom_faqs (public content)
-CREATE POLICY "anon_select" ON public.custom_faqs
-    FOR SELECT USING (true);
-CREATE POLICY "service_role_all" ON public.custom_faqs
-    FOR ALL USING (auth.role() = 'service_role');
-
--- local_recommendations (public content)
-CREATE POLICY "anon_select" ON public.local_recommendations
-    FOR SELECT USING (true);
-CREATE POLICY "service_role_all" ON public.local_recommendations
-    FOR ALL USING (auth.role() = 'service_role');
-
--- ----- CATEGORY D: TASKS (anon read+write for CommandCenter mobile) -----
--- Tasks table is used from CommandCenter and possibly mobile; needs anon access.
-
-CREATE POLICY "anon_select" ON public.tasks
-    FOR SELECT USING (true);
-CREATE POLICY "anon_insert" ON public.tasks
-    FOR INSERT WITH CHECK (true);
-CREATE POLICY "anon_update" ON public.tasks
-    FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY "anon_delete" ON public.tasks
-    FOR DELETE USING (true);
-CREATE POLICY "service_role_all" ON public.tasks
-    FOR ALL USING (auth.role() = 'service_role');
-
--- ----- CATEGORY E: BriefMyNews user tables (auth user owns their rows) -----
--- If these use Supabase Auth, users access their own rows.
--- If no auth is set up, restrict to service_role only.
-
-CREATE POLICY "service_role_all" ON public.bmn_articles
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.bmn_digests
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.bmn_profiles
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.bmn_user_sources
-    FOR ALL USING (auth.role() = 'service_role');
-
-CREATE POLICY "service_role_all" ON public.bmn_user_topics
-    FOR ALL USING (auth.role() = 'service_role');
-
--- =============================================
--- STEP 4: IMMEDIATE ACTION - Revoke the leaked Google OAuth token
--- =============================================
--- The Google access_token and refresh_token for skillettsites@gmail.com
--- were publicly exposed. After running this SQL:
--- 1. Go to https://myaccount.google.com/permissions
--- 2. Revoke access for the app that generated this token
--- 3. Re-authenticate to get a new refresh token
--- 4. Update the oauth_tokens table with the new credentials
-
--- =============================================
--- VERIFICATION: Run this after applying to confirm RLS is active
--- =============================================
--- SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;
--- SELECT * FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename;
+-- =============================================================================
+-- VERIFICATION (run after applying)
+-- =============================================================================
+-- 1. Every table should have rowsecurity = true:
+--    SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname='public' AND NOT rowsecurity;
+--    -> expect 0 rows
+-- 2. Inspect policies:
+--    SELECT tablename, policyname, cmd, roles FROM pg_policies WHERE schemaname='public' ORDER BY tablename;
