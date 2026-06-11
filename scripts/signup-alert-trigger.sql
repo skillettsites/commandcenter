@@ -9,7 +9,8 @@
 -- SIGNUP_ALERT_SECRET env var set on CommandCenter in Vercel.
 
 -- pg_net lets Postgres make outbound HTTP calls (async, won't block signups).
-create extension if not exists pg_net with schema extensions;
+-- Already enabled on most Supabase projects; this is a no-op if so.
+create extension if not exists pg_net;
 
 create or replace function public.notify_new_signup()
 returns trigger
