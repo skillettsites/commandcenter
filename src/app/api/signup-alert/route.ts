@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendTelegram, escapeHtml, formatLondonTime } from '@/lib/telegram';
+import { attributeSignup } from '@/lib/signup-attribution';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -60,7 +61,6 @@ export async function POST(req: Request) {
   }
 
   const email = record.email || record.phone || record.id || 'unknown';
-  const meta = record.raw_user_meta_data || null;
   const appMeta = record.raw_app_meta_data || null;
 
   // Provider (email / google / etc.) lives in app metadata.
@@ -69,16 +69,18 @@ export async function POST(req: Request) {
     (Array.isArray(appMeta?.providers) ? String((appMeta!.providers as unknown[])[0]) : null) ||
     'email';
 
-  // Site/source is only present if the signup code set it in user metadata.
-  const site = pickString(meta, ['site', 'source', 'signup_site', 'app', 'brand', 'origin']);
+  // Work out which site this account came from (shared auth pool -> infer).
+  const { site, detail } = await attributeSignup(record);
 
   const tsSec = record.created_at ? Math.floor(new Date(record.created_at).getTime() / 1000) : Math.floor(Date.now() / 1000);
   const when = Number.isFinite(tsSec) ? formatLondonTime(tsSec) : '';
 
   const lines = [
     '🎉 <b>New signup</b>',
+    `🌐 <b>${escapeHtml(site)}</b>`,
+    detail ? `📝 ${escapeHtml(detail)}` : '',
     `📧 ${escapeHtml(email)}`,
-    site ? `🌐 ${escapeHtml(site)} · ${escapeHtml(provider)}` : `🔑 via ${escapeHtml(provider)}`,
+    `🔑 via ${escapeHtml(provider)}`,
     when ? `🕗 ${when}` : '',
   ].filter(Boolean);
 

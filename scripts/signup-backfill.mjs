@@ -27,6 +27,7 @@ const users = (au.users || []).map((u) => ({
   email: (u.email || '').toLowerCase(),
   created: u.created_at,
   plan: u.user_metadata?.selected_plan || u.user_metadata?.account_type || u.app_metadata?.tier || null,
+  ays: u.user_metadata?.selected_plan || null, // only AskYourStay's signup sets selected_plan
   name: u.user_metadata?.full_name || u.user_metadata?.display_name || null,
   sites: new Map(), // site -> details[]
 }));
@@ -44,7 +45,11 @@ const SOURCES = [
   { t: 'premium_reports', link: 'user_id', site: 'CarCostCheck', what: (r) => `premium report ${r.registration || ''}` },
   { t: 'mms_profiles', link: 'email', site: 'MatchMySkillset', what: (r) => `profile${r.role ? ' (' + r.role + ')' : ''}` },
   { t: 'mms_email_leads', link: 'email', site: 'MatchMySkillset', what: (r) => `skills assessment lead${r.top_match ? ' -> ' + r.top_match : ''}` },
+  { t: 'mms_skill_assessments', link: 'user_id', site: 'MatchMySkillset', what: () => 'skill assessment' },
+  { t: 'mms_job_clicks', link: 'user_id', site: 'MatchMySkillset', what: () => 'job clicks' },
   { t: 'bmn_waitlist', link: 'email', site: 'BriefMyNews', what: () => 'waitlist' },
+  { t: 'bmn_user_topics', link: 'user_id', site: 'BriefMyNews', what: (r) => `topic: ${r.topic || ''}${r.frequency ? ' (' + r.frequency + ')' : ''}` },
+  { t: 'bmn_digests', link: 'user_id', site: 'BriefMyNews', what: (r) => `digest sent${r.topic ? ': ' + r.topic : ''}` },
   { t: 'user_progress', link: 'user_id', site: 'AppealAFine (UK)', what: () => 'fine-appeal progress' },
   { t: 'user_progress_us', link: 'user_id', site: 'AppealAFine (US)', what: () => 'fine-appeal progress' },
   { t: 'reports', link: 'customer_email', site: 'HomeBuyerCheck / PostcodeCheck', what: (r) => `${r.tier || ''} property report` },
@@ -71,7 +76,14 @@ for (const s of SOURCES) {
   }
 }
 
-// Email-prefix heuristic for accounts with no activity rows.
+// Metadata signals (present from the moment of signup, before any activity).
+for (const u of users) {
+  // Only AskYourStay's signup writes selected_plan into auth user_metadata.
+  if (u.ays && !u.sites.has('AskYourStay')) {
+    u.sites.set('AskYourStay', new Set([`${u.ays} plan (trial)`]));
+  }
+}
+// Email-prefix heuristic for any remaining accounts with no activity rows.
 for (const u of users) {
   if (u.sites.size) continue;
   if (/^bmn[-.]/.test(u.email)) u.sites.set('BriefMyNews', new Set(['QA / test account']));
