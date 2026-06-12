@@ -10,6 +10,7 @@ import {
   dividendSchedules,
   jepqTarget,
   pokemonCards,
+  upcomingMoney,
 } from '@/lib/portfolio';
 import { getServiceClient } from '@/lib/supabase';
 
@@ -572,6 +573,60 @@ export async function GET() {
 
   const netWorth = investmentsTotal + propertyEquity + cashTotal + pokemonTotalGBP;
 
+  /* ---------- freedom pot: live "where the capital comes from" ----------
+     Mirrors the Freedom Plan POT_SOURCES, but pulled live from portfolio.ts so it
+     never goes stale. Deployable = liquid investments + selling-property equity +
+     family money + deployable cash, minus CGT friction. Kept-property equity stays
+     outside the income portfolio. */
+  const CGT_FRICTION = 8000; // ~£8k CGT on GIA gains when liquidating into the income sleeve
+
+  // Liquid investments = stocks + funds + investment cash + ICE vested (NOT unvested RSUs)
+  const investmentsLiquid = Math.round(stocksTotal + fundsTotal + investmentCashTotal + etradeVestedValue);
+
+  // Selling properties: equity each (released on completion)
+  const sellingProps = propertyHoldings
+    .filter((p) => p.type === 'selling')
+    .map((p) => ({ id: p.id, name: p.name, equity: Math.round(p.value - p.mortgage) }));
+  const sellingEquity = sellingProps.reduce((s, p) => s + p.equity, 0);
+
+  // Kept properties: equity stays outside the deployable pot
+  const keptProps = propertyHoldings
+    .filter((p) => p.type === 'keeping')
+    .map((p) => ({ id: p.id, name: p.name, equity: Math.round(p.value - p.mortgage) }));
+  const keptEquity = keptProps.reduce((s, p) => s + p.equity, 0);
+
+  // Family money + loan (incoming, from upcomingMoney)
+  const familyMoney = upcomingMoney.map((m) => ({ id: m.id, source: m.source, amount: m.amount, status: m.status }));
+  const familyTotal = familyMoney.reduce((s, m) => s + m.amount, 0);
+
+  // Deployable cash: every account deployed (no buffer), matching the Freedom Plan assumption
+  const cashDeployable = cashHoldings.map((c) => ({ account: c.account, balance: Math.round(c.balance) }));
+  const cashDeployableTotal = Math.round(cashTotal);
+
+  const deployableGross = investmentsLiquid + sellingEquity + familyTotal + cashDeployableTotal;
+  const deployablePot = deployableGross - CGT_FRICTION;
+
+  const freedom = {
+    deployablePot,
+    deployableGross,
+    friction: CGT_FRICTION,
+    keptOutside: keptEquity,
+    sources: {
+      investments: {
+        total: investmentsLiquid,
+        isaAndGia: Math.round(stocksTotal + fundsTotal + investmentCashTotal),
+        iceVested: etradeVestedValue,
+        stocks: Math.round(stocksTotal),
+        funds: Math.round(fundsTotal),
+        investmentCash: Math.round(investmentCashTotal),
+      },
+      propertySales: { total: sellingEquity, properties: sellingProps },
+      family: { total: familyTotal, items: familyMoney },
+      cash: { total: cashDeployableTotal, accounts: cashDeployable },
+    },
+    keptProperties: keptProps,
+  };
+
   return NextResponse.json({
     stocks,
     funds,
@@ -601,6 +656,7 @@ export async function GET() {
     },
     forexRate,
     dividends,
+    freedom,
     totals: {
       stocks: stocksTotal,
       funds: fundsTotal,

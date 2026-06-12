@@ -30,13 +30,37 @@ export function yearsToTarget(current: number, target: number, annualRate: numbe
 export const FREEDOM_TARGET_MONTHLY = 11000;
 
 // Income sleeve funds (live-verified yields, June 2026).
-const FUNDS = [
-  { cls: 'eq' as const, pct: 26, y: 8.42 }, // UBS Global Enhanced
-  { cls: 'eq' as const, pct: 20, y: 6.7 }, // Fidelity Enhanced
-  { cls: 'bd' as const, pct: 18, y: 7.15 }, // PIMCO STHS
-  { cls: 'bd' as const, pct: 16, y: 7.2 }, // iShares HYSD
-  { cls: 'eq' as const, pct: 10, y: 10.5 }, // JPM JEQP
+export interface SleeveFund {
+  name: string;
+  ticker: string;
+  cls: 'eq' | 'bd';
+  pct: number; // weight in the income sleeve (sums to 90)
+  y: number; // headline yield %
+  freq: string;
+  nav: string; // 2-year NAV stability note
+  navState: 'good' | 'watch' | 'risk';
+}
+
+export const SLEEVE_FUNDS: SleeveFund[] = [
+  { name: 'UBS Global Enhanced Eq Income', ticker: 'BL0RSP8', cls: 'eq', pct: 26, y: 8.42, freq: 'Monthly', nav: 'Rising 2 yrs straight', navState: 'good' },
+  { name: 'Fidelity Enhanced Income', ticker: 'BYSYZP1', cls: 'eq', pct: 20, y: 6.7, freq: 'Monthly', nav: 'Flat then +10%', navState: 'good' },
+  { name: 'PIMCO ST High Yield (STHS)', ticker: 'IE00BYXVWC37', cls: 'bd', pct: 18, y: 7.15, freq: 'Monthly', nav: 'Stable ~£9', navState: 'good' },
+  { name: 'iShares USD High Yield (HYSD)', ticker: 'IE000IIOOR48', cls: 'bd', pct: 16, y: 7.2, freq: 'Quarterly', nav: 'Mild dip ~-3% / 2y', navState: 'watch' },
+  { name: 'JPM Nasdaq Prem Income (JEQP)', ticker: 'IE000U9J8HX9', cls: 'eq', pct: 10, y: 10.5, freq: 'Monthly', nav: '-8% in 2025, recovering', navState: 'risk' },
 ];
+
+export interface GrowthHolding {
+  name: string;
+  ticker: string;
+  value: number;
+}
+export const GROWTH_HOLDINGS: GrowthHolding[] = [
+  { name: 'NVIDIA', ticker: 'NVDA', value: 30000 },
+  { name: 'Alphabet', ticker: 'GOOGL', value: 30000 },
+  { name: 'Tesla', ticker: 'TSLA', value: 30000 },
+];
+
+const FUNDS = SLEEVE_FUNDS.map((f) => ({ cls: f.cls, pct: f.pct, y: f.y }));
 const GROWTH_FIXED = 90000; // NVDA + GOOGL + TSLA @ £30k each, never topped up
 const INCOME_PCT = FUNDS.reduce((a, f) => a + f.pct, 0);
 export const BASE_BLEND = FUNDS.reduce((a, f) => a + f.pct * f.y, 0) / INCOME_PCT; // ≈ 7.8
@@ -188,6 +212,83 @@ export function sleeveAllocation(pot = 1467152) {
     { label: 'Bonds & credit', value: (sleeve * BD_PCT) / INCOME_PCT, color: 'var(--cyan)' },
     { label: 'Growth (NVDA/GOOGL/TSLA)', value: GROWTH_FIXED, color: 'var(--purple)' },
   ];
+}
+
+export interface AllocSlice {
+  name: string;
+  ticker: string;
+  kind: 'eq' | 'bd' | 'growth';
+  value: number; // £ deployed
+  pctOfPot: number; // % of whole pot
+  yield: number; // effective yield % (after blend scale)
+  monthly: number; // £/mo gross income
+  nav: string;
+  navState: 'good' | 'watch' | 'risk' | 'na';
+  freq: string;
+  color: string;
+}
+
+// Per-holding allocation detail for the interactive donut / table.
+export function sleeveFundDetail(pot = 1467152, yldPct = BASE_BLEND): AllocSlice[] {
+  const sleeve = pot - GROWTH_FIXED;
+  const scale = yldPct / BASE_BLEND;
+  const eqColors = ['var(--accent)', '#6aa6ff', 'var(--purple)'];
+  const bdColors = ['var(--cyan)', '#5eead4'];
+  let ei = 0,
+    bi = 0;
+  const funds: AllocSlice[] = SLEEVE_FUNDS.map((f) => {
+    const value = (sleeve * f.pct) / INCOME_PCT;
+    const yEff = f.y * scale;
+    const color = f.cls === 'eq' ? eqColors[ei++ % eqColors.length] : bdColors[bi++ % bdColors.length];
+    return {
+      name: f.name,
+      ticker: f.ticker,
+      kind: f.cls,
+      value,
+      pctOfPot: (value / pot) * 100,
+      yield: yEff,
+      monthly: (value * yEff) / 1200,
+      nav: f.nav,
+      navState: f.navState,
+      freq: f.freq,
+      color,
+    };
+  });
+  const growth: AllocSlice[] = GROWTH_HOLDINGS.map((g, i) => ({
+    name: g.name,
+    ticker: g.ticker,
+    kind: 'growth' as const,
+    value: g.value,
+    pctOfPot: (g.value / pot) * 100,
+    yield: 0,
+    monthly: 0,
+    nav: 'Capital growth sleeve',
+    navState: 'na' as const,
+    freq: 'Fixed £30k',
+    color: ['var(--orange)', '#fb923c', '#fbbf24'][i % 3],
+  }));
+  return [...funds, ...growth];
+}
+
+export interface WaterfallRow {
+  label: string;
+  value: number; // signed (tax is negative)
+  color: string;
+  emphasis?: boolean;
+}
+
+// Per-scenario income waterfall: gross distributions -> tax -> net + rents + business (+ salary) = total.
+export function scenarioWaterfall(r: ScenarioResult): WaterfallRow[] {
+  const rows: WaterfallRow[] = [
+    { label: 'Portfolio distributions (gross)', value: r.grossMo, color: 'var(--accent)' },
+    { label: `Tax (${r.regime})`, value: -r.taxMo, color: 'var(--red)' },
+    { label: 'Net portfolio income', value: r.netPortMo, color: 'var(--green)' },
+    { label: 'Rents net (Binnacle + Cordage)', value: r.rents, color: 'var(--purple)' },
+    { label: 'Websites + GYG + YouTube net', value: r.bizNet, color: 'var(--cyan)' },
+  ];
+  if (r.salary) rows.push({ label: 'Salary + bonus + RSUs net', value: r.salary, color: 'var(--orange)' });
+  rows.push({ label: 'Total net / month', value: r.totalMo, color: 'var(--green)', emphasis: true });
+  return rows;
 }
 
 /* ============================ formatting ============================ */
