@@ -198,7 +198,7 @@ export default function AffiliateClicks() {
                 {type}
               </span>
               <span className={`text-[10px] font-medium ${stats.today > 0 ? 'text-[var(--green)]' : 'text-[var(--text-tertiary)]'}`}>
-                {stats.total}
+                {stats.today}
               </span>
             </div>
           ))}

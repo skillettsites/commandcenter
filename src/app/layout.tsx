@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import ThemeProvider from "@/components/ThemeProvider";
-import BottomNav from "@/components/BottomNav";
+import AppShell from "@/components/AppShell";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
@@ -11,15 +11,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Personal task dashboard and site monitor",
+  title: "Command Center",
+  description: "Personal command center — sites, growth, forecasts and finances",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  themeColor: "#000000",
+  viewportFit: "cover",
+  themeColor: "#08080b",
 };
 
 export default function RootLayout({
@@ -31,8 +31,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <ThemeProvider>
-          {children}
-          <BottomNav />
+          <AppShell>{children}</AppShell>
         </ThemeProvider>
         <Analytics />
       </body>
