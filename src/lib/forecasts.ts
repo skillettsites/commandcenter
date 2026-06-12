@@ -2,8 +2,9 @@
 //
 // The "Financial Freedom" model is a faithful port of the authoritative
 // Freedom Plan dashboard (finances/retirement-plan.html, built 2026-06-10):
-// ~£1.47M pot → income sleeve @ 7.8% blend, business + rent, taxed per
-// scenario. Target is £11k/mo net. Keep this in sync with that file.
+// ~£1.44M deployable pot → income sleeve @ 7.8% blend, business + rent, taxed
+// per scenario. Target is £11k/mo net. Pot, ISA and business income refreshed
+// from live data 12 Jun 2026. Keep in sync with the Freedom Plan dashboard.
 
 /* ============================ net worth ============================ */
 export interface NetWorthPoint {
@@ -70,11 +71,13 @@ const EQ_Y = FUNDS.filter((f) => f.cls === 'eq').reduce((a, f) => a + f.pct * f.
 const BD_Y = FUNDS.filter((f) => f.cls === 'bd').reduce((a, f) => a + f.pct * f.y, 0) / BD_PCT;
 
 const EURGBP = 1.17;
-const ISA0 = 297917;
+const ISA0 = 297186; // HL ISA value 12 Jun 2026
 const UK_DIV = 0.3935;
 const UK_INT = 0.45;
-// Business income/mo: Stripe (live 90d, net of fees/COGS) + GYG + YouTube.
-const BIZ_GROSS = 1300 + 200 + 20; // £1,520/mo
+// Business income/mo (pre personal-tax profit). Real Stripe last 30d (12 Jun 2026):
+// CarCostCheck £2,303 (423 txns) + PCC/HBC £46 + AppealAFine £20 = £2,369 gross.
+// Net of Stripe fees + OneAuto/AutoCheck COGS ~£1,880, + GYG £200 + YouTube £20.
+const BIZ_GROSS = 1880 + 200 + 20; // ~£2,100/mo (was £1,520; refresh from live Stripe)
 
 function spainTax(annualGBP: number): number {
   const inc = annualGBP * EURGBP;
@@ -143,12 +146,12 @@ export interface Scenario {
 }
 
 export const SCENARIOS: Scenario[] = [
-  { id: 's5', label: 'Cyprus non-dom', flag: '🇨🇾', quit: true, duration: '17 yrs', regime: 'Non-dom · 0% divs/interest', pot: 1467152, salary: 0, rents: 1400, tax: 'cyprus', isa: 0, bizTax: 0.18 },
-  { id: 's4', label: 'Portugal IFICI', flag: '🇵🇹', quit: true, duration: '10 yrs', regime: 'NHR 2.0 · foreign income 0%', pot: 1467152, salary: 0, rents: 1400, tax: 'beckham', isa: 0, bizTax: 0.25 },
-  { id: 's1', label: 'Spain + own SL', flag: '🇪🇸', quit: true, duration: '6 yrs', regime: 'Beckham law · portfolio 0%', pot: 1467152, salary: 0, rents: 1400, tax: 'beckham', isa: 0, bizTax: 0.3 },
-  { id: 's6', label: 'Stay at ICE · pot in her name', flag: '🇬🇧', quit: false, duration: 'ongoing', regime: 'UK · graduated bands + ISAs', pot: 1470152, salary: 10588, rents: 200, tax: 'uk', isa: ISA0, bizTax: 0.47, split: true },
-  { id: 's3', label: 'ICE remote from Spain', flag: '✈️', quit: false, duration: '6 yrs', regime: 'Beckham digital nomad', pot: 1467152, salary: 13245, rents: 1400, tax: 'beckham', isa: 0, bizTax: 0.24 },
-  { id: 's2', label: 'Stay at ICE (UK)', flag: '🇬🇧', quit: false, duration: 'ongoing', regime: 'UK additional rate', pot: 1470152, salary: 10588, rents: 200, tax: 'uk', isa: ISA0, bizTax: 0.47 },
+  { id: 's5', label: 'Cyprus non-dom', flag: '🇨🇾', quit: true, duration: '17 yrs', regime: 'Non-dom · 0% divs/interest', pot: 1438691, salary: 0, rents: 1400, tax: 'cyprus', isa: 0, bizTax: 0.18 },
+  { id: 's4', label: 'Portugal IFICI', flag: '🇵🇹', quit: true, duration: '10 yrs', regime: 'NHR 2.0 · foreign income 0%', pot: 1438691, salary: 0, rents: 1400, tax: 'beckham', isa: 0, bizTax: 0.25 },
+  { id: 's1', label: 'Spain + own SL', flag: '🇪🇸', quit: true, duration: '6 yrs', regime: 'Beckham law · portfolio 0%', pot: 1438691, salary: 0, rents: 1400, tax: 'beckham', isa: 0, bizTax: 0.3 },
+  { id: 's6', label: 'Stay at ICE · pot in her name', flag: '🇬🇧', quit: false, duration: 'ongoing', regime: 'UK · graduated bands + ISAs', pot: 1441691, salary: 10588, rents: 200, tax: 'uk', isa: ISA0, bizTax: 0.47, split: true },
+  { id: 's3', label: 'ICE remote from Spain', flag: '✈️', quit: false, duration: '6 yrs', regime: 'Beckham digital nomad', pot: 1438691, salary: 13245, rents: 1400, tax: 'beckham', isa: 0, bizTax: 0.24 },
+  { id: 's2', label: 'Stay at ICE (UK)', flag: '🇬🇧', quit: false, duration: 'ongoing', regime: 'UK additional rate', pot: 1441691, salary: 10588, rents: 200, tax: 'uk', isa: ISA0, bizTax: 0.47 },
 ];
 
 export interface ScenarioResult extends Scenario {
