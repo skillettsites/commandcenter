@@ -194,7 +194,7 @@ export const propertyHoldings: PropertyHolding[] = [
 ];
 
 export const cashHoldings: CashHolding[] = [
-  { account: 'NatWest (personal)', balance: 100000 }, // incl. £100k mum probate received 31 May 2026
+  { account: 'NatWest (personal)', balance: 54000 }, // updated 12 Jun 2026 (was £100k; ~£46k deployed into HL investments)
   { account: 'NatWest 8002', balance: 2154 },
   { account: 'Revolut', balance: 1941 },
   { account: 'Premium Bonds', balance: 26000 },
