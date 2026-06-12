@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   projectNetWorth,
   freedomPlan,
+  liveBizGross,
   sleeveAllocation,
   sleeveFundDetail,
   scenarioWaterfall,
@@ -282,10 +283,21 @@ export default function ForecastBoard() {
     [netWorth, rate]
   );
 
-  /* freedom plan — pot defaults to the modelled ~£1.47M; if the live deployable pot
-     is present we surface it alongside (the per-scenario maths still uses the model pot
-     so it stays comparable with the Freedom Plan). */
-  const plan = useMemo(() => freedomPlan(yld), [yld]);
+  /* freedom plan — business income is now LIVE from Stripe: this month's run-rate
+     across all accounts, net of fees/COGS, plus GYG + YouTube. Falls back to the
+     model constant when Stripe data is absent, so it never goes stale. */
+  const plan = useMemo(() => {
+    let biz: number | undefined;
+    if (stripe) {
+      const now = new Date();
+      const dom = now.getDate();
+      const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const grossMo = (stripe.thisMonthRevenue ?? 0) / 100;
+      const runRate = dom > 0 ? (grossMo / dom) * dim : grossMo;
+      if (runRate > 0) biz = liveBizGross(runRate);
+    }
+    return freedomPlan(yld, biz);
+  }, [yld, stripe]);
   const quitWinners = plan.filter((s) => s.quit && s.clears);
   const bestQuit = [...plan].filter((s) => s.quit).sort((a, b) => b.totalMo - a.totalMo)[0];
   const active = plan.find((s) => s.id === activeScenario) ?? plan[0];
@@ -510,7 +522,8 @@ export default function ForecastBoard() {
             <button onClick={() => setYld(parseFloat(BASE_BLEND.toFixed(1)))} className="chip">Reset 7.8%</button>
           </div>
           <p className="text-[11px] text-[var(--text-tertiary)] mb-3">
-            Deploy the ~{gbpCompact(plan[0].pot)} pot into a {yld.toFixed(1)}% income sleeve. Tap a route to see exactly how it reaches £{FREEDOM_TARGET_MONTHLY.toLocaleString()}/mo:
+            Deploy the ~{gbpCompact(plan[0].pot)} pot into a {yld.toFixed(1)}% income sleeve. Tap a route to see exactly how it reaches £{FREEDOM_TARGET_MONTHLY.toLocaleString()}/mo.
+            {stripe ? ` Website income is live from Stripe (~${gbp((active.bizNet / (1 - active.bizTax)))}/mo, net of fees and COGS, + GYG and YouTube).` : ''}
           </p>
           <div className="space-y-2.5">
             {plan.map((s) => (

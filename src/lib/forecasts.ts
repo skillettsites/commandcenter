@@ -166,7 +166,9 @@ export interface ScenarioResult extends Scenario {
 }
 
 // Static year-0 net income for a scenario at a given blended yield (%).
-export function calcScenario(s: Scenario, yldPct: number): ScenarioResult {
+// bizGross (monthly, pre personal-tax) defaults to the constant but can be
+// passed live from Stripe so the forecast never goes stale.
+export function calcScenario(s: Scenario, yldPct: number, bizGross: number = BIZ_GROSS): ScenarioResult {
   const sleeve = s.pot - GROWTH_FIXED;
   const scale = yldPct / BASE_BLEND;
   let gross: number, tax: number;
@@ -187,7 +189,7 @@ export function calcScenario(s: Scenario, yldPct: number): ScenarioResult {
     tax = s.tax === 'spain' ? spainTax(gross) : s.tax === 'cyprus' ? Math.min(gross * 0.0265, 4077) : 0;
   }
   const netPortMo = (gross - tax) / 12;
-  const bizNet = BIZ_GROSS * (1 - s.bizTax);
+  const bizNet = bizGross * (1 - s.bizTax);
   const totalMo = netPortMo + s.salary + s.rents + bizNet;
   const passiveMo = netPortMo + s.rents + bizNet;
   return {
@@ -203,8 +205,16 @@ export function calcScenario(s: Scenario, yldPct: number): ScenarioResult {
   };
 }
 
-export function freedomPlan(yldPct: number): ScenarioResult[] {
-  return SCENARIOS.map((s) => calcScenario(s, yldPct));
+export function freedomPlan(yldPct: number, bizGross: number = BIZ_GROSS): ScenarioResult[] {
+  return SCENARIOS.map((s) => calcScenario(s, yldPct, bizGross));
+}
+
+// Default business income (monthly, pre personal-tax) when live Stripe is absent.
+export const BIZ_GROSS_DEFAULT = BIZ_GROSS;
+// Convert a live GROSS monthly Stripe run-rate into the model's business income:
+// net of Stripe fees + OneAuto/AutoCheck COGS (~20%), plus GYG + YouTube (off-Stripe).
+export function liveBizGross(stripeRunRateMo: number): number {
+  return Math.round(stripeRunRateMo * 0.8 + 220);
 }
 
 // Income-sleeve allocation for display (equity-income vs bonds-credit + growth).
