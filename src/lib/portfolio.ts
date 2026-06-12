@@ -111,9 +111,12 @@ export const stockHoldings: StockHolding[] = [
   { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800.38, account: 'ISA', currency: 'GBP' },
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281.38, account: 'ISA', currency: 'USD' },
   { symbol: '2TSL.L', name: '2x Tesla ETP', shares: 75, costBasis: 5924.18, account: 'ISA', currency: 'GBP' },
-  // Fund & Share holdings
+  // Fund & Share holdings (updated 12 Jun 2026 from HL app)
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4462.60, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15088.75, account: 'F&S', currency: 'USD' },
+  { symbol: 'SPCX', name: 'SpaceX', shares: 84, costBasis: 9952.87, account: 'F&S', currency: 'USD' },
+  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 37, costBasis: 9746.10, account: 'F&S', currency: 'USD' },
+  { symbol: 'NVDA', name: 'NVIDIA', shares: 65, costBasis: 9993.09, account: 'F&S', currency: 'USD' },
 ];
 
 export const fundHoldings: FundHolding[] = [
@@ -123,7 +126,7 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'BYSYZP1',
     yahooSymbol: '0P0000XMHQ.L',
     units: 108130.87,
-    currentValue: 96000, // fallback; live value via HL unit-price cache. Reconciled from ISA total 31 May 2026
+    currentValue: 96000, // fallback; live value via HL unit-price cache. Reconciled 12 Jun 2026 (ISA £297,186, F&S £100,347, HL total £397,533)
     costBasis: 87396.11,
     account: 'ISA',
   },
@@ -133,15 +136,15 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'BL0RSP8',
     yahooSymbol: '0P00012V5G.L',
     units: 147233.897,
-    currentValue: 53546, // fallback; live value via HL unit-price cache. Reconciled from ISA total 31 May 2026
+    currentValue: 53546, // fallback; live value via HL unit-price cache. Reconciled 12 Jun 2026 (ISA £297,186, F&S £100,347, HL total £397,533)
     costBasis: 48172.72,
     account: 'ISA',
   },
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 11.40 },
-  { account: 'F&S Cash', balance: 38109.27 },
+  { account: 'ISA Cash', balance: 412.95 },   // 12 Jun 2026
+  { account: 'F&S Cash', balance: 28413.46 },  // 12 Jun 2026
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
