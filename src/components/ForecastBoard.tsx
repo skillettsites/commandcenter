@@ -631,7 +631,7 @@ export default function ForecastBoard() {
                   <div className="flex items-center justify-between text-[12px]">
                     <span className="flex items-center gap-2 text-[var(--text-secondary)] min-w-0">
                       <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: a.color }} />
-                      <span className="truncate">{a.ticker}</span>
+                      <span className="truncate">{a.name}</span>
                     </span>
                     <span className="text-[var(--text-primary)] font-medium tabular-nums flex-shrink-0">{a.pctOfPot.toFixed(0)}%</span>
                   </div>
