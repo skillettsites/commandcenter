@@ -281,6 +281,7 @@ export default function StripeRevenue() {
                   minTickGap={20}
                 />
                 <YAxis
+                  domain={['auto', 'auto']}
                   tick={{ fontSize: 9, fill: 'var(--text-secondary)' }}
                   tickFormatter={(v: number) => `£${(v / 100).toFixed(0)}`}
                   width={40}

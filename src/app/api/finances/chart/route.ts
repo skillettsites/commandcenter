@@ -8,6 +8,7 @@ interface ChartDataPoint {
 }
 
 const RANGE_MAP: Record<string, { range: string; interval: string }> = {
+  '1D': { range: '1d', interval: '5m' },
   '1W': { range: '5d', interval: '15m' },
   '1M': { range: '1mo', interval: '1d' },
   '3M': { range: '3mo', interval: '1d' },

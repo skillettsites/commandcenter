@@ -36,7 +36,9 @@ function parseEnGb(d: string): number {
 export default function RevenueBoard() {
   const [data, setData] = useState<StripeData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<'month' | 'all'>('month');
+  const [range, setRange] = useState<'week' | 'month' | 'all'>('month');
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -51,7 +53,10 @@ export default function RevenueBoard() {
     if (!data) return null;
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const series = (data.dailySeries ?? []).filter((d) => (range === 'month' ? d.date.startsWith(ym) : true));
+    const allSeries = data.dailySeries ?? [];
+    const series = range === 'month' ? allSeries.filter((d) => d.date.startsWith(ym))
+      : range === 'week' ? allSeries.slice(-7)
+      : allSeries;
     const dayOfMonth = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const runRate = dayOfMonth > 0 ? ((data.thisMonthRevenue / P) / dayOfMonth) * daysInMonth : data.thisMonthRevenue / P;
@@ -78,8 +83,8 @@ export default function RevenueBoard() {
       right={
         <Segmented
           value={range}
-          onChange={setRange}
-          options={[{ value: 'month', label: 'Month' }, { value: 'all', label: 'All' }]}
+          onChange={(v) => { setRange(v); setSelectedDay(null); }}
+          options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'all', label: 'All' }]}
         />
       }
     >
@@ -97,15 +102,60 @@ export default function RevenueBoard() {
             <Stat label="All time" value={gbpCompact(data.totalRevenue / P)} sub={`${data.totalCharges} sales`} />
           </div>
 
-          {/* Chart */}
+          {/* Chart — click any day for a breakdown */}
           <AreaChart
             height={190}
             labels={view.series.map((d) => { const [, m, dd] = d.date.split('-'); return `${+dd}/${+m}`; })}
             formatValue={(v) => gbp(v)}
+            onPointClick={(i) => setSelectedDay((cur) => (cur === i ? null : i))}
+            selected={selectedDay}
             series={[
               { name: 'Revenue', color: 'var(--green)', data: view.series.map((d) => d.revenue / P), type: 'area' },
             ]}
           />
+          {selectedDay === null && (
+            <p className="text-[10px] text-[var(--text-tertiary)] text-center mt-1">Tap a day for its breakdown</p>
+          )}
+
+          {/* Day breakdown */}
+          {selectedDay !== null && view.series[selectedDay] && (() => {
+            const day = view.series[selectedDay];
+            const [yy, mm, dd] = day.date.split('-');
+            const human = `${+dd}/${+mm}/${yy}`;
+            const daySales = (data.accounts ?? [])
+              .flatMap((a) => a.recentCharges.map((c) => ({ ...c, account: a.name })))
+              .filter((c) => { const m = c.date.match(/(\d{2})\/(\d{2})\/(\d{4})/); return !!m && `${m[3]}-${m[2]}-${m[1]}` === day.date; });
+            return (
+              <div className="mt-3 rounded-xl bg-[var(--bg-elevated)] p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[12px] font-semibold text-[var(--text-primary)]">{human}</div>
+                  <button onClick={() => setSelectedDay(null)} className="text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Close</button>
+                </div>
+                <div className="flex gap-6 mb-2">
+                  <div>
+                    <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Revenue</div>
+                    <div className="text-[18px] font-bold text-[var(--green)] tabular-nums">{gbp(day.revenue / P, 2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Sales</div>
+                    <div className="text-[18px] font-bold tabular-nums">{day.charges}</div>
+                  </div>
+                </div>
+                {daySales.length > 0 ? (
+                  <div className="space-y-1 border-t border-[var(--hairline)] pt-2">
+                    {daySales.map((c, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-[var(--text-secondary)] truncate">{c.account} · {c.email || 'guest'}</span>
+                        <span className="text-[var(--green)] font-semibold tabular-nums flex-shrink-0">{gbp(c.amount / P, 2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-[var(--text-tertiary)] border-t border-[var(--hairline)] pt-2">Per-sale detail is outside the recent window; totals are from the daily series.</p>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Per-account + recent */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
@@ -113,6 +163,8 @@ export default function RevenueBoard() {
               <div className="section-eyebrow mb-2.5">By site · this month</div>
               <BarList
                 formatValue={(v) => gbp(v)}
+                onItemClick={(label) => setSelectedAccount((cur) => (cur === label ? null : label))}
+                activeLabel={selectedAccount ?? undefined}
                 items={view.accounts.slice(0, 6).map((a, i) => ({
                   label: a.name,
                   value: a.month,
@@ -120,6 +172,17 @@ export default function RevenueBoard() {
                   color: ['var(--green)', 'var(--cyan)', 'var(--accent)', 'var(--purple)', 'var(--orange)', 'var(--yellow)'][i % 6],
                 }))}
               />
+              {selectedAccount && (() => {
+                const acc = (data.accounts ?? []).find((a) => a.name === selectedAccount);
+                if (!acc) return null;
+                return (
+                  <div className="mt-2.5 rounded-lg bg-[var(--bg-elevated)] p-2.5 text-[11px] space-y-1">
+                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">Today</span><span className="tabular-nums">{gbp(acc.todayRevenue / P, 2)} · {acc.todayCharges} sales</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">This month</span><span className="tabular-nums">{gbp(acc.thisMonthRevenue / P, 2)} · {acc.thisMonthCharges} sales</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">All time</span><span className="tabular-nums">{gbp(acc.totalRevenue / P, 2)} · {acc.chargeCount} sales</span></div>
+                  </div>
+                );
+              })()}
             </div>
             <div>
               <div className="section-eyebrow mb-2.5">Recent sales</div>

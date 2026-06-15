@@ -383,7 +383,7 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
                           axisLine={false}
                           interval="preserveStartEnd"
                         />
-                        <YAxis tick={{ fontSize: 9, fill: 'var(--text-tertiary)' }} tickLine={false} axisLine={false} />
+                        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 9, fill: 'var(--text-tertiary)' }} tickLine={false} axisLine={false} />
                         <Tooltip content={<CustomTooltip />} />
                         <Area
                           type="monotone"
@@ -426,7 +426,7 @@ export default function GrowthAnalytics({ startExpanded = false }: { startExpand
                           axisLine={false}
                           interval="preserveStartEnd"
                         />
-                        <YAxis tick={{ fontSize: 9, fill: 'var(--text-tertiary)' }} tickLine={false} axisLine={false} />
+                        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 9, fill: 'var(--text-tertiary)' }} tickLine={false} axisLine={false} />
                         <Tooltip content={<CustomTooltip />} />
                         <Area
                           type="monotone"
@@ -867,7 +867,7 @@ function IndexingRow({
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                     <XAxis dataKey="label" tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} interval={6} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} width={24} axisLine={false} tickLine={false} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} width={24} axisLine={false} tickLine={false} />
                     <Tooltip
                       contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8, fontSize: 10 }}
                       labelStyle={{ color: '#999', fontSize: 9 }}
@@ -888,7 +888,7 @@ function IndexingRow({
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                     <XAxis dataKey="label" tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} interval={6} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} width={30} axisLine={false} tickLine={false} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 8, fill: 'var(--text-tertiary)' }} width={30} axisLine={false} tickLine={false} />
                     <Tooltip
                       contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8, fontSize: 10 }}
                       labelStyle={{ color: '#999', fontSize: 9 }}

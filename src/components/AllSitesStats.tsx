@@ -328,7 +328,14 @@ function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; 
   const totalViews = hourly.reduce((sum, h) => sum + h.pageViews, 0);
   const totalUsers = hourly.reduce((sum, h) => sum + h.users, 0);
   const displayData = (range === '24h' || range === 'today') ? hourly.slice(-24) : hourly;
-  const maxViews = Math.max(...displayData.map(h => h.pageViews), 1);
+  // Adaptive Y domain: hug the data with a little headroom instead of pinning to 0.
+  const viewVals = displayData.map(h => h.pageViews);
+  const maxRaw = Math.max(...viewVals, 1);
+  const minRaw = viewVals.length ? Math.min(...viewVals) : 0;
+  const vSpan = (maxRaw - minRaw) || maxRaw || 1;
+  const minViews = minRaw - vSpan * 0.08;
+  const maxViews = maxRaw + vSpan * 0.08;
+  const vDenom = (maxViews - minViews) || 1;
 
   const chartWidth = 300;
   const chartHeight = 140;
@@ -338,7 +345,7 @@ function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; 
 
   const points = displayData.map((h, i) => ({
     x: pad.left + (displayData.length === 1 ? innerW / 2 : (i / (displayData.length - 1)) * innerW),
-    y: pad.top + innerH - (h.pageViews / maxViews) * innerH,
+    y: pad.top + innerH - ((h.pageViews - minViews) / vDenom) * innerH,
     views: h.pageViews,
     users: h.users,
     label: h.dateHour,

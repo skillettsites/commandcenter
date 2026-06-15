@@ -142,12 +142,16 @@ export function AreaChart({
   height = 200,
   formatValue = (v) => fmtNum(Math.round(v)),
   yTicks = true,
+  onPointClick,
+  selected = null,
 }: {
   series: ChartSeries[];
   labels: string[];
   height?: number;
   formatValue?: (v: number) => string;
   yTicks?: boolean;
+  onPointClick?: (i: number) => void;
+  selected?: number | null;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const n = labels.length;
@@ -157,9 +161,27 @@ export function AreaChart({
   const pad = { t: 12, r: 10, b: 22, l: 36 };
   const innerW = W - pad.l - pad.r;
   const innerH = H - pad.t - pad.b;
-  const maxV = Math.max(1, ...series.flatMap((s) => s.data));
+
+  // Adaptive Y domain: pure line/area charts hug the data (no forced 0
+  // baseline, so movement fills the panel); charts that include bars keep a
+  // 0 baseline so bar heights stay truthful.
+  const hasBars = series.some((s) => s.type === 'bar');
+  const allVals = series.flatMap((s) => s.data).filter((v) => Number.isFinite(v));
+  const rawMax = allVals.length ? Math.max(...allVals) : 1;
+  const rawMin = allVals.length ? Math.min(...allVals) : 0;
+  const span = (rawMax - rawMin) || Math.abs(rawMax) || 1;
+  const maxV = hasBars ? Math.max(1, rawMax * 1.08) : rawMax + span * 0.08;
+  const minV = hasBars ? 0 : rawMin - span * 0.08;
+  const denom = (maxV - minV) || 1;
+
   const x = (i: number) => pad.l + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
-  const y = (v: number) => pad.t + innerH - (v / maxV) * innerH;
+  const y = (v: number) => pad.t + innerH - ((v - minV) / denom) * innerH;
+  const nearest = (clientX: number, rect: DOMRect) => {
+    const mx = ((clientX - rect.left) / rect.width) * W;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < n; i++) { const d = Math.abs(x(i) - mx); if (d < bd) { bd = d; best = i; } }
+    return best;
+  };
 
   const barSeries = series.filter((s) => s.type === 'bar');
   const lineSeries = series.filter((s) => s.type !== 'bar');
@@ -169,16 +191,11 @@ export function AreaChart({
     <div>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-auto"
+        className={`w-full h-auto ${onPointClick ? 'cursor-pointer' : ''}`}
         preserveAspectRatio="none"
-        onMouseMove={(e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          const mx = ((e.clientX - r.left) / r.width) * W;
-          let best = 0, bd = Infinity;
-          for (let i = 0; i < n; i++) { const d = Math.abs(x(i) - mx); if (d < bd) { bd = d; best = i; } }
-          setHover(best);
-        }}
+        onMouseMove={(e) => setHover(nearest(e.clientX, e.currentTarget.getBoundingClientRect()))}
         onMouseLeave={() => setHover(null)}
+        onClick={onPointClick ? (e) => onPointClick(nearest(e.clientX, e.currentTarget.getBoundingClientRect())) : undefined}
       >
         <defs>
           {lineSeries.map((s, si) => (
@@ -193,7 +210,7 @@ export function AreaChart({
         {yTicks && [0, 0.5, 1].map((g) => (
           <g key={g}>
             <line x1={pad.l} x2={pad.l + innerW} y1={pad.t + innerH * (1 - g)} y2={pad.t + innerH * (1 - g)} stroke="currentColor" opacity={0.07} strokeWidth={0.5} />
-            <text x={pad.l - 5} y={pad.t + innerH * (1 - g) + 3} textAnchor="end" fontSize="8" fill="currentColor" opacity={0.4} fontFamily="system-ui">{fmtCompact(maxV * g)}</text>
+            <text x={pad.l - 5} y={pad.t + innerH * (1 - g) + 3} textAnchor="end" fontSize="8" fill="currentColor" opacity={0.4} fontFamily="system-ui">{fmtCompact(minV + (maxV - minV) * g)}</text>
           </g>
         ))}
 
@@ -231,6 +248,14 @@ export function AreaChart({
         {hover != null && lineSeries.map((s, si) => (
           <circle key={si} cx={x(hover)} cy={y(s.data[hover] ?? 0)} r={3} fill="#fff" stroke={s.color} strokeWidth={2} />
         ))}
+
+        {/* persistent selected marker (click) */}
+        {selected != null && selected !== hover && selected >= 0 && selected < n && (
+          <line x1={x(selected)} x2={x(selected)} y1={pad.t} y2={pad.t + innerH} stroke="var(--accent)" opacity={0.55} strokeWidth={1.2} />
+        )}
+        {selected != null && selected >= 0 && selected < n && lineSeries.map((s, si) => (
+          <circle key={`sel-${si}`} cx={x(selected)} cy={y(s.data[selected] ?? 0)} r={3.5} fill="var(--accent)" stroke="#fff" strokeWidth={1.5} />
+        ))}
       </svg>
 
       {/* legend + readout */}
@@ -254,15 +279,23 @@ export function AreaChart({
 export function BarList({
   items,
   formatValue = (v) => fmtNum(v),
+  onItemClick,
+  activeLabel,
 }: {
   items: { label: string; value: number; color?: string; sub?: string }[];
   formatValue?: (v: number) => string;
+  onItemClick?: (label: string) => void;
+  activeLabel?: string;
 }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
     <div className="space-y-2.5">
       {items.map((it) => (
-        <div key={it.label}>
+        <div
+          key={it.label}
+          onClick={onItemClick ? () => onItemClick(it.label) : undefined}
+          className={onItemClick ? `cursor-pointer rounded-lg -mx-1.5 px-1.5 py-0.5 transition-colors hover:bg-[var(--bg-elevated)] ${activeLabel === it.label ? 'bg-[var(--bg-elevated)]' : ''}` : ''}
+        >
           <div className="flex items-center justify-between text-[12px] mb-1">
             <span className="text-[var(--text-secondary)] truncate flex items-center gap-1.5">
               {it.color && <span className="w-2 h-2 rounded-full" style={{ background: it.color }} />}

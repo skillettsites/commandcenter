@@ -26,7 +26,7 @@ interface ChartResponse {
   chartData: { date: string; price: number }[];
 }
 
-type Period = '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL';
+type Period = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL';
 
 interface ShareDetailProps {
   symbol: string;
@@ -48,6 +48,9 @@ interface ShareDetailProps {
 
 function formatDateLabel(dateStr: string, period: Period): string {
   const d = new Date(dateStr);
+  if (period === '1D') {
+    return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
   if (period === '1W') {
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
   }
@@ -121,8 +124,8 @@ export default function ShareDetail({
           day: 'numeric',
           month: 'short',
           year: 'numeric',
-          hour: p === '1W' ? '2-digit' : undefined,
-          minute: p === '1W' ? '2-digit' : undefined,
+          hour: p === '1W' || p === '1D' ? '2-digit' : undefined,
+          minute: p === '1W' || p === '1D' ? '2-digit' : undefined,
         }),
       }));
 
@@ -148,7 +151,7 @@ export default function ShareDetail({
     }
   }, []);
 
-  const periods: Period[] = ['1W', '1M', '3M', '6M', '1Y', 'ALL'];
+  const periods: Period[] = ['1D', '1W', '1M', '3M', '6M', '1Y', 'ALL'];
 
   // Determine chart color based on price movement
   const firstPrice = chartData.length > 0 ? chartData[0].price : 0;
@@ -312,7 +315,7 @@ export default function ShareDetail({
             {isPositive ? '+' : ''}{periodChange.toFixed(2)} ({isPositive ? '+' : ''}{periodChangePercent.toFixed(1)}%)
           </span>
           <span className="text-[10px] text-[var(--text-tertiary)]">
-            over {period === '1W' ? '1 week' : period === '1M' ? '1 month' : period === '3M' ? '3 months' : period === '6M' ? '6 months' : period === '1Y' ? '1 year' : 'all time'}
+            over {period === '1D' ? '1 day' : period === '1W' ? '1 week' : period === '1M' ? '1 month' : period === '3M' ? '3 months' : period === '6M' ? '6 months' : period === '1Y' ? '1 year' : 'all time'}
           </span>
         </div>
       )}
