@@ -1,5 +1,8 @@
 // Portfolio configuration - update values here when data changes
-// Last manual update: 2026-05-31 (from HL app screenshots)
+// Last manual update: 2026-06-15 (from HL app screenshots)
+// HL total £407,016.57 (invested £378,150.92, cash £28,865.65; +£130,983.90 / +52.99% all-time).
+// ISA £302,206.19 (+52.48%, cash £413.04). Fund & Share £104,810.38 (+55.06%, cash £28,450.72).
+// Holdings unchanged vs 12 Jun; the rise is market value (+£9.5k since 12 Jun). FX 1.34091 USD/GBP.
 
 export interface StockHolding {
   symbol: string;
@@ -126,7 +129,7 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'BYSYZP1',
     yahooSymbol: '0P0000XMHQ.L',
     units: 108130.87,
-    currentValue: 96000, // fallback; live value via HL unit-price cache. Reconciled 12 Jun 2026 (ISA £297,186, F&S £100,347, HL total £397,533)
+    currentValue: 96620, // fallback; live value via HL unit-price cache. Reconciled 15 Jun 2026 (ISA £302,206, F&S £104,810, HL total £407,017)
     costBasis: 87396.11,
     account: 'ISA',
   },
@@ -136,15 +139,15 @@ export const fundHoldings: FundHolding[] = [
     sedol: 'BL0RSP8',
     yahooSymbol: '0P00012V5G.L',
     units: 147233.897,
-    currentValue: 53546, // fallback; live value via HL unit-price cache. Reconciled 12 Jun 2026 (ISA £297,186, F&S £100,347, HL total £397,533)
-    costBasis: 48172.72,
+    currentValue: 53902, // fallback; live value via HL unit-price cache. Reconciled 15 Jun 2026 (ISA £302,206, F&S £104,810, HL total £407,017)
+    costBasis: 48218.22,
     account: 'ISA',
   },
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 412.95 },   // 12 Jun 2026
-  { account: 'F&S Cash', balance: 28413.46 },  // 12 Jun 2026
+  { account: 'ISA Cash', balance: 413.04 },    // 15 Jun 2026
+  { account: 'F&S Cash', balance: 28450.72 },  // 15 Jun 2026
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
