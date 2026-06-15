@@ -6,7 +6,7 @@ import { Module, Segmented, AreaChart, BarList, gbp, gbpCompact, fmtNum } from '
 /* ----------------------------- types ----------------------------- */
 interface Stock { symbol: string; account: string; shares: number; currentValue: number; costBasis: number; gainLoss: number; gainLossPercent: number; dailyChangePercent: number; livePrice: number; currency?: string; }
 interface Fund { id: string; name: string; currentValue: number; gainLossPercent: number; isLive: boolean; }
-interface Etrade { symbol: string; name: string; totalShares: number; vestedShares: number; unvestedShares: number; totalValue: number; vestedValue: number; unvestedValue: number; dailyChangePercent: number; }
+interface Etrade { symbol: string; name: string; totalShares: number; vestedShares: number; unvestedShares: number; totalValue: number; vestedValue: number; unvestedValue: number; dailyChangePercent: number; livePriceGBP?: number | null; vesting?: { date: string; shares: number; label?: string }[]; }
 interface CashAcct { account: string; balance: number; }
 interface Property { id: string; name: string; value: number; mortgage: number; type: 'keeping' | 'selling'; rentalIncome?: number; mortgagePayment?: number; serviceCharge?: number; }
 interface Dividends {
@@ -177,13 +177,13 @@ function InvestmentsModule({ data, blurValues, forexRate }: { data: FinData; blu
     const rows: Holding[] = [];
     for (const s of data.stocks ?? []) rows.push({ key: `s-${s.symbol}`, name: s.symbol, sub: `${s.account} · ${s.shares} sh`, value: s.currentValue, gainPct: s.gainLossPercent, dailyPct: s.dailyChangePercent, symbol: s.symbol, currency: s.currency });
     for (const f of data.funds ?? []) rows.push({ key: `f-${f.id}`, name: f.name, sub: 'Income fund', value: f.currentValue, gainPct: f.gainLossPercent, dailyPct: null });
-    if (data.etrade && data.etrade.totalValue > 0) rows.push({ key: 'etrade', name: `${data.etrade.symbol} (E*Trade)`, sub: `${data.etrade.vestedShares} vested · ${data.etrade.unvestedShares} unvested`, value: data.etrade.totalValue, gainPct: null, dailyPct: data.etrade.dailyChangePercent });
+    if (data.etrade && data.etrade.vestedValue > 0) rows.push({ key: 'etrade', name: `${data.etrade.symbol} (E*Trade)`, sub: `${data.etrade.vestedShares} vested · ${data.etrade.unvestedShares} unvested (excl.)`, value: data.etrade.vestedValue, gainPct: null, dailyPct: data.etrade.dailyChangePercent });
     for (const c of data.cashInvestmentAccounts ?? []) if (c.balance > 0) rows.push({ key: `ic-${c.account}`, name: c.account, sub: 'Investment cash', value: c.balance, gainPct: null, dailyPct: null });
     return rows.sort((a, b) => b.value - a.value);
   }, [data]);
 
   const max = Math.max(1, ...holdings.map((h) => h.value));
-  const todayChange = (data.stocks ?? []).reduce((s, st) => s + (st.currentValue * (st.dailyChangePercent || 0)) / 100, 0) + (data.etrade ? (data.etrade.totalValue * (data.etrade.dailyChangePercent || 0)) / 100 : 0);
+  const todayChange = (data.stocks ?? []).reduce((s, st) => s + (st.currentValue * (st.dailyChangePercent || 0)) / 100, 0) + (data.etrade ? (data.etrade.vestedValue * (data.etrade.dailyChangePercent || 0)) / 100 : 0);
 
   function toggle(h: Holding) {
     const next = open === h.key ? null : h.key;
@@ -210,7 +210,7 @@ function InvestmentsModule({ data, blurValues, forexRate }: { data: FinData; blu
           const isOpen = open === h.key;
           return (
             <div key={h.key} className="rounded-xl overflow-hidden border border-transparent hover:border-[var(--hairline)] transition-colors">
-              <button onClick={() => toggle(h)} className={`w-full text-left p-2.5 ${h.symbol ? 'cursor-pointer hover:bg-[var(--surface-hover)]' : 'cursor-default'} transition-colors`}>
+              <button onClick={() => toggle(h)} className={`w-full text-left p-2.5 ${h.symbol || h.key === 'etrade' ? 'cursor-pointer hover:bg-[var(--surface-hover)]' : 'cursor-default'} transition-colors`}>
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{h.name}</div>
@@ -235,11 +235,52 @@ function InvestmentsModule({ data, blurValues, forexRate }: { data: FinData; blu
                   ) : <div className="h-[130px] flex items-center justify-center text-[11px] text-[var(--text-tertiary)]">Loading chart…</div>}
                 </div>
               )}
+              {isOpen && h.key === 'etrade' && data.etrade && (
+                <EtradeBreakdown etrade={data.etrade} blur={blur} />
+              )}
             </div>
           );
         })}
       </div>
     </Module>
+  );
+}
+
+/* ============================ E*Trade vesting breakdown ============================ */
+function EtradeBreakdown({ etrade, blur }: { etrade: Etrade; blur: (n: React.ReactNode) => React.ReactNode }) {
+  const perShareGBP = etrade.livePriceGBP ?? (etrade.unvestedShares > 0 ? etrade.unvestedValue / etrade.unvestedShares : 0);
+  const sched = (etrade.vesting ?? []).slice().sort((a, b) => a.date.localeCompare(b.date));
+  return (
+    <div className="px-2.5 pb-3 fade-in space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5">
+          <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)]">Vested · in net worth</div>
+          <div className="text-[15px] font-bold text-[var(--text-primary)] tabular-nums">{blur(gbp(etrade.vestedValue))}</div>
+          <div className="text-[10px] text-[var(--text-tertiary)]">{etrade.vestedShares.toLocaleString()} shares</div>
+        </div>
+        <div className="rounded-lg bg-[var(--bg-elevated)] p-2.5 border border-dashed border-[var(--hairline)]">
+          <div className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)]">Unvested · excluded</div>
+          <div className="text-[15px] font-bold text-[var(--text-tertiary)] tabular-nums">{blur(gbp(etrade.unvestedValue))}</div>
+          <div className="text-[10px] text-[var(--text-tertiary)]">{etrade.unvestedShares.toLocaleString()} shares</div>
+        </div>
+      </div>
+      <div>
+        <div className="section-eyebrow mb-1.5">Vesting schedule</div>
+        {sched.length === 0 ? (
+          <p className="text-[11px] text-[var(--text-tertiary)]">Vest dates not set yet — add the dates + share counts from E*Trade.</p>
+        ) : (
+          <div className="space-y-1">
+            {sched.map((v, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px] py-0.5 border-b border-[var(--hairline)] last:border-0">
+                <span className="text-[var(--text-secondary)]">{new Date(v.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}{v.label ? ` · ${v.label}` : ''}</span>
+                <span className="tabular-nums text-[var(--text-primary)]">{v.shares.toLocaleString()} sh · {blur(gbp(Math.round(v.shares * perShareGBP)))}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[10px] text-[var(--text-tertiary)] mt-1.5">Unvested shares stay out of net worth until each vest date. Est. value at the live ICE price.</p>
+      </div>
+    </div>
   );
 }
 

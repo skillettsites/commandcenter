@@ -645,6 +645,7 @@ export async function GET() {
       isLive: icePrice !== null,
       dailyChangePercent: iceDailyChangePercent,
       dailyChangeGBP: iceDailyChangeGBP,
+      vesting: etradeHoldings.vestingSchedule ?? [],
     },
     properties: propertyHoldings,
     cash: cashHoldings,

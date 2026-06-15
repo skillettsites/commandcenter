@@ -164,6 +164,9 @@ export const etradeHoldings = {
   totalShares: 1500,
   account: 'E*Trade' as const,
   currency: 'USD' as const,
+  // Upcoming RSU vest dates (shares per tranche). Unvested shares are EXCLUDED
+  // from net worth until each date. Populate from E*Trade (dates + share counts).
+  vestingSchedule: [] as { date: string; shares: number; label?: string }[],
 };
 // Fallback GBP value if Yahoo Finance unavailable
 export const etradeValue = 134202; // vested only, as at 21 Mar 2026
