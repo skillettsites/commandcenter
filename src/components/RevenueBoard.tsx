@@ -39,6 +39,7 @@ export default function RevenueBoard() {
   const [range, setRange] = useState<'week' | 'month' | 'all'>('month');
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [statView, setStatView] = useState<'today' | 'month' | 'all' | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -94,13 +95,55 @@ export default function RevenueBoard() {
         <p className="text-[13px] text-[var(--text-tertiary)]">Revenue unavailable.</p>
       ) : (
         <>
-          {/* KPI row */}
+          {/* KPI row — tap a card to reveal its breakdown */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <Stat label="Today" value={gbp(data.todayRevenue / P)} sub={`${data.todayCharges} sales`} />
-            <Stat label="This month" value={gbp(data.thisMonthRevenue / P)} sub={`${data.thisMonthCharges} sales`} accent="var(--green)" />
+            <Stat label="Today" value={gbp(data.todayRevenue / P)} sub={`${data.todayCharges} sales`} active={statView === 'today'} onClick={() => setStatView((v) => (v === 'today' ? null : 'today'))} />
+            <Stat label="This month" value={gbp(data.thisMonthRevenue / P)} sub={`${data.thisMonthCharges} sales`} accent="var(--green)" active={statView === 'month'} onClick={() => setStatView((v) => (v === 'month' ? null : 'month'))} />
             <Stat label="Run-rate" value={gbp(view.runRate)} sub={`day ${view.dayOfMonth}/${view.daysInMonth}`} />
-            <Stat label="All time" value={gbpCompact(data.totalRevenue / P)} sub={`${data.totalCharges} sales`} />
+            <Stat label="All time" value={gbpCompact(data.totalRevenue / P)} sub={`${data.totalCharges} sales`} active={statView === 'all'} onClick={() => setStatView((v) => (v === 'all' ? null : 'all'))} />
           </div>
+
+          {/* KPI reveal panel */}
+          {statView && (() => {
+            if (statView === 'today') {
+              const todayStr = new Date().toLocaleDateString('en-GB');
+              const sales = (data.accounts ?? [])
+                .flatMap((a) => a.recentCharges.map((c) => ({ ...c, account: a.name })))
+                .filter((c) => c.date === todayStr)
+                .sort((a, b) => b.amount - a.amount);
+              return (
+                <RevealPanel title={`Today · ${gbp(data.todayRevenue / P, 2)} from ${data.todayCharges} sales`} onClose={() => setStatView(null)}>
+                  {sales.length === 0
+                    ? <p className="text-[11px] text-[var(--text-tertiary)]">No sales recorded yet today.</p>
+                    : sales.map((c, i) => (
+                        <Row key={i} left={`${c.account} · ${c.email || 'guest'}`} right={gbp(c.amount / P, 2)} />
+                      ))}
+                </RevealPanel>
+              );
+            }
+            const rows = (data.accounts ?? [])
+              .map((a) => ({
+                name: a.name,
+                value: statView === 'month' ? a.thisMonthRevenue : a.totalRevenue,
+                count: statView === 'month' ? a.thisMonthCharges : a.chargeCount,
+              }))
+              .filter((a) => a.value > 0)
+              .sort((a, b) => b.value - a.value);
+            return (
+              <RevealPanel
+                title={statView === 'month'
+                  ? `This month · ${gbp(data.thisMonthRevenue / P, 2)} from ${data.thisMonthCharges} sales`
+                  : `All time · ${gbp(data.totalRevenue / P, 2)} from ${data.totalCharges} sales`}
+                onClose={() => setStatView(null)}
+              >
+                {rows.length === 0
+                  ? <p className="text-[11px] text-[var(--text-tertiary)]">No sales in this period.</p>
+                  : rows.map((r) => (
+                      <Row key={r.name} left={r.name} right={`${gbp(r.value / P, 2)} · ${r.count}`} />
+                    ))}
+              </RevealPanel>
+            );
+          })()}
 
           {/* Chart — click any day for a breakdown */}
           <AreaChart
@@ -209,12 +252,39 @@ export default function RevenueBoard() {
   );
 }
 
-function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: string }) {
+function Stat({ label, value, sub, accent, onClick, active }: { label: string; value: string; sub?: string; accent?: string; onClick?: () => void; active?: boolean }) {
   return (
-    <div className="rounded-xl bg-[var(--bg-elevated)] p-3">
-      <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</div>
+    <div
+      onClick={onClick}
+      className={`rounded-xl bg-[var(--bg-elevated)] p-3 transition-colors ${onClick ? 'cursor-pointer hover:bg-[var(--bg-card)]' : ''} ${active ? 'ring-2 ring-[var(--green)]/60' : ''}`}
+    >
+      <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider flex items-center gap-1">
+        {label}
+        {onClick && <span className="text-[var(--text-tertiary)] opacity-50">{active ? '▾' : '›'}</span>}
+      </div>
       <div className="text-[18px] font-bold tabular-nums" style={{ color: accent || 'var(--text-primary)' }}>{value}</div>
       {sub && <div className="text-[10px] text-[var(--text-tertiary)]">{sub}</div>}
+    </div>
+  );
+}
+
+function RevealPanel({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="mb-4 -mt-1 rounded-xl bg-[var(--bg-elevated)] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[12px] font-semibold text-[var(--text-primary)]">{title}</div>
+        <button onClick={onClose} className="text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Close</button>
+      </div>
+      <div className="space-y-1 max-h-56 overflow-y-auto">{children}</div>
+    </div>
+  );
+}
+
+function Row({ left, right }: { left: string; right: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-[11px]">
+      <span className="text-[var(--text-secondary)] truncate">{left}</span>
+      <span className="text-[var(--green)] font-semibold tabular-nums flex-shrink-0">{right}</span>
     </div>
   );
 }

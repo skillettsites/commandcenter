@@ -43,11 +43,11 @@ interface AggregatedStats {
   sitesToday: SiteTodayData[];
 }
 
-const RANGE_LABEL: Record<string, string> = { '1h': 'Last Hour', 'today': 'Today', '24h': 'Last 24 Hours', '1m': 'Last 30 Days', 'all': 'All Time' };
+const RANGE_LABEL: Record<string, string> = { '1h': 'Last Hour', 'today': 'Today', '24h': 'Last 24 Hours', '7d': 'Last 7 Days', '1m': 'Last 30 Days', 'all': 'All Time' };
 
 export default function AllSitesStats() {
   const [expanded, setExpanded] = useState(true);
-  const [chartRange, setChartRange] = useState<'1h' | 'today' | '24h' | '1m' | 'all'>('1h');
+  const [chartRange, setChartRange] = useState<'1h' | 'today' | '24h' | '7d' | '1m' | 'all'>('1h');
   const [data, setData] = useState<CombinedData | null>(null);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AggregatedStats | null>(null);
@@ -198,7 +198,7 @@ export default function AllSitesStats() {
   }, [expanded, chartRange]);
 
   const cycleRange = () => {
-    setChartRange(prev => prev === '1h' ? 'today' : prev === 'today' ? '24h' : prev === '24h' ? '1m' : prev === '1m' ? 'all' : '1h');
+    setChartRange(prev => prev === '1h' ? 'today' : prev === 'today' ? '24h' : prev === '24h' ? '7d' : prev === '7d' ? '1m' : prev === '1m' ? 'all' : '1h');
   };
 
   // Build source tag string
@@ -308,7 +308,7 @@ function StatBox({ label, value, secondary }: { label: string; value: number; se
   );
 }
 
-function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; range: '1h' | 'today' | '24h' | '1m' | 'all'; onCycleRange: () => void }) {
+function CombinedChart({ hourly, range, onCycleRange }: { hourly: HourlyData[]; range: '1h' | 'today' | '24h' | '7d' | '1m' | 'all'; onCycleRange: () => void }) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   // Reset selection when range changes

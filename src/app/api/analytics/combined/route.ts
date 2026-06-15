@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
 
   let startDate: string;
   let timeDimension: string;
-  if (range === '1m') {
+  if (range === '7d') {
+    startDate = '7daysAgo';
+    timeDimension = 'date';
+  } else if (range === '1m') {
     startDate = '30daysAgo';
     timeDimension = 'date';
   } else if (range === 'all') {
@@ -126,6 +129,8 @@ export async function GET(request: NextRequest) {
     pvFromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
   } else if (range === '24h') {
     pvFromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  } else if (range === '7d') {
+    pvFromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
   } else if (range === '1m') {
     pvFromDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
   } else {
@@ -148,6 +153,9 @@ export async function GET(request: NextRequest) {
     let vTo: string;
     if (range === '1h' || range === 'today' || range === '24h') {
       vFrom = today;
+      vTo = today;
+    } else if (range === '7d') {
+      vFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
       vTo = today;
     } else if (range === '1m') {
       vFrom = monthStart;

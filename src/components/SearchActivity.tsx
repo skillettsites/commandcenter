@@ -49,7 +49,7 @@ interface SiteChart {
 
 type ChartData = Record<string, SiteChart>;
 
-type TimeRange = '24h' | '1m' | 'all';
+type TimeRange = '24h' | '7d' | '1m' | 'all';
 
 const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -61,6 +61,7 @@ const SITE_LABELS: Record<string, { name: string; color: string }> = {
 
 const RANGE_LABELS: Record<TimeRange, string> = {
   '24h': '24 Hours',
+  '7d': '7 Days',
   '1m': '1 Month',
   'all': 'All Time',
 };
@@ -86,7 +87,7 @@ function formatAxisLabel(period: string, range: TimeRange): string {
     if (hour === 0) return '12am';
     if (hour === 12) return '12pm';
     return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
-  } else if (range === '1m') {
+  } else if (range === '1m' || range === '7d') {
     // period format: 2026-03-20
     const parts = period.split('-');
     const month = parseInt(parts[1], 10);
@@ -469,7 +470,7 @@ export default function SearchActivity() {
         <div className="card overflow-hidden fade-in">
           {/* Time range toggle */}
           <div className="px-3.5 pt-3 pb-2 flex items-center gap-1">
-            {(['all', '1m', '24h'] as TimeRange[]).map((r) => (
+            {(['all', '1m', '7d', '24h'] as TimeRange[]).map((r) => (
               <button
                 key={r}
                 onClick={(e) => {

@@ -17,7 +17,7 @@ interface Point { period: string; count: number }
 interface Prediction { todaySearches: number; todayPurchases: number; predictedTotal: number; predictedLow: number; predictedHigh: number }
 interface ChartEntry { searches: Point[]; purchases?: Point[]; prediction?: Prediction }
 
-type Range = '24h' | '1m' | 'all';
+type Range = '24h' | '7d' | '1m' | 'all';
 
 function color(id: string) {
   return projects.find((p) => p.id === id)?.color ?? 'var(--accent)';
@@ -92,7 +92,7 @@ export default function SearchesBoard() {
         <Segmented
           value={range}
           onChange={setRange}
-          options={[{ value: '24h', label: '24h' }, { value: '1m', label: '30d' }, { value: 'all', label: 'All' }]}
+          options={[{ value: '24h', label: '24h' }, { value: '7d', label: 'Week' }, { value: '1m', label: '30d' }, { value: 'all', label: 'All' }]}
         />
       }
     >

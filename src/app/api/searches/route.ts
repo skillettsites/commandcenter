@@ -223,6 +223,8 @@ export async function GET(request: NextRequest) {
       fromDate = todayStart;
     } else if (period === '24h') {
       fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    } else if (period === '7d') {
+      fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
     } else if (period === '1m') {
       fromDate = monthStart;
     } else {
@@ -285,6 +287,8 @@ export async function GET(request: NextRequest) {
         fromDate = new Date(todayStart);
       } else if (range === '24h') {
         fromDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (range === '7d') {
+        fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       } else if (range === '1m') {
         fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       } else {
@@ -335,11 +339,12 @@ export async function GET(request: NextRequest) {
           const k = hourKey(r.created_at);
           if (purchaseBuckets.has(k)) purchaseBuckets.set(k, (purchaseBuckets.get(k) ?? 0) + 1);
         }
-      } else if (range === '1m') {
-        // 30 daily buckets keyed by UK-local date so they line up with the
-        // user's perception of "today".
+      } else if (range === '1m' || range === '7d') {
+        // Daily buckets keyed by UK-local date so they line up with the
+        // user's perception of "today". 7 buckets for the week view, 30 for month.
+        const numDays = range === '7d' ? 7 : 30;
         const cutoffMs = new Date(SEARCHES_CUTOFF).getTime();
-        for (let d = 29; d >= 0; d--) {
+        for (let d = numDays - 1; d >= 0; d--) {
           const bucketTime = new Date(now.getTime() - d * 24 * 60 * 60 * 1000);
           if (bucketTime.getTime() < cutoffMs) continue;
           const key = ukDateKey(bucketTime);
