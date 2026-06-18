@@ -9,6 +9,11 @@ interface AccountConfig {
   //   e.g. HomeBuyerCheck).
   source: "stripe" | "supabase";
   envVar?: string;
+  // HomeBuyerCheck sells on the same Stripe account as PostcodeCheck ("Postcode
+  // Check"). HBC sales are pulled authoritatively from the Supabase reports
+  // table, so a Stripe account flagged here has HBC's payment_intents excluded
+  // to avoid counting every HBC sale twice (once as PCC, once as HBC).
+  sharesAccountWithHbc?: boolean;
   // Legacy base64 fallback used only when the env-var key is unset/stale. SECURITY: these
   // live keys are already in this public repo's git history — they should be ROTATED, after
   // which both these literals and the matching env vars must be updated. Do NOT add new keys
@@ -39,6 +44,7 @@ const ACCOUNTS: AccountConfig[] = [
     envVar: "STRIPE_KEY_POSTCODECHECK",
     fallbackB64: "c2tfbGl2ZV9aTnFRM3ZhalFLRTRvdlFLWjJYN1gwV0owMFFhU1hTaDlm",
     sites: ["PostcodeCheck"],
+    sharesAccountWithHbc: true,
   },
   {
     name: "MatchMySkillset",
@@ -61,6 +67,9 @@ interface StripeCharge {
   refunded: boolean;
   created: number;
   billing_details?: { email?: string };
+  // Stripe charges carry this natively; Supabase rows map it from
+  // stripe_payment_intent. Used to de-dupe the shared PCC/HBC account.
+  payment_intent?: string;
 }
 
 // HomeBuyerCheck's Stripe key is Sensitive in Vercel, so its authoritative purchase
@@ -72,14 +81,14 @@ async function fetchSupabaseCharges(): Promise<StripeCharge[]> {
   const key = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!base || !key) throw new Error("Supabase URL/service-role key not set");
   const q =
-    "reports?select=created_at,amount_paid,customer_email,stripe_session_id" +
+    "reports?select=created_at,amount_paid,customer_email,stripe_session_id,stripe_payment_intent" +
     "&stripe_session_id=like.cs_live*&order=created_at.desc&limit=1000";
   const res = await fetch(`${base}/rest/v1/${q}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Supabase HTTP ${res.status}`);
-  const rows: Array<{ created_at: string; amount_paid: number | null; customer_email: string | null }> =
+  const rows: Array<{ created_at: string; amount_paid: number | null; customer_email: string | null; stripe_payment_intent: string | null }> =
     await res.json();
   return rows.map((r) => ({
     amount: r.amount_paid ?? 0,
@@ -87,6 +96,7 @@ async function fetchSupabaseCharges(): Promise<StripeCharge[]> {
     refunded: false,
     created: Math.floor(new Date(r.created_at).getTime() / 1000),
     billing_details: { email: r.customer_email || "Unknown" },
+    payment_intent: r.stripe_payment_intent || undefined,
   }));
 }
 
@@ -157,17 +167,39 @@ export async function GET() {
       buckets.set(new Date(d).toISOString().slice(0, 10), { revenue: 0, charges: 0 });
     }
 
+    // HomeBuyerCheck (Supabase reports) is the authoritative HBC source AND
+    // shares a Stripe account with PostcodeCheck. Fetch it once up front so we
+    // can both reuse it for the HBC account and exclude its payment_intents from
+    // the shared Stripe pull (otherwise every HBC sale counts twice).
+    let hbcCharges: StripeCharge[] = [];
+    let hbcPaymentIntents = new Set<string>();
+    try {
+      hbcCharges = await fetchSupabaseCharges();
+      hbcPaymentIntents = new Set(
+        hbcCharges.map((c) => c.payment_intent).filter((p): p is string => !!p)
+      );
+    } catch (err) {
+      console.error("[stripe] HBC prefetch:", err instanceof Error ? err.message : String(err));
+    }
+
     for (const account of ACCOUNTS) {
       try {
         let allCharges: StripeCharge[];
         if (account.source === "supabase") {
-          allCharges = await fetchSupabaseCharges();
+          allCharges = hbcCharges;
         } else {
           const key =
             cleanEnv(process.env[account.envVar!]) ||
             (account.fallbackB64 ? Buffer.from(account.fallbackB64, "base64").toString() : "");
           if (!key) continue;
           allCharges = await fetchCharges(key);
+          // Drop HBC sales that live on this shared Stripe account, they're
+          // already counted via the Supabase HBC source.
+          if (account.sharesAccountWithHbc && hbcPaymentIntents.size > 0) {
+            allCharges = allCharges.filter(
+              (c) => !c.payment_intent || !hbcPaymentIntents.has(c.payment_intent)
+            );
+          }
         }
         const paid = allCharges.filter(
           (c) => c.paid && !c.refunded && c.created >= REVENUE_START_DATE
