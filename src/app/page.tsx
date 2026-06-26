@@ -1,4 +1,5 @@
 import HeroStats from '@/components/HeroStats';
+import GoogleAdsStats from '@/components/GoogleAdsStats';
 import RevenueBoard from '@/components/RevenueBoard';
 import UsersBoard from '@/components/UsersBoard';
 import SitesGraph from '@/components/SitesGraph';
@@ -21,6 +22,9 @@ export default function Home() {
       <div className="space-y-5 lg:space-y-6">
         {/* Hero KPIs */}
         <HeroStats />
+
+        {/* Google Ads (CarCostCheck) */}
+        <GoogleAdsStats />
 
         {/* Money + audience */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
