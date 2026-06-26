@@ -41,7 +41,13 @@ export async function GET(
   // Determine date range and dimension based on range param
   let startDate: string;
   let timeDimension: string;
-  if (range === '1m') {
+  if (range === '7d') {
+    startDate = '7daysAgo';
+    timeDimension = 'date';
+  } else if (range === '90d') {
+    startDate = '90daysAgo';
+    timeDimension = 'date';
+  } else if (range === '1m' || range === '30d') {
     startDate = '30daysAgo';
     timeDimension = 'date';
   } else if (range === 'all') {

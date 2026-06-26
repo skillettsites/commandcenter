@@ -104,10 +104,16 @@ async function fetchCharges(key: string): Promise<StripeCharge[]> {
   const auth = Buffer.from(key + ":").toString("base64");
   const all: StripeCharge[] = [];
   let starting_after: string | undefined;
-  // Paginate until we hit charges older than the revenue start, max 5 pages
-  for (let page = 0; page < 5; page++) {
+  // Pull EVERY charge since the revenue start, not just the most recent page or
+  // two. We pass created[gte] so Stripe only returns in-window charges and
+  // has_more naturally flips off once we've fetched them all; the 50-page cap
+  // (5000 charges/account) is only a runaway safety valve. The previous 5-page
+  // (500-charge) cap silently truncated high-volume accounts like CarCostCheck,
+  // undercounting the "all time" total by hundreds of sales.
+  for (let page = 0; page < 50; page++) {
     const url = new URL("https://api.stripe.com/v1/charges");
     url.searchParams.set("limit", "100");
+    url.searchParams.set("created[gte]", String(Math.floor(REVENUE_START_DATE)));
     if (starting_after) url.searchParams.set("starting_after", starting_after);
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Basic ${auth}` },
@@ -118,7 +124,6 @@ async function fetchCharges(key: string): Promise<StripeCharge[]> {
     const batch: (StripeCharge & { id: string })[] = data.data || [];
     all.push(...batch);
     if (!data.has_more || batch.length === 0) break;
-    if (batch[batch.length - 1].created < REVENUE_START_DATE) break;
     starting_after = batch[batch.length - 1].id;
   }
   return all;
@@ -141,6 +146,7 @@ export async function GET() {
         thisMonthRevenue: number;
         thisMonthCharges: number;
         recentCharges: Array<{ amount: number; site: string; email: string; date: string }>;
+        dailySeries: Array<{ date: string; revenue: number; charges: number }>;
       }>,
       totalRevenue: 0,
       totalCharges: 0,
@@ -211,6 +217,8 @@ export async function GET() {
         const todayChargesList = paid.filter((c) => c.created >= todayStart);
         const todayRevenue = todayChargesList.reduce((s, c) => s + c.amount, 0);
 
+        // Per-account daily series (for the per-site graph) plus the global buckets.
+        const acctBuckets = new Map<string, { revenue: number; charges: number }>();
         for (const c of paid) {
           const key = utcDateKey(c.created);
           const bucket = buckets.get(key);
@@ -218,7 +226,14 @@ export async function GET() {
             bucket.revenue += c.amount;
             bucket.charges += 1;
           }
+          const ab = acctBuckets.get(key) ?? { revenue: 0, charges: 0 };
+          ab.revenue += c.amount;
+          ab.charges += 1;
+          acctBuckets.set(key, ab);
         }
+        const acctDailySeries = Array.from(acctBuckets.entries())
+          .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+          .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges }));
 
         const recentCharges = paid.slice(0, 5).map((c) => ({
           amount: c.amount,
@@ -237,6 +252,7 @@ export async function GET() {
           thisMonthRevenue: monthRevenue,
           thisMonthCharges: monthCharges.length,
           recentCharges,
+          dailySeries: acctDailySeries,
         });
 
         results.totalRevenue += totalRevenue;

@@ -1,7 +1,7 @@
 import HeroStats from '@/components/HeroStats';
 import RevenueBoard from '@/components/RevenueBoard';
 import UsersBoard from '@/components/UsersBoard';
-import SitesBoard from '@/components/SitesBoard';
+import SitesGraph from '@/components/SitesGraph';
 import SearchesBoard from '@/components/SearchesBoard';
 import GeoAnalytics from '@/components/GeoAnalytics';
 import AutoResearch from '@/components/AutoResearch';
@@ -33,7 +33,7 @@ export default function Home() {
         </div>
 
         {/* Sites network */}
-        <SitesBoard />
+        <SitesGraph />
 
         {/* Demand */}
         <SearchesBoard />
