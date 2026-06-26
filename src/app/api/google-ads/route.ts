@@ -6,15 +6,27 @@ export const revalidate = 0;
 const ACC = '1096860797'; // CarCostCheck ad account
 const MCC = '4341302949'; // Skillettsites manager
 
+// Read an env var, trimming the trailing \n that env files sometimes append.
+// Prefer dedicated GADS_* vars (prod uses the "claude" OAuth client, which is
+// different from commandcenter's shared GOOGLE_CLIENT_ID); fall back to the
+// generic names locally.
+function env(...keys: string[]): string {
+  for (const k of keys) {
+    const v = process.env[k];
+    if (v) return v.replace(/\\n$/, '').replace(/[\r\n\s]+$/, '').trim();
+  }
+  return '';
+}
+
 function ukDate(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(d);
 }
 
 async function getToken(): Promise<string | undefined> {
   const body = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID || '',
-    client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
-    refresh_token: process.env.GMAIL_REFRESH_TOKEN || '',
+    client_id: env('GADS_CLIENT_ID', 'GOOGLE_CLIENT_ID'),
+    client_secret: env('GADS_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET'),
+    refresh_token: env('GADS_REFRESH_TOKEN', 'GMAIL_REFRESH_TOKEN'),
     grant_type: 'refresh_token',
   });
   const r = await fetch('https://oauth2.googleapis.com/token', {
@@ -31,7 +43,7 @@ async function gaql(at: string, query: string) {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${at}`,
-      'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || '',
+      'developer-token': env('GADS_DEV_TOKEN', 'GOOGLE_ADS_DEVELOPER_TOKEN'),
       'login-customer-id': MCC,
       'Content-Type': 'application/json',
     },
