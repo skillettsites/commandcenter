@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Module, Segmented, AreaChart, BarList, gbp, gbpCompact, fmtNum } from './DashKit';
+import { upcomingMoney } from '@/lib/portfolio';
 
 /* ----------------------------- types ----------------------------- */
 interface Stock { symbol: string; account: string; shares: number; currentValue: number; costBasis: number; gainLoss: number; gainLossPercent: number; dailyChangePercent: number; livePrice: number; currency?: string; }
@@ -77,6 +78,8 @@ export default function FinancesBoard() {
   if (!data) return <p className="text-[13px] text-[var(--text-tertiary)]">Finances unavailable.</p>;
 
   const t = data.totals;
+  const upcomingTotal = upcomingMoney.reduce((s, m) => s + m.amount, 0);
+  const projectedNetWorth = t.netWorth + upcomingTotal;
 
   /* allocation */
   const alloc = [
@@ -111,6 +114,11 @@ export default function FinancesBoard() {
             <div className="text-[34px] sm:text-[38px] font-bold tracking-tight text-[var(--text-primary)] tabular-nums leading-none">
               {blur(gbp(t.netWorth))}
             </div>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[10px] uppercase tracking-wider text-[var(--orange)]">Projected</span>
+              <span className="text-[18px] font-bold text-[var(--orange)] tabular-nums leading-none">{blur(gbp(projectedNetWorth))}</span>
+              <span className="text-[10px] text-[var(--text-tertiary)]">incl. £{Math.round(upcomingTotal / 1000)}k upcoming</span>
+            </div>
             <div className="text-[11px] text-[var(--text-tertiary)] mt-1.5">£1 = ${(1 / data.forexRate).toFixed(4)} · updated {new Date(data.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
           {nwSeries.length > 1 && (
@@ -141,6 +149,31 @@ export default function FinancesBoard() {
             ))}
           </div>
         </div>
+      </Module>
+
+      {/* ---------- family / upcoming money ---------- */}
+      <Module
+        eyebrow="Incoming"
+        title="Family / Upcoming Money"
+        accent="var(--orange)"
+        icon={<span>👪</span>}
+        right={<div className="text-right"><div className="text-[16px] font-bold text-[var(--orange)] tabular-nums">{blur(gbp(upcomingTotal))}</div><div className="text-[11px] text-[var(--text-tertiary)]">not in net worth</div></div>}
+      >
+        <div className="space-y-2">
+          {upcomingMoney.map((item) => (
+            <div key={item.id} className="flex items-center justify-between gap-2 rounded-xl bg-[var(--bg-elevated)] p-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: item.status === 'confirmed' ? 'var(--green)' : item.status === 'expected' ? 'var(--orange)' : 'var(--text-tertiary)' }} />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{item.source}</div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] truncate">{item.notes} · {item.status}</div>
+                </div>
+              </div>
+              <span className="text-[14px] font-bold text-[var(--text-primary)] tabular-nums flex-shrink-0">{blur(gbp(item.amount))}</span>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-[var(--text-tertiary)] mt-3">Money owed / incoming (sister&apos;s repayment, house-sale shares). Excluded from net worth above; added into projected net worth.</p>
       </Module>
 
       {/* ---------- investments + dividends ---------- */}
