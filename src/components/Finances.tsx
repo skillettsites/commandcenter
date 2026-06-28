@@ -855,11 +855,42 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
             <div className="text-center py-3 rounded-lg bg-[var(--bg-elevated)]">
               <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-0.5">Total Net Worth</div>
               <div className="text-[24px] font-bold text-[var(--text-primary)]">{formatGBP(data.totals.netWorth)}</div>
-              <div className="flex items-center justify-center gap-1.5 mt-1">
-                <span className="w-4 border-t border-dashed border-[var(--orange)]" />
-                <span className="text-[11px] text-[var(--orange)]">
-                  {formatGBP(data.totals.netWorth + upcomingTotal)} inc. pending £{Math.round(upcomingTotal / 1000)}k
-                </span>
+              <div className="mt-2 pt-2 mx-8 border-t border-dashed border-[var(--border-light)]">
+                <div className="text-[10px] uppercase tracking-wider text-[var(--orange)] mb-0.5">Projected Net Worth</div>
+                <div className="text-[18px] font-bold text-[var(--orange)]">{formatGBP(data.totals.netWorth + upcomingTotal)}</div>
+                <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">incl. £{Math.round(upcomingTotal / 1000)}k family / upcoming money</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Family / Upcoming money — own always-visible section */}
+          <div className="px-3.5 pb-3">
+            <div className="rounded-lg bg-[var(--bg-elevated)] p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-5 rounded-full flex-shrink-0 bg-[var(--orange)]" />
+                  <span className="text-[13px] font-semibold text-[var(--text-primary)]">Family / Upcoming Money</span>
+                </div>
+                <span className="text-[13px] font-bold text-[var(--orange)]">{formatGBP(upcomingTotal)}</span>
+              </div>
+              <div className="space-y-1.5">
+                {upcomingMoney.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between py-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        item.status === 'confirmed' ? 'bg-[var(--green)]' :
+                        item.status === 'expected' ? 'bg-[var(--orange)]' : 'bg-[var(--text-tertiary)]'
+                      }`} />
+                      <span className="text-[12px] text-[var(--text-secondary)]">{item.source}</span>
+                    </div>
+                    <span className="text-[12px] font-medium text-[var(--text-primary)]">{formatGBP(item.amount)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 mt-2 pt-2 border-t border-[var(--border-light)] text-[9px] text-[var(--text-tertiary)]">
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--green)]" />Confirmed</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--orange)]" />Expected</span>
+                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />Pending</span>
               </div>
             </div>
           </div>
@@ -1291,32 +1322,6 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                         <span className="text-[13px] font-medium text-[var(--text-primary)]">{formatGBP(c.balance)}</span>
                       </div>
                     ))}
-                  </div>
-
-                  {/* Upcoming money */}
-                  <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
-                    <div className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                      Upcoming (£{upcomingTotal.toLocaleString()})
-                    </div>
-                    <div className="space-y-1.5">
-                      {upcomingMoney.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between py-0.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              item.status === 'confirmed' ? 'bg-[var(--green)]' :
-                              item.status === 'expected' ? 'bg-[var(--orange)]' : 'bg-[var(--text-tertiary)]'
-                            }`} />
-                            <span className="text-[11px] text-[var(--text-secondary)]">{item.source}</span>
-                          </div>
-                          <span className="text-[12px] font-medium text-[var(--text-primary)]">{formatGBP(item.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex gap-3 mt-2 text-[9px] text-[var(--text-tertiary)]">
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--green)]" />Confirmed</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--orange)]" />Expected</span>
-                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" />Pending</span>
-                    </div>
                   </div>
                 </div>
               )}
