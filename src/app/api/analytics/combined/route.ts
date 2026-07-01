@@ -213,6 +213,13 @@ export async function GET(request: NextRequest) {
     return [project.id, { views: totalViews, users: totalUsers }] as const;
   }));
 
+  // Sites that actually returned GA data this range. Used to decide which sites
+  // need a first-party (tracked pageviews) fallback so GA-less sites like
+  // BriefMyNews still appear in the traffic chart instead of a flat/empty line.
+  const gaSites = new Set(
+    [...gaPerSite].filter(([, v]) => v.views > 0).map(([id]) => id)
+  );
+
   // Per-site breakdown: MAX across Vercel, GA4, and tracked pageviews
   const allSiteIds = new Set([...ALL_SITES, ...gaProjects.map(p => p.id)]);
   const perSite = Array.from(allSiteIds)
@@ -225,16 +232,45 @@ export async function GET(request: NextRequest) {
       const gaUsers = ga?.users ?? 0;
       const vercelViews = vercel?.pageViews ?? 0;
       const vercelUsers = vercel?.visitors ?? 0;
+      // When a site has no GA/Vercel visitor data, fall back to its tracked
+      // pageview count as a visitor proxy so it isn't stuck at zero.
+      const trackedUsersProxy = gaSites.has(siteId) ? 0 : tracked;
       return {
         siteId,
         name: proj?.name || siteId,
         color: proj?.color || '#888',
         pageViews: Math.max(tracked, gaViews, vercelViews),
-        users: Math.max(gaUsers, vercelUsers),
+        users: Math.max(gaUsers, vercelUsers, trackedUsersProxy),
       };
     })
     .filter(s => s.pageViews > 0 || s.users > 0)
     .sort((a, b) => b.pageViews - a.pageViews);
+
+  // Fold first-party pageviews into the time-series for GA-less sites so their
+  // traffic shows as a line. GA-tracked sites already contribute above, so we
+  // only supplement sites with no GA data (avoids double-counting).
+  const trackedOnlySites = ALL_SITES.filter(
+    id => (trackedCounts[id] ?? 0) > 0 && !gaSites.has(id)
+  );
+  if (trackedOnlySites.length > 0) {
+    const { data: pvRows } = await supabase
+      .from('pageviews')
+      .select('created_at')
+      .in('site_id', trackedOnlySites)
+      .gte('created_at', pvFromDate)
+      .limit(20000);
+    for (const r of pvRows ?? []) {
+      const d = new Date(r.created_at as string);
+      const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+      const key = timeDimension === 'dateHour' ? `${ymd}${String(d.getUTCHours()).padStart(2, '0')}` : ymd;
+      if (range === '1h' && allowedKeys && !allowedKeys.has(key)) continue;
+      const existing = merged.get(key);
+      if (existing) existing.pageViews += 1;
+      else merged.set(key, { dateHour: key, pageViews: 1, users: 0, sessions: 0 });
+    }
+    hourly = Array.from(merged.values()).sort((a, b) => a.dateHour.localeCompare(b.dateHour));
+    if (range === '1h' && allowedKeys) hourly = hourly.filter(h => allowedKeys!.has(h.dateHour));
+  }
 
   return NextResponse.json({ hourly, perSite });
 }
