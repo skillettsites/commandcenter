@@ -11,6 +11,9 @@ interface Account {
   todayCharges: number;
   thisMonthRevenue: number;
   thisMonthCharges: number;
+  totalProfit: number;
+  todayProfit: number;
+  thisMonthProfit: number;
   recentCharges: { amount: number; site: string; email: string; date: string }[];
 }
 interface StripeData {
@@ -21,7 +24,10 @@ interface StripeData {
   thisMonthCharges: number;
   todayRevenue: number;
   todayCharges: number;
-  dailySeries: { date: string; revenue: number; charges: number }[];
+  totalProfit: number;
+  thisMonthProfit: number;
+  todayProfit: number;
+  dailySeries: { date: string; revenue: number; charges: number; profit: number }[];
 }
 
 const P = 100; // pence → pounds
@@ -65,9 +71,10 @@ export default function RevenueBoard() {
     const dayOfMonth = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const runRate = dayOfMonth > 0 ? ((data.thisMonthRevenue / P) / dayOfMonth) * daysInMonth : data.thisMonthRevenue / P;
+    const profitRunRate = dayOfMonth > 0 ? ((data.thisMonthProfit / P) / dayOfMonth) * daysInMonth : data.thisMonthProfit / P;
 
     const accounts = (data.accounts ?? [])
-      .map((a) => ({ name: a.name, month: a.thisMonthRevenue / P, total: a.totalRevenue / P, monthCharges: a.thisMonthCharges }))
+      .map((a) => ({ name: a.name, month: a.thisMonthRevenue / P, total: a.totalRevenue / P, monthCharges: a.thisMonthCharges, monthProfit: a.thisMonthProfit / P, totalProfit: a.totalProfit / P }))
       .filter((a) => a.month > 0 || a.total > 0)
       .sort((a, b) => b.month - a.month || b.total - a.total);
 
@@ -76,7 +83,7 @@ export default function RevenueBoard() {
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 8);
 
-    return { series, runRate, accounts, recent, dayOfMonth, daysInMonth };
+    return { series, runRate, profitRunRate, accounts, recent, dayOfMonth, daysInMonth };
   }, [data, range]);
 
   return (
@@ -101,10 +108,10 @@ export default function RevenueBoard() {
         <>
           {/* KPI row — tap a card to reveal its breakdown */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <Stat label="Today" value={gbp(data.todayRevenue / P)} sub={`${data.todayCharges} sales`} active={statView === 'today'} onClick={() => setStatView((v) => (v === 'today' ? null : 'today'))} />
-            <Stat label="This month" value={gbp(data.thisMonthRevenue / P)} sub={`${data.thisMonthCharges} sales`} accent="var(--green)" active={statView === 'month'} onClick={() => setStatView((v) => (v === 'month' ? null : 'month'))} />
-            <Stat label="Run-rate" value={gbp(view.runRate)} sub={`day ${view.dayOfMonth}/${view.daysInMonth}`} />
-            <Stat label="All time" value={gbpCompact(data.totalRevenue / P)} sub={`${data.totalCharges} sales`} active={statView === 'all'} onClick={() => setStatView((v) => (v === 'all' ? null : 'all'))} />
+            <Stat label="Today" value={gbp(data.todayRevenue / P)} profit={`${gbp(data.todayProfit / P)} profit`} sub={`${data.todayCharges} sales`} active={statView === 'today'} onClick={() => setStatView((v) => (v === 'today' ? null : 'today'))} />
+            <Stat label="This month" value={gbp(data.thisMonthRevenue / P)} profit={`${gbp(data.thisMonthProfit / P)} profit`} sub={`${data.thisMonthCharges} sales`} accent="var(--green)" active={statView === 'month'} onClick={() => setStatView((v) => (v === 'month' ? null : 'month'))} />
+            <Stat label="Run-rate" value={gbp(view.runRate)} profit={`${gbp(view.profitRunRate)} profit`} sub={`day ${view.dayOfMonth}/${view.daysInMonth}`} />
+            <Stat label="All time" value={gbpCompact(data.totalRevenue / P)} profit={`${gbpCompact(data.totalProfit / P)} profit`} sub={`${data.totalCharges} sales`} active={statView === 'all'} onClick={() => setStatView((v) => (v === 'all' ? null : 'all'))} />
           </div>
 
           {/* KPI reveal panel */}
@@ -116,7 +123,7 @@ export default function RevenueBoard() {
                 .filter((c) => c.date === todayStr)
                 .sort((a, b) => b.amount - a.amount);
               return (
-                <RevealPanel title={`Today · ${gbp(data.todayRevenue / P, 2)} from ${data.todayCharges} sales`} onClose={() => setStatView(null)}>
+                <RevealPanel title={`Today · ${gbp(data.todayRevenue / P, 2)} rev · ${gbp(data.todayProfit / P, 2)} profit · ${data.todayCharges} sales`} onClose={() => setStatView(null)}>
                   {sales.length === 0
                     ? <p className="text-[11px] text-[var(--text-tertiary)]">No sales recorded yet today.</p>
                     : sales.map((c, i) => (
@@ -130,20 +137,22 @@ export default function RevenueBoard() {
                 name: a.name,
                 value: statView === 'month' ? a.thisMonthRevenue : a.totalRevenue,
                 count: statView === 'month' ? a.thisMonthCharges : a.chargeCount,
+                profit: statView === 'month' ? a.thisMonthProfit : a.totalProfit,
               }))
               .filter((a) => a.value > 0)
               .sort((a, b) => b.value - a.value);
+            const periodProfit = statView === 'month' ? data.thisMonthProfit : data.totalProfit;
             return (
               <RevealPanel
                 title={statView === 'month'
-                  ? `This month · ${gbp(data.thisMonthRevenue / P, 2)} from ${data.thisMonthCharges} sales`
-                  : `All time · ${gbp(data.totalRevenue / P, 2)} from ${data.totalCharges} sales`}
+                  ? `This month · ${gbp(data.thisMonthRevenue / P, 2)} rev · ${gbp(periodProfit / P, 2)} profit · ${data.thisMonthCharges} sales`
+                  : `All time · ${gbp(data.totalRevenue / P, 2)} rev · ${gbp(periodProfit / P, 2)} profit · ${data.totalCharges} sales`}
                 onClose={() => setStatView(null)}
               >
                 {rows.length === 0
                   ? <p className="text-[11px] text-[var(--text-tertiary)]">No sales in this period.</p>
                   : rows.map((r) => (
-                      <Row key={r.name} left={r.name} right={`${gbp(r.value / P, 2)} · ${r.count}`} />
+                      <Row key={r.name} left={r.name} right={`${gbp(r.value / P, 2)} · ${r.count}`} note={`${gbp(r.profit / P, 2)} profit`} />
                     ))}
               </RevealPanel>
             );
@@ -182,6 +191,10 @@ export default function RevenueBoard() {
                   <div>
                     <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Revenue</div>
                     <div className="text-[18px] font-bold text-[var(--green)] tabular-nums">{gbp(day.revenue / P, 2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Profit</div>
+                    <div className="text-[18px] font-bold text-[var(--green)] tabular-nums">{gbp(day.profit / P, 2)}</div>
                   </div>
                   <div>
                     <div className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Sales</div>
@@ -224,9 +237,9 @@ export default function RevenueBoard() {
                 if (!acc) return null;
                 return (
                   <div className="mt-2.5 rounded-lg bg-[var(--bg-elevated)] p-2.5 text-[11px] space-y-1">
-                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">Today</span><span className="tabular-nums">{gbp(acc.todayRevenue / P, 2)} · {acc.todayCharges} sales</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">This month</span><span className="tabular-nums">{gbp(acc.thisMonthRevenue / P, 2)} · {acc.thisMonthCharges} sales</span></div>
-                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">All time</span><span className="tabular-nums">{gbp(acc.totalRevenue / P, 2)} · {acc.chargeCount} sales</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">Today</span><span className="tabular-nums">{gbp(acc.todayRevenue / P, 2)} · <span className="text-[var(--green)]">{gbp(acc.todayProfit / P, 2)} profit</span> · {acc.todayCharges} sales</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">This month</span><span className="tabular-nums">{gbp(acc.thisMonthRevenue / P, 2)} · <span className="text-[var(--green)]">{gbp(acc.thisMonthProfit / P, 2)} profit</span> · {acc.thisMonthCharges} sales</span></div>
+                    <div className="flex justify-between"><span className="text-[var(--text-tertiary)]">All time</span><span className="tabular-nums">{gbp(acc.totalRevenue / P, 2)} · <span className="text-[var(--green)]">{gbp(acc.totalProfit / P, 2)} profit</span> · {acc.chargeCount} sales</span></div>
                   </div>
                 );
               })()}
@@ -256,7 +269,7 @@ export default function RevenueBoard() {
   );
 }
 
-function Stat({ label, value, sub, accent, onClick, active }: { label: string; value: string; sub?: string; accent?: string; onClick?: () => void; active?: boolean }) {
+function Stat({ label, value, profit, sub, accent, onClick, active }: { label: string; value: string; profit?: string; sub?: string; accent?: string; onClick?: () => void; active?: boolean }) {
   return (
     <div
       onClick={onClick}
@@ -267,6 +280,7 @@ function Stat({ label, value, sub, accent, onClick, active }: { label: string; v
         {onClick && <span className="text-[var(--text-tertiary)] opacity-50">{active ? '▾' : '›'}</span>}
       </div>
       <div className="text-[18px] font-bold tabular-nums" style={{ color: accent || 'var(--text-primary)' }}>{value}</div>
+      {profit && <div className="text-[11px] font-semibold text-[var(--green)] tabular-nums leading-tight">{profit}</div>}
       {sub && <div className="text-[10px] text-[var(--text-tertiary)]">{sub}</div>}
     </div>
   );
@@ -284,11 +298,14 @@ function RevealPanel({ title, onClose, children }: { title: string; onClose: () 
   );
 }
 
-function Row({ left, right }: { left: string; right: string }) {
+function Row({ left, right, note }: { left: string; right: string; note?: string }) {
   return (
     <div className="flex items-center justify-between gap-2 text-[11px]">
       <span className="text-[var(--text-secondary)] truncate">{left}</span>
-      <span className="text-[var(--green)] font-semibold tabular-nums flex-shrink-0">{right}</span>
+      <span className="flex items-baseline gap-1.5 flex-shrink-0 tabular-nums">
+        <span className="text-[var(--green)] font-semibold">{right}</span>
+        {note && <span className="text-[10px] text-[var(--text-tertiary)]">{note}</span>}
+      </span>
     </div>
   );
 }

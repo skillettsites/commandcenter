@@ -67,6 +67,27 @@ function cleanEnv(v: string | undefined): string {
   return (v || "").replace(/\\n$/, "").trim();
 }
 
+// ─── Per-sale cost model (all pence) ─────────────────────────────────────────
+// Profit = charge amount − Stripe processing fee − per-sale third-party API/data cost.
+// Stripe UK standard pricing: 1.5% + 20p per successful domestic card charge.
+const STRIPE_PCT = 0.015;
+const STRIPE_FIXED = 20;
+// Per-sale third-party data/API cost by account, in pence. CarCostCheck's OneAuto
+// (Experian AutoCheck) is a hard £1.10/sale; the others are ESTIMATES — set the real
+// numbers here as they're confirmed. A missing account defaults to 0 (Stripe fee only).
+const SALE_DATA_COST: Record<string, number> = {
+  CarCostCheck: 110,   // OneAuto AutoCheck £1.10 (some cache hits cost £0 — modelled at full)
+  HomeBuyerCheck: 20,  // Claude report generation (est.)
+  PostcodeCheck: 10,   // mostly free gov data + light AI (est.)
+  AppealAFine: 15,     // AI appeal-letter generation (est.)
+  MatchMySkillset: 20, // AI career analysis (est.)
+  BriefMyNews: 10,     // AI digest (est.)
+};
+function chargeCost(accountName: string, amount: number): number {
+  const stripeFee = Math.round(amount * STRIPE_PCT) + STRIPE_FIXED;
+  return stripeFee + (SALE_DATA_COST[accountName] ?? 0);
+}
+
 interface StripeCharge {
   amount: number;
   paid: boolean;
@@ -151,8 +172,11 @@ export async function GET() {
         todayCharges: number;
         thisMonthRevenue: number;
         thisMonthCharges: number;
+        totalProfit: number;
+        todayProfit: number;
+        thisMonthProfit: number;
         recentCharges: Array<{ amount: number; site: string; email: string; date: string }>;
-        dailySeries: Array<{ date: string; revenue: number; charges: number }>;
+        dailySeries: Array<{ date: string; revenue: number; charges: number; profit: number }>;
       }>,
       totalRevenue: 0,
       totalCharges: 0,
@@ -160,7 +184,10 @@ export async function GET() {
       thisMonthCharges: 0,
       todayRevenue: 0,
       todayCharges: 0,
-      dailySeries: [] as Array<{ date: string; revenue: number; charges: number }>,
+      totalProfit: 0,
+      thisMonthProfit: 0,
+      todayProfit: 0,
+      dailySeries: [] as Array<{ date: string; revenue: number; charges: number; profit: number }>,
     };
 
     const now = new Date();
@@ -168,7 +195,7 @@ export async function GET() {
     const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000;
 
     // Prefill daily buckets from revenue start to today (UTC)
-    const buckets = new Map<string, { revenue: number; charges: number }>();
+    const buckets = new Map<string, { revenue: number; charges: number; profit: number }>();
     const startDay = new Date(REVENUE_START_DATE * 1000);
     const endDay = new Date(todayStart * 1000);
     for (
@@ -176,7 +203,7 @@ export async function GET() {
       d <= endDay.getTime();
       d += 86400000
     ) {
-      buckets.set(new Date(d).toISOString().slice(0, 10), { revenue: 0, charges: 0 });
+      buckets.set(new Date(d).toISOString().slice(0, 10), { revenue: 0, charges: 0, profit: 0 });
     }
 
     // HomeBuyerCheck (Supabase reports) is the authoritative HBC source AND
@@ -217,29 +244,42 @@ export async function GET() {
           (c) => c.paid && !c.refunded && c.created >= REVENUE_START_DATE
         );
 
-        const totalRevenue = paid.reduce((s, c) => s + c.amount, 0);
-        const monthCharges = paid.filter((c) => c.created >= monthStart);
-        const monthRevenue = monthCharges.reduce((s, c) => s + c.amount, 0);
-        const todayChargesList = paid.filter((c) => c.created >= todayStart);
-        const todayRevenue = todayChargesList.reduce((s, c) => s + c.amount, 0);
+        // Price each charge once: profit = amount − Stripe fee − per-sale data cost.
+        const priced = paid.map((c) => {
+          const profit = c.amount - chargeCost(account.name, c.amount);
+          return { c, profit };
+        });
+
+        const totalRevenue = priced.reduce((s, p) => s + p.c.amount, 0);
+        const totalProfit = priced.reduce((s, p) => s + p.profit, 0);
+        const monthPriced = priced.filter((p) => p.c.created >= monthStart);
+        const monthRevenue = monthPriced.reduce((s, p) => s + p.c.amount, 0);
+        const monthProfit = monthPriced.reduce((s, p) => s + p.profit, 0);
+        const todayPriced = priced.filter((p) => p.c.created >= todayStart);
+        const todayRevenue = todayPriced.reduce((s, p) => s + p.c.amount, 0);
+        const todayProfit = todayPriced.reduce((s, p) => s + p.profit, 0);
+        const monthCharges = monthPriced;
+        const todayChargesList = todayPriced;
 
         // Per-account daily series (for the per-site graph) plus the global buckets.
-        const acctBuckets = new Map<string, { revenue: number; charges: number }>();
-        for (const c of paid) {
+        const acctBuckets = new Map<string, { revenue: number; charges: number; profit: number }>();
+        for (const { c, profit } of priced) {
           const key = utcDateKey(c.created);
           const bucket = buckets.get(key);
           if (bucket) {
             bucket.revenue += c.amount;
             bucket.charges += 1;
+            bucket.profit += profit;
           }
-          const ab = acctBuckets.get(key) ?? { revenue: 0, charges: 0 };
+          const ab = acctBuckets.get(key) ?? { revenue: 0, charges: 0, profit: 0 };
           ab.revenue += c.amount;
           ab.charges += 1;
+          ab.profit += profit;
           acctBuckets.set(key, ab);
         }
         const acctDailySeries = Array.from(acctBuckets.entries())
           .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-          .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges }));
+          .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges, profit: v.profit }));
 
         const recentCharges = paid.slice(0, 5).map((c) => ({
           amount: c.amount,
@@ -257,6 +297,9 @@ export async function GET() {
           todayCharges: todayChargesList.length,
           thisMonthRevenue: monthRevenue,
           thisMonthCharges: monthCharges.length,
+          totalProfit,
+          todayProfit,
+          thisMonthProfit: monthProfit,
           recentCharges,
           dailySeries: acctDailySeries,
         });
@@ -267,6 +310,9 @@ export async function GET() {
         results.thisMonthCharges += monthCharges.length;
         results.todayRevenue += todayRevenue;
         results.todayCharges += todayChargesList.length;
+        results.totalProfit += totalProfit;
+        results.thisMonthProfit += monthProfit;
+        results.todayProfit += todayProfit;
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.error(`[stripe] ${account.name}:`, errMsg);
@@ -275,7 +321,7 @@ export async function GET() {
 
     results.dailySeries = Array.from(buckets.entries())
       .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-      .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges }));
+      .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges, profit: v.profit }));
 
     return NextResponse.json(results);
   } catch (error) {
