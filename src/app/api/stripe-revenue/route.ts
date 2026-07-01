@@ -69,23 +69,49 @@ function cleanEnv(v: string | undefined): string {
 
 // ─── Per-sale cost model (all pence) ─────────────────────────────────────────
 // Profit = charge amount − Stripe processing fee − per-sale third-party API/data cost.
-// Stripe UK standard pricing: 1.5% + 20p per successful domestic card charge.
+//
+// Stripe fee: we use the ACTUAL fee Stripe recorded per charge (balance_transaction.fee,
+// pulled via expand in fetchCharges) so it's exact per card type, not an estimate. Only
+// the Supabase-sourced sites (HomeBuyerCheck) fall back to the 1.5% + 20p UK estimate.
 const STRIPE_PCT = 0.015;
 const STRIPE_FIXED = 20;
-// Per-sale third-party data/API cost by account, in pence. CarCostCheck's OneAuto
-// (Experian AutoCheck) is a hard £1.10/sale; the others are ESTIMATES — set the real
-// numbers here as they're confirmed. A missing account defaults to 0 (Stripe fee only).
+
+// CarCostCheck data cost varies by report. metadata.product is on the checkout SESSION,
+// not the charge, so we classify by amount (prices are distinct enough that the ~10%
+// promo/early-bird variance can't cross a band). Costs from the CCC codebase:
+//   valuation £2.99 → AutoPredict £1.50 + Marketcheck £0.20      = 170p (no AutoCheck)
+//   premium   £4.99 → AutoCheck £1.10                            = 110p
+//   bundle    £6.99 → AutoCheck £1.10 + AutoPredict £1.50 + MC £0.20 = 280p
+//   trade credit packs (≥ £30) → 0 at sale; the AutoCheck cost lands later when a credit is spent.
+// Conservative: AutoCheck by-reg cache hits and skipped-Marketcheck (no mileage) make the
+// real average slightly lower, so profit shown is a floor. Insurance-API cost is undocumented
+// and not included.
+function cccDataCost(amount: number): number {
+  if (amount >= 3000) return 0;   // trade credit pack
+  if (amount >= 600) return 280;  // bundle
+  if (amount >= 350) return 110;  // premium
+  return 170;                     // valuation
+}
+
+// Per-sale data/API cost for the non-CCC sites, in pence. These are ESTIMATES — replace
+// with real figures when known. A missing account defaults to 0 (Stripe fee only).
 const SALE_DATA_COST: Record<string, number> = {
-  CarCostCheck: 110,   // OneAuto AutoCheck £1.10 (some cache hits cost £0 — modelled at full)
   HomeBuyerCheck: 20,  // Claude report generation (est.)
   PostcodeCheck: 10,   // mostly free gov data + light AI (est.)
   AppealAFine: 15,     // AI appeal-letter generation (est.)
   MatchMySkillset: 20, // AI career analysis (est.)
   BriefMyNews: 10,     // AI digest (est.)
 };
-function chargeCost(accountName: string, amount: number): number {
-  const stripeFee = Math.round(amount * STRIPE_PCT) + STRIPE_FIXED;
-  return stripeFee + (SALE_DATA_COST[accountName] ?? 0);
+
+function realFee(c: StripeCharge): number | undefined {
+  const bt = c.balance_transaction;
+  return bt && typeof bt === "object" && typeof bt.fee === "number" ? bt.fee : undefined;
+}
+
+function chargeCost(accountName: string, amount: number, fee?: number): number {
+  const stripeFee = fee != null ? fee : Math.round(amount * STRIPE_PCT) + STRIPE_FIXED;
+  const dataCost = accountName === "CarCostCheck" ? cccDataCost(amount) : (SALE_DATA_COST[accountName] ?? 0);
+  return stripeFee + dataCost;
 }
 
 interface StripeCharge {
@@ -97,6 +123,9 @@ interface StripeCharge {
   // Stripe charges carry this natively; Supabase rows map it from
   // stripe_payment_intent. Used to de-dupe the shared PCC/HBC account.
   payment_intent?: string;
+  // Expanded on the Stripe pull so we can read the exact processing fee Stripe took.
+  // A string (unexpanded id) or null for Supabase-sourced rows.
+  balance_transaction?: { fee?: number } | string | null;
 }
 
 // HomeBuyerCheck's Stripe key is Sensitive in Vercel, so its authoritative purchase
@@ -141,6 +170,8 @@ async function fetchCharges(key: string): Promise<StripeCharge[]> {
     const url = new URL("https://api.stripe.com/v1/charges");
     url.searchParams.set("limit", "100");
     url.searchParams.set("created[gte]", String(Math.floor(REVENUE_START_DATE)));
+    // Pull the real processing fee Stripe took on each charge for exact profit.
+    url.searchParams.append("expand[]", "data.balance_transaction");
     if (starting_after) url.searchParams.set("starting_after", starting_after);
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Basic ${auth}` },
@@ -244,9 +275,9 @@ export async function GET() {
           (c) => c.paid && !c.refunded && c.created >= REVENUE_START_DATE
         );
 
-        // Price each charge once: profit = amount − Stripe fee − per-sale data cost.
+        // Price each charge once: profit = amount − (real) Stripe fee − per-sale data cost.
         const priced = paid.map((c) => {
-          const profit = c.amount - chargeCost(account.name, c.amount);
+          const profit = c.amount - chargeCost(account.name, c.amount, realFee(c));
           return { c, profit };
         });
 
