@@ -23,6 +23,7 @@ const ACCOUNT_TO_SITE: Record<string, string> = {
   MatchMySkillset: 'matchmyskillset',
   AppealAFine: 'appealafine',
   HomeBuyerCheck: 'homebuyercheck',
+  BriefMyNews: 'briefmynews',
 };
 
 interface DailyPoint { date: string; revenue: number; charges: number }

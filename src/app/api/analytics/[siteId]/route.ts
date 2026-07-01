@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
+import { getServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,56 @@ function getClient(): BetaAnalyticsDataClient | null {
   return _client;
 }
 
+// First-party fallback: build the detail view from the Supabase `pageviews`
+// table for sites GA can't read (e.g. BriefMyNews, whose GA4 property isn't
+// shared with the reader service account). Uses pageviews as a visitor proxy.
+async function buildFromPageviews(siteId: string, range: string) {
+  const now = Date.now();
+  const hourlyBuckets = range === 'today' || range === '24h' || range === 'yesterday';
+  let from: string;
+  if (range === '7d') from = new Date(now - 7 * 864e5).toISOString();
+  else if (range === '90d') from = new Date(now - 90 * 864e5).toISOString();
+  else if (range === '1m' || range === '30d') from = new Date(now - 30 * 864e5).toISOString();
+  else if (range === 'all') from = '2020-01-01T00:00:00.000Z';
+  else if (range === 'today') from = new Date(new Date().setUTCHours(0, 0, 0, 0)).toISOString();
+  else from = new Date(now - 24 * 3600e3).toISOString();
+
+  const supabase = getServiceClient();
+  const { data } = await supabase
+    .from('pageviews')
+    .select('created_at, path, referrer')
+    .eq('site_id', siteId)
+    .gte('created_at', from)
+    .limit(50000);
+
+  const rows = data ?? [];
+  const byTime = new Map<string, number>();
+  const byPath = new Map<string, number>();
+  const bySource = new Map<string, number>();
+  for (const r of rows) {
+    const d = new Date(r.created_at as string);
+    const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+    const key = hourlyBuckets ? `${ymd}${String(d.getUTCHours()).padStart(2, '0')}` : ymd;
+    byTime.set(key, (byTime.get(key) ?? 0) + 1);
+    if (r.path) byPath.set(r.path as string, (byPath.get(r.path as string) ?? 0) + 1);
+    let src = '(direct)';
+    if (r.referrer) { try { src = new URL(r.referrer as string).hostname; } catch { /* keep direct */ } }
+    bySource.set(src, (bySource.get(src) ?? 0) + 1);
+  }
+
+  const hourly = Array.from(byTime.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([dateHour, count]) => ({ dateHour, pageViews: count, users: count, sessions: count }));
+  const topPages = Array.from(byPath.entries())
+    .sort((a, b) => b[1] - a[1]).slice(0, 10)
+    .map(([path, views]) => ({ path, views }));
+  const sources = Array.from(bySource.entries())
+    .sort((a, b) => b[1] - a[1]).slice(0, 10)
+    .map(([source, sessions]) => ({ source, sessions, users: sessions }));
+
+  return { hourly, sources, topPages, source: 'pageviews' as const };
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ siteId: string }> }
@@ -31,8 +82,13 @@ export async function GET(
   }
 
   const project = projects.find(p => p.id === siteId);
-  if (!project?.gaPropertyId) {
-    return NextResponse.json({ error: 'No GA property for this site' }, { status: 404 });
+  if (!project) {
+    return NextResponse.json({ error: 'Unknown site' }, { status: 404 });
+  }
+  // No GA property -> serve first-party pageviews directly.
+  if (!project.gaPropertyId) {
+    const range = request.nextUrl.searchParams.get('range') || '24h';
+    return NextResponse.json(await buildFromPageviews(siteId, range));
   }
 
   const propertyId = `properties/${project.gaPropertyId}`;
@@ -118,9 +174,22 @@ export async function GET(
       views: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
 
+    // GA returned nothing (e.g. property not shared with the reader account, or
+    // no data) -> fall back to first-party pageviews so the chart isn't blank.
+    if (hourly.length === 0) {
+      const fb = await buildFromPageviews(siteId, range);
+      if (fb.hourly.length > 0) return NextResponse.json(fb);
+    }
+
     return NextResponse.json({ hourly, sources, topPages });
   } catch (err) {
     console.error(`Analytics detail error for ${siteId}:`, err);
-    return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
+    // GA call failed (commonly a permission error on a property that isn't
+    // shared with the reader account) -> serve first-party pageviews instead.
+    try {
+      return NextResponse.json(await buildFromPageviews(siteId, range));
+    } catch {
+      return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
+    }
   }
 }
