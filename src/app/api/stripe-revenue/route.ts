@@ -53,6 +53,12 @@ const ACCOUNTS: AccountConfig[] = [
     fallbackB64: "c2tfbGl2ZV81MVNqSWFTSTdvUkNGeVZyTExleVVVTjVVYURRQ1A5OGllWUlkbE5JeFdmT2FOb1FyMEdWc0d0dFJQZXNhTlhwbFQyNno2aGF2cnVMRmtndDlqV1ppTng0YTAwSll5OThRWTQ=",
     sites: ["MatchMySkillset"],
   },
+  {
+    name: "BriefMyNews",
+    source: "stripe",
+    envVar: "STRIPE_KEY_BRIEFMYNEWS",
+    sites: ["BriefMyNews"],
+  },
   { name: "HomeBuyerCheck", source: "supabase", sites: ["HomeBuyerCheck"] },
 ];
 
