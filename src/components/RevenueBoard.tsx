@@ -55,7 +55,11 @@ export default function RevenueBoard() {
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const allSeries = data.dailySeries ?? [];
-    const series = range === 'month' ? allSeries.filter((d) => d.date.startsWith(ym))
+    // Month view filters to the current month, but early in the month (e.g. the
+    // 1st) that leaves 0-1 points and the area chart can't draw a line. Fall
+    // back to a rolling ~14-day window so the chart always renders.
+    const monthRows = allSeries.filter((d) => d.date.startsWith(ym));
+    const series = range === 'month' ? (monthRows.length >= 2 ? monthRows : allSeries.slice(-14))
       : range === 'week' ? allSeries.slice(-7)
       : allSeries;
     const dayOfMonth = now.getDate();

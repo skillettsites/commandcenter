@@ -16,6 +16,10 @@ import { Module, Segmented, fmtNum, fmtCompact } from './DashKit';
 
 type Range = '7d' | '30d' | '90d' | 'all';
 
+interface TopPage { path: string; views: number }
+interface Source { source: string; sessions: number; users: number }
+interface SiteDetail { hourly: TrafficRow[]; topPages: TopPage[]; sources: Source[] }
+
 // Stripe account name (from /api/stripe-revenue) -> site id (projects.ts)
 const ACCOUNT_TO_SITE: Record<string, string> = {
   CarCostCheck: 'carcostcheck',
@@ -73,7 +77,7 @@ export default function SitesGraph() {
   const [siteId, setSiteId] = useState('carcostcheck');
   const [range, setRange] = useState<Range>('30d');
   const [stripe, setStripe] = useState<StripeData | null>(null);
-  const [traffic, setTraffic] = useState<Record<string, TrafficRow[]>>({});
+  const [traffic, setTraffic] = useState<Record<string, SiteDetail>>({});
   const [loading, setLoading] = useState(true);
 
   const site = SITE_OPTIONS.find((s) => s.id === siteId) ?? SITE_OPTIONS[0];
@@ -97,9 +101,9 @@ export default function SitesGraph() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         fetched.current.add(cacheKey);
-        setTraffic((prev) => ({ ...prev, [cacheKey]: d?.hourly ?? [] }));
+        setTraffic((prev) => ({ ...prev, [cacheKey]: { hourly: d?.hourly ?? [], topPages: d?.topPages ?? [], sources: d?.sources ?? [] } }));
       })
-      .catch(() => setTraffic((prev) => ({ ...prev, [cacheKey]: [] })))
+      .catch(() => setTraffic((prev) => ({ ...prev, [cacheKey]: { hourly: [], topPages: [], sources: [] } })))
       .finally(() => setLoading(false));
   }, [cacheKey, siteId, range]);
 
@@ -110,7 +114,7 @@ export default function SitesGraph() {
   }, [stripe, siteId]);
 
   const merged = useMemo<MergedPoint[]>(() => {
-    const rows = traffic[cacheKey] ?? [];
+    const rows = traffic[cacheKey]?.hourly ?? [];
     const windowStart = new Date();
     windowStart.setUTCDate(windowStart.getUTCDate() - RANGE_DAYS[range]);
     const startStr = range === 'all' ? '0000-00-00' : windowStart.toISOString().slice(0, 10);
@@ -253,6 +257,42 @@ export default function SitesGraph() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Top pages + traffic sources for the selected site */}
+      {(() => {
+        const detail = traffic[cacheKey];
+        if (!detail || (detail.topPages.length === 0 && detail.sources.length === 0)) return null;
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
+            <div>
+              <div className="section-eyebrow mb-2.5">Top pages</div>
+              <div className="space-y-1">
+                {detail.topPages.length === 0
+                  ? <p className="text-[11px] text-[var(--text-tertiary)]">No page data.</p>
+                  : detail.topPages.slice(0, 6).map((p, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-[var(--text-secondary)] truncate">{p.path}</span>
+                        <span className="text-[var(--text-primary)] tabular-nums flex-shrink-0">{fmtNum(p.views)}</span>
+                      </div>
+                    ))}
+              </div>
+            </div>
+            <div>
+              <div className="section-eyebrow mb-2.5">Sources</div>
+              <div className="space-y-1">
+                {detail.sources.length === 0
+                  ? <p className="text-[11px] text-[var(--text-tertiary)]">No source data.</p>
+                  : detail.sources.slice(0, 6).map((s, i) => (
+                      <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="text-[var(--text-secondary)] truncate">{s.source}</span>
+                        <span className="text-[var(--text-primary)] tabular-nums flex-shrink-0">{fmtNum(s.sessions)}</span>
+                      </div>
+                    ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </Module>
   );
 }
