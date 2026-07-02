@@ -855,10 +855,18 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
             <div className="text-center py-3 rounded-lg bg-[var(--bg-elevated)]">
               <div className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mb-0.5">Total Net Worth</div>
               <div className="text-[24px] font-bold text-[var(--text-primary)]">{formatGBP(data.totals.netWorth)}</div>
+              <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">vested ICE only</div>
+              {data.totals.etradeUnvested > 0 && (
+                <div className="mt-2 pt-2 mx-8 border-t border-dashed border-[var(--border-light)]">
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--cyan)] mb-0.5">Expected Net Worth</div>
+                  <div className="text-[18px] font-bold text-[var(--cyan)]">{formatGBP(data.totals.netWorth + data.totals.etradeUnvested)}</div>
+                  <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">incl. {formatGBP(data.totals.etradeUnvested)} unvested ICE RSUs</div>
+                </div>
+              )}
               <div className="mt-2 pt-2 mx-8 border-t border-dashed border-[var(--border-light)]">
                 <div className="text-[10px] uppercase tracking-wider text-[var(--orange)] mb-0.5">Projected Net Worth</div>
-                <div className="text-[18px] font-bold text-[var(--orange)]">{formatGBP(data.totals.netWorth + upcomingTotal)}</div>
-                <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">incl. £{Math.round(upcomingTotal / 1000)}k family / upcoming money</div>
+                <div className="text-[18px] font-bold text-[var(--orange)]">{formatGBP(data.totals.netWorth + data.totals.etradeUnvested + upcomingTotal)}</div>
+                <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">incl. unvested ICE + £{Math.round(upcomingTotal / 1000)}k family / upcoming money</div>
               </div>
             </div>
           </div>
@@ -1091,15 +1099,14 @@ export default function Finances({ startExpanded = false }: { startExpanded?: bo
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
                         <div className="text-[13px] font-medium text-[var(--text-primary)]">{formatGBP(data.etrade.vestedValue)}</div>
-                        {investmentView === 'today' && data.etrade.dailyChangeGBP !== null ? (
+                        {investmentView === 'today' && data.etrade.dailyChangeGBP !== null && (
                           <div className="flex items-center gap-1 justify-end">
                             <GainLossText value={data.etrade.dailyChangeGBP} size="xs" />
                             <PercentBadge value={data.etrade.dailyChangePercent} />
                           </div>
-                        ) : (
-                          data.etrade.unvestedValue > 0 && (
-                            <div className="text-[10px] text-[var(--text-tertiary)]">+{formatGBP(data.etrade.unvestedValue)} unvested</div>
-                          )
+                        )}
+                        {data.etrade.unvestedValue > 0 && (
+                          <div className="text-[10px] text-[var(--text-tertiary)]">+{formatGBP(data.etrade.unvestedValue)} unvested</div>
                         )}
                       </div>
                     </div>
