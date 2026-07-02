@@ -1,8 +1,9 @@
 // Portfolio configuration - update values here when data changes
-// Last manual update: 2026-06-15 (from HL app screenshots)
-// HL total £407,016.57 (invested £378,150.92, cash £28,865.65; +£130,983.90 / +52.99% all-time).
-// ISA £302,206.19 (+52.48%, cash £413.04). Fund & Share £104,810.38 (+55.06%, cash £28,450.72).
-// Holdings unchanged vs 12 Jun; the rise is market value (+£9.5k since 12 Jun). FX 1.34091 USD/GBP.
+// Last manual update: 2026-07-02 (from HL + E*Trade app screenshots)
+// HL total £400,272.40 (invested £360,360.68, cash £39,911.72; +£126,211.57 / +53.90% all-time; +£850.79 today).
+// ISA £298,496.91 (+52.77%, cash £2.87). Fund & Share £101,775.49 (+59.54%, cash £39,089.22). FX 1.33387 USD/GBP (HL app, 02 Jul).
+// Changes vs 15 Jun: ISA GOOGL 198->275 sh (cost ->£33,477.91); Fidelity units 108,130.87->85,205.61 (cost ->£68,780.37); added ISA SpaceX 69 sh (£7,962.29); ISA cash ->£2.87; F&S cash ->£39,089.22.
+// E*Trade (ICE) 02 Jul: ESPP (vested) $145,612.77, RS (unvested) $57,446.24 at $126.73 -> vested ~1,149 sh, unvested ~453 sh.
 
 export interface StockHolding {
   symbol: string;
@@ -109,10 +110,11 @@ export interface DividendSchedule {
 
 export const stockHoldings: StockHolding[] = [
   // ISA holdings
-  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 198, costBasis: 19965.32, account: 'ISA', currency: 'USD' },
+  { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 275, costBasis: 33477.91, account: 'ISA', currency: 'USD' },
   { symbol: 'AMZN', name: 'Amazon', shares: 143, costBasis: 22338.02, account: 'ISA', currency: 'USD' },
   { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800.38, account: 'ISA', currency: 'GBP' },
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281.38, account: 'ISA', currency: 'USD' },
+  { symbol: 'SPCX', name: 'SpaceX', shares: 69, costBasis: 7962.29, account: 'ISA', currency: 'USD' },
   { symbol: '2TSL.L', name: '2x Tesla ETP', shares: 75, costBasis: 5924.18, account: 'ISA', currency: 'GBP' },
   // Fund & Share holdings (updated 12 Jun 2026 from HL app)
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4462.60, account: 'F&S', currency: 'USD' },
@@ -128,9 +130,9 @@ export const fundHoldings: FundHolding[] = [
     name: 'Fidelity Enhanced Income',
     sedol: 'BYSYZP1',
     yahooSymbol: '0P0000XMHQ.L',
-    units: 108130.87,
-    currentValue: 96620, // fallback; live value via HL unit-price cache. Reconciled 15 Jun 2026 (ISA £302,206, F&S £104,810, HL total £407,017)
-    costBasis: 87396.11,
+    units: 85205.61,
+    currentValue: 76150, // fallback; live value via HL unit-price cache. Units reduced 02 Jul 2026 (108,130.87 -> 85,205.61)
+    costBasis: 68780.37,
     account: 'ISA',
   },
   {
@@ -146,8 +148,8 @@ export const fundHoldings: FundHolding[] = [
 ];
 
 export const cashInvestmentAccounts: CashHolding[] = [
-  { account: 'ISA Cash', balance: 413.04 },    // 15 Jun 2026
-  { account: 'F&S Cash', balance: 28450.72 },  // 15 Jun 2026
+  { account: 'ISA Cash', balance: 2.87 },       // 02 Jul 2026
+  { account: 'F&S Cash', balance: 39089.22 },   // 02 Jul 2026
 ];
 
 // E*Trade ICE holdings - live priced via Yahoo Finance (symbol: ICE)
@@ -155,13 +157,13 @@ export const cashInvestmentAccounts: CashHolding[] = [
 export const etradeHoldings = {
   symbol: 'ICE',
   name: 'ICE (Intercontinental Exchange)',
-  esppValueUSD: 166193, // Employee Stock Purchase Plan (vested)
-  rsValueUSD: 71457, // Restricted Stock (unvested)
-  totalValueUSD: 237650,
-  // Share counts for live price tracking
-  vestedShares: 1049, // ESPP
-  unvestedShares: 451, // RS
-  totalShares: 1500,
+  esppValueUSD: 145612.77, // Employee Stock Purchase Plan (vested) — E*Trade app 02 Jul 2026
+  rsValueUSD: 57446.24, // Restricted Stock (unvested) — E*Trade app 02 Jul 2026
+  totalValueUSD: 203059.01,
+  // Share counts for live price tracking (derived from USD values / $126.73 ICE price, 02 Jul 2026)
+  vestedShares: 1149, // ESPP
+  unvestedShares: 453, // RS
+  totalShares: 1602,
   account: 'E*Trade' as const,
   currency: 'USD' as const,
   // Upcoming RSU vest dates (shares per tranche). Unvested shares are EXCLUDED
@@ -169,7 +171,7 @@ export const etradeHoldings = {
   vestingSchedule: [] as { date: string; shares: number; label?: string }[],
 };
 // Fallback GBP value if Yahoo Finance unavailable
-export const etradeValue = 134202; // vested only, as at 21 Mar 2026
+export const etradeValue = 109165; // vested only ($145,612.77 / 1.33387), as at 02 Jul 2026
 
 export const propertyHoldings: PropertyHolding[] = [
   {
