@@ -79,7 +79,8 @@ export default function FinancesBoard() {
 
   const t = data.totals;
   const upcomingTotal = upcomingMoney.reduce((s, m) => s + m.amount, 0);
-  const projectedNetWorth = t.netWorth + upcomingTotal;
+  const expectedNetWorth = t.netWorth + (t.etradeUnvested || 0); // + unvested ICE RSUs
+  const projectedNetWorth = expectedNetWorth + upcomingTotal;    // + family / upcoming money
 
   /* allocation */
   const alloc = [
@@ -114,10 +115,17 @@ export default function FinancesBoard() {
             <div className="text-[34px] sm:text-[38px] font-bold tracking-tight text-[var(--text-primary)] tabular-nums leading-none">
               {blur(gbp(t.netWorth))}
             </div>
+            {(t.etradeUnvested || 0) > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--cyan)]">Expected</span>
+                <span className="text-[18px] font-bold text-[var(--cyan)] tabular-nums leading-none">{blur(gbp(expectedNetWorth))}</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">incl. {gbp(t.etradeUnvested)} unvested ICE</span>
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[10px] uppercase tracking-wider text-[var(--orange)]">Projected</span>
               <span className="text-[18px] font-bold text-[var(--orange)] tabular-nums leading-none">{blur(gbp(projectedNetWorth))}</span>
-              <span className="text-[10px] text-[var(--text-tertiary)]">incl. £{Math.round(upcomingTotal / 1000)}k upcoming</span>
+              <span className="text-[10px] text-[var(--text-tertiary)]">incl. unvested ICE + £{Math.round(upcomingTotal / 1000)}k upcoming</span>
             </div>
             <div className="text-[11px] text-[var(--text-tertiary)] mt-1.5">£1 = ${(1 / data.forexRate).toFixed(4)} · updated {new Date(data.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
           </div>
@@ -210,7 +218,7 @@ function InvestmentsModule({ data, blurValues, forexRate }: { data: FinData; blu
     const rows: Holding[] = [];
     for (const s of data.stocks ?? []) rows.push({ key: `s-${s.symbol}`, name: s.symbol, sub: `${s.account} · ${s.shares} sh`, value: s.currentValue, gainPct: s.gainLossPercent, dailyPct: s.dailyChangePercent, symbol: s.symbol, currency: s.currency });
     for (const f of data.funds ?? []) rows.push({ key: `f-${f.id}`, name: f.name, sub: 'Income fund', value: f.currentValue, gainPct: f.gainLossPercent, dailyPct: null });
-    if (data.etrade && data.etrade.vestedValue > 0) rows.push({ key: 'etrade', name: `${data.etrade.symbol} (E*Trade)`, sub: `${data.etrade.vestedShares} vested · ${data.etrade.unvestedShares} unvested (excl.)`, value: data.etrade.vestedValue, gainPct: null, dailyPct: data.etrade.dailyChangePercent });
+    if (data.etrade && data.etrade.vestedValue > 0) rows.push({ key: 'etrade', name: `${data.etrade.symbol} (E*Trade)`, sub: `${data.etrade.vestedShares} vested · ${data.etrade.unvestedShares} unvested · +${gbp(data.etrade.unvestedValue)} unvested (excl. net worth)`, value: data.etrade.vestedValue, gainPct: null, dailyPct: data.etrade.dailyChangePercent });
     for (const c of data.cashInvestmentAccounts ?? []) if (c.balance > 0) rows.push({ key: `ic-${c.account}`, name: c.account, sub: 'Investment cash', value: c.balance, gainPct: null, dailyPct: null });
     return rows.sort((a, b) => b.value - a.value);
   }, [data]);
