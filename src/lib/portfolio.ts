@@ -115,7 +115,7 @@ export const stockHoldings: StockHolding[] = [
   { symbol: 'JEQP.L', name: 'JEPQ (Nasdaq Equity Premium Income)', shares: 564, costBasis: 10800.38, account: 'ISA', currency: 'GBP' },
   { symbol: 'NVDA', name: 'NVIDIA', shares: 320, costBasis: 3281.38, account: 'ISA', currency: 'USD' },
   { symbol: 'SPCX', name: 'SpaceX', shares: 69, costBasis: 7962.29, account: 'ISA', currency: 'USD' },
-  { symbol: '2TSL.L', name: '2x Tesla ETP', shares: 75, costBasis: 5924.18, account: 'ISA', currency: 'GBP' },
+  // 2x Tesla ETP (2TSL) sold — no longer in the ISA (absent from the 02 Jul holdings list; its ~£17k would rank near the top if held).
   // Fund & Share holdings (updated 12 Jun 2026 from HL app)
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4462.60, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15088.75, account: 'F&S', currency: 'USD' },
