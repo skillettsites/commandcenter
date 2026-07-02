@@ -119,7 +119,7 @@ export const stockHoldings: StockHolding[] = [
   // Fund & Share holdings (updated 12 Jun 2026 from HL app)
   { symbol: 'PLTR', name: 'Palantir', shares: 247, costBasis: 4462.60, account: 'F&S', currency: 'USD' },
   { symbol: 'TSLA', name: 'Tesla', shares: 62, costBasis: 15088.75, account: 'F&S', currency: 'USD' },
-  { symbol: 'SPCX', name: 'SpaceX', shares: 84, costBasis: 9952.87, account: 'F&S', currency: 'USD' },
+  // SpaceX (SPCX) now held in the ISA (69 sh) — no longer in Fund & Share (absent from the 02 Jul F&S holdings).
   { symbol: 'GOOGL', name: 'Alphabet/Google', shares: 37, costBasis: 9746.10, account: 'F&S', currency: 'USD' },
   { symbol: 'NVDA', name: 'NVIDIA', shares: 65, costBasis: 9993.09, account: 'F&S', currency: 'USD' },
 ];
