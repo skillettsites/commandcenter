@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { projects } from '@/lib/projects';
 
 type Spark = number[];
+type LiveSite = { siteId: string; users: number };
 
 interface Kpi {
   netWorth: number | null;
@@ -82,6 +84,7 @@ function KpiCard({
   index,
   blur,
   onToggleBlur,
+  onClick,
 }: {
   label: string;
   value: string;
@@ -94,6 +97,7 @@ function KpiCard({
   index: number;
   blur?: boolean;
   onToggleBlur?: () => void;
+  onClick?: () => void;
 }) {
   const hidden = !!blur;
   const blurCls = hidden ? 'blur-[7px] select-none pointer-events-none' : '';
@@ -140,13 +144,13 @@ function KpiCard({
     </div>
   );
 
-  return href ? (
-    <a href={href} className="block">
+  if (href) return <a href={href} className="block">{inner}</a>;
+  if (onClick) return (
+    <div role="button" tabIndex={0} onClick={onClick} onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }} className="cursor-pointer">
       {inner}
-    </a>
-  ) : (
-    inner
+    </div>
   );
+  return inner;
 }
 
 const empty: Kpi = {
@@ -164,6 +168,8 @@ export default function HeroStats() {
   const [kpi, setKpi] = useState<Kpi>(empty);
   const [done, setDone] = useState<Record<DoneKey, boolean>>({ net: false, rev: false, vis: false, live: false });
   const [revealNetWorth, setRevealNetWorth] = useState(false); // blurred by default for privacy
+  const [liveList, setLiveList] = useState<LiveSite[]>([]);
+  const [showLive, setShowLive] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -231,9 +237,14 @@ export default function HeroStats() {
     j('/api/analytics/realtime').then((realtime) => {
       const patch: Partial<Kpi> = {};
       if (Array.isArray(realtime?.data)) {
-        const rows = realtime.data as { realtimeUsers: number }[];
+        const rows = realtime.data as { siteId: string; realtimeUsers: number }[];
         patch.liveNow = rows.reduce((s, r) => s + (r.realtimeUsers || 0), 0);
-        patch.liveSites = rows.filter((r) => (r.realtimeUsers || 0) > 0).length;
+        const live = rows
+          .filter((r) => (r.realtimeUsers || 0) > 0)
+          .map((r) => ({ siteId: r.siteId, users: r.realtimeUsers }))
+          .sort((a, b) => b.users - a.users);
+        patch.liveSites = live.length;
+        if (alive) setLiveList(live);
       }
       merge(patch, 'live');
     });
@@ -250,6 +261,7 @@ export default function HeroStats() {
   };
 
   return (
+    <>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       <KpiCard
         index={0}
@@ -294,8 +306,48 @@ export default function HeroStats() {
         delta={null}
         spark={kpi.visitorSpark}
         color="var(--orange)"
-        footnote={kpi.liveSites != null ? `Active on ${kpi.liveSites} site${kpi.liveSites === 1 ? '' : 's'}` : undefined}
+        footnote={kpi.liveSites != null ? `On ${kpi.liveSites} site${kpi.liveSites === 1 ? '' : 's'} · tap for details` : undefined}
+        onClick={() => setShowLive(true)}
       />
     </div>
+
+    {showLive && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" onClick={() => setShowLive(false)}>
+        <div className="w-full max-w-sm rounded-2xl border border-[var(--hairline)] bg-[var(--bg-card)] p-5 max-h-[80vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[14px] font-semibold text-[var(--text-primary)]">
+              Live now · {kpi.liveNow ?? 0} {kpi.liveNow === 1 ? 'person' : 'people'}
+            </div>
+            <button onClick={() => setShowLive(false)} className="text-[12px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Close</button>
+          </div>
+          {liveList.length === 0 ? (
+            <p className="py-3 text-center text-[12px] text-[var(--text-tertiary)]">No one is on any site right now.</p>
+          ) : (
+            <div className="space-y-1">
+              {liveList.map((row) => {
+                const proj = projects.find((p) => p.id === row.siteId);
+                return (
+                  <a
+                    key={row.siteId}
+                    href={proj?.url || '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-[var(--surface-hover)] transition-colors"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: proj?.color || 'var(--orange)' }} />
+                      <span className="truncate text-[13px] text-[var(--text-primary)]">{proj?.name || row.siteId}</span>
+                    </span>
+                    <span className="text-[14px] font-bold tabular-nums text-[var(--text-primary)]">{row.users}</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+          <p className="mt-3 text-[10px] text-[var(--text-tertiary)]">Active in the last 5 minutes. Tap a site to open it.</p>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
