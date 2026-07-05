@@ -36,12 +36,16 @@ export async function GET(request: NextRequest) {
     }));
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
+  const today = [{ startDate: 'today', endDate: 'today' }];
   try {
-    const [total, pages, geo, device] = await Promise.all([
+    const [total, pages, geo, device, tPages, tSources] = await Promise.all([
       client.runRealtimeReport({ property, metrics: [{ name: 'activeUsers' }] }),
       client.runRealtimeReport({ property, dimensions: [{ name: 'unifiedScreenName' }], metrics: [{ name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }], limit: 30 }),
       client.runRealtimeReport({ property, dimensions: [{ name: 'city' }, { name: 'country' }], metrics: [{ name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }], limit: 30 }),
       client.runRealtimeReport({ property, dimensions: [{ name: 'deviceCategory' }], metrics: [{ name: 'activeUsers' }] }),
+      // Today's actual page paths + how people arrived (standard Data API).
+      client.runReport({ property, dateRanges: today, dimensions: [{ name: 'pagePath' }], metrics: [{ name: 'screenPageViews' }, { name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }], limit: 40 }),
+      client.runReport({ property, dateRanges: today, dimensions: [{ name: 'sessionDefaultChannelGroup' }, { name: 'sessionSource' }], metrics: [{ name: 'sessions' }, { name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 25 }),
     ]);
     return NextResponse.json({
       siteId,
@@ -49,6 +53,8 @@ export async function GET(request: NextRequest) {
       pages: rows(pages[0], 1).map((r) => ({ page: r.dims[0], users: r.users })),
       locations: rows(geo[0], 2).map((r) => ({ city: r.dims[0], country: r.dims[1], users: r.users })),
       devices: rows(device[0], 1).map((r) => ({ device: r.dims[0], users: r.users })),
+      todayPages: rows(tPages[0], 1).map((r) => ({ path: r.dims[0], views: r.users })),
+      todaySources: rows(tSources[0], 2).map((r) => ({ channel: r.dims[0], source: r.dims[1], sessions: r.users })),
       timestamp: new Date().toISOString(),
     });
   } catch (e) {
