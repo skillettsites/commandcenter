@@ -28,11 +28,13 @@ export async function GET(request: NextRequest) {
   if (!client) return NextResponse.json({ error: 'GA not configured' }, { status: 503 });
 
   const property = `properties/${project.gaPropertyId}`;
-  const rows = (r: { rows?: Array<{ dimensionValues?: Array<{ value?: string | null }>; metricValues?: Array<{ value?: string | null }> }> }, dims: number) =>
-    (r.rows ?? []).map((row) => ({
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const rows = (r: any, dims: number): Array<{ dims: string[]; users: number }> =>
+    (r?.rows ?? []).map((row: any) => ({
       dims: Array.from({ length: dims }, (_, i) => row.dimensionValues?.[i]?.value ?? ''),
       users: parseInt(row.metricValues?.[0]?.value ?? '0'),
     }));
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   try {
     const [total, pages, geo, device] = await Promise.all([
