@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
-import { getServiceClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,29 +42,9 @@ export async function GET() {
     );
   }
 
-  // First-party live activity: distinct-ish views in the last 5 minutes from the
-  // pageviews table. Covers sites GA can't see (e.g. GA property not shared) so
-  // every site with someone on it shows up.
-  const recentMap = new Map<string, number>();
-  try {
-    const supabase = getServiceClient();
-    const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data } = await supabase
-      .from('pageviews')
-      .select('site_id')
-      .gte('created_at', since)
-      .limit(20000);
-    for (const row of data ?? []) {
-      recentMap.set(row.site_id, (recentMap.get(row.site_id) ?? 0) + 1);
-    }
-  } catch {
-    /* first-party fallback unavailable */
-  }
-
-  const allSiteIds = new Set<string>([...gaMap.keys(), ...recentMap.keys()]);
-  const data = Array.from(allSiteIds).map((siteId) => ({
+  const data = Array.from(gaMap.entries()).map(([siteId, realtimeUsers]) => ({
     siteId,
-    realtimeUsers: Math.max(gaMap.get(siteId) ?? 0, recentMap.get(siteId) ?? 0),
+    realtimeUsers,
   }));
 
   return NextResponse.json({ data, timestamp: new Date().toISOString() });

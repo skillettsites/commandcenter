@@ -26,10 +26,9 @@ interface Site {
   today: number;
   month: number;
   total: number;
-  live: number;
 }
 
-type Sort = 'traffic' | 'live' | 'today';
+type Sort = 'traffic' | 'today';
 
 const STATUS_COLOR: Record<string, string> = { up: 'var(--green)', slow: 'var(--yellow)', down: 'var(--red)', unknown: 'var(--text-tertiary)' };
 
@@ -48,15 +47,13 @@ export default function SitesBoard() {
     Promise.all([
       j('/api/analytics'),
       j('/api/pageviews?view=summary'),
-      j('/api/analytics/realtime'),
       j('/api/health'),
-    ]).then(([ga, pv, rt, health]) => {
+    ]).then(([ga, pv, health]) => {
       if (!alive) return;
       const gaMap = new Map<string, { activeUsers: number; monthVisitors: number; totalVisitors: number }>(
         (ga?.data ?? []).map((r: { siteId: string; activeUsers: number; monthVisitors: number; totalVisitors: number }) => [r.siteId, r])
       );
       const tracked = (pv ?? {}) as Record<string, { today: number; month: number; total: number }>;
-      const rtMap = new Map<string, number>((rt?.data ?? []).map((r: { siteId: string; realtimeUsers: number }) => [r.siteId, r.realtimeUsers]));
       const healthMap = new Map<string, { status: string; responseTime: number | null }>(
         (Array.isArray(health) ? health : []).map((r: { siteId: string; status: string; responseTime: number | null }) => [r.siteId, r])
       );
@@ -78,7 +75,6 @@ export default function SitesBoard() {
             today: Math.max(g?.activeUsers ?? 0, t?.today ?? 0),
             month: Math.max(g?.monthVisitors ?? 0, t?.month ?? 0),
             total: Math.max(g?.totalVisitors ?? 0, t?.total ?? 0),
-            live: rtMap.get(p.id) ?? 0,
           };
         });
       setSites(list);
@@ -105,12 +101,10 @@ export default function SitesBoard() {
   const sorted = useMemo(() => {
     const arr = [...sites];
     if (sort === 'traffic') arr.sort((a, b) => b.month - a.month);
-    else if (sort === 'live') arr.sort((a, b) => b.live - a.live || b.today - a.today);
     else arr.sort((a, b) => b.today - a.today);
     return arr;
   }, [sites, sort]);
 
-  const liveTotal = sites.reduce((s, x) => s + x.live, 0);
   const upCount = sites.filter((s) => s.status === 'up').length;
   const visible = showAll ? sorted : sorted.slice(0, 9);
 
@@ -141,12 +135,12 @@ export default function SitesBoard() {
       right={
         <div className="flex items-center gap-3">
           <span className="hidden sm:flex items-center gap-1.5 text-[11px] text-[var(--text-tertiary)]">
-            <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] pulse-dot" /> {liveTotal} live · {upCount}/{sites.length} up
+            {upCount}/{sites.length} up
           </span>
           <Segmented
             value={sort}
             onChange={setSort}
-            options={[{ value: 'traffic', label: 'Top' }, { value: 'live', label: 'Live' }, { value: 'today', label: 'Today' }]}
+            options={[{ value: 'traffic', label: 'Top' }, { value: 'today', label: 'Today' }]}
           />
         </div>
       }
@@ -170,7 +164,6 @@ export default function SitesBoard() {
                         <span className="text-[13px] font-semibold text-[var(--text-primary)] truncate">{s.name}</span>
                       </div>
                       <span className="flex items-center gap-1 flex-shrink-0">
-                        {s.live > 0 && <span className="text-[10px] font-semibold text-[var(--green)] tabular-nums">{s.live}●</span>}
                         <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[s.status] }} title={s.status} />
                       </span>
                     </div>

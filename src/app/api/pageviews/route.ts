@@ -41,18 +41,20 @@ export async function GET(request: NextRequest) {
     const results: Record<string, { today: number; week: number; month: number; total: number }> = {};
 
     for (const siteId of sites) {
-      const [todayRes, weekRes, monthRes, totalRes] = await Promise.all([
+      const [todayRes, weekRes, monthRes] = await Promise.all([
         supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteId).gte('created_at', todayStart),
         supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteId).gte('created_at', weekStart),
         supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteId).gte('created_at', monthStart),
-        supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteId),
       ]);
 
       results[siteId] = {
         today: todayRes.count ?? 0,
         week: weekRes.count ?? 0,
         month: monthRes.count ?? 0,
-        total: totalRes.count ?? 0,
+        // Unbounded all-time count removed: it was a full-table scan on a large,
+        // ever-growing table that exhausted Supabase disk IO. All-time totals come
+        // from GA/Vercel instead. Key kept so callers don't break.
+        total: 0,
       };
     }
 
@@ -161,11 +163,10 @@ export async function GET(request: NextRequest) {
 
   // Full: combines summary + top pages + geo + recent for a single site
   if (view === 'full' && siteFilter) {
-    const [todayRes, weekRes, monthRes, totalRes] = await Promise.all([
+    const [todayRes, weekRes, monthRes] = await Promise.all([
       supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteFilter).gte('created_at', todayStart),
       supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteFilter).gte('created_at', weekStart),
       supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteFilter).gte('created_at', monthStart),
-      supabase.from('pageviews').select('*', { count: 'exact', head: true }).eq('site_id', siteFilter),
     ]);
 
     const { data: allRows } = await supabase
@@ -209,7 +210,8 @@ export async function GET(request: NextRequest) {
         today: todayRes.count ?? 0,
         week: weekRes.count ?? 0,
         month: monthRes.count ?? 0,
-        total: totalRes.count ?? 0,
+        // Unbounded all-time count removed (full-table scan drained Supabase disk IO).
+        total: 0,
       },
       topPages: Array.from(pathCounts.entries())
         .map(([path, count]) => ({ path, count }))

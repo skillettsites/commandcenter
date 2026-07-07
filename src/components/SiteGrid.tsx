@@ -15,7 +15,6 @@ interface SiteData {
   pageViews: number | null;
   totalVisitors: number | null;
   monthVisitors: number | null;
-  realtimeUsers: number | null;
   trackedToday: number | null;
   gaPropertyId?: string;
   gscSiteUrl?: string;
@@ -58,14 +57,13 @@ export default function SiteGrid() {
         pageViews: null,
         totalVisitors: null,
         monthVisitors: null,
-        realtimeUsers: null,
         trackedToday: null,
       }))
   );
   const [expanded, setExpanded] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(true);
   const [showAll, setShowAll] = useState(false);
-  const [sortMode, setSortMode] = useState<'most-viewed' | 'last-viewed' | 'live-now'>('most-viewed');
+  const [sortMode, setSortMode] = useState<'most-viewed' | 'last-viewed'>('most-viewed');
   const [lastViewed, setLastViewed] = useState<Record<string, number>>({});
 
   // Load last-viewed timestamps from localStorage
@@ -125,23 +123,6 @@ export default function SiteGrid() {
       }
     }
 
-    async function fetchRealtime() {
-      try {
-        const res = await fetch('/api/analytics/realtime');
-        if (res.ok) {
-          const { data } = await res.json();
-          setSites(prev =>
-            prev.map(site => {
-              const rt = data.find((d: { siteId: string; realtimeUsers: number }) => d.siteId === site.id);
-              return rt ? { ...site, realtimeUsers: rt.realtimeUsers } : site;
-            })
-          );
-        }
-      } catch {
-        // Realtime not available
-      }
-    }
-
     async function fetchTrackedPageviews() {
       try {
         const res = await fetch('/api/pageviews?view=summary&range=today');
@@ -161,22 +142,11 @@ export default function SiteGrid() {
 
     fetchHealth();
     fetchAnalytics();
-    fetchRealtime();
     fetchTrackedPageviews();
-
-    // Refresh realtime every 30 seconds
-    const rtInterval = setInterval(fetchRealtime, 30000);
-    return () => clearInterval(rtInterval);
   }, []);
 
   // Sort sites based on selected mode
   const sortedSites = [...sites].sort((a, b) => {
-    if (sortMode === 'live-now') {
-      const aLive = a.realtimeUsers ?? 0;
-      const bLive = b.realtimeUsers ?? 0;
-      if (bLive !== aLive) return bLive - aLive;
-      return (b.visitors ?? 0) - (a.visitors ?? 0);
-    }
     if (sortMode === 'last-viewed') {
       const aTime = lastViewed[a.id] ?? 0;
       const bTime = lastViewed[b.id] ?? 0;
@@ -190,7 +160,7 @@ export default function SiteGrid() {
     return (b.pageViews ?? 0) - (a.pageViews ?? 0);
   });
 
-  const filteredSites = sortMode === 'live-now' ? sortedSites.filter(s => (s.realtimeUsers ?? 0) > 0) : sortedSites;
+  const filteredSites = sortedSites;
   const visibleSites = showAll ? filteredSites : filteredSites.slice(0, 5);
   const hasMore = filteredSites.length > 5;
 
@@ -201,7 +171,6 @@ export default function SiteGrid() {
   const totalPageViews = sites.reduce((sum, s) => sum + (s.pageViews ?? 0), 0);
   const allTimeVisitors = sites.reduce((sum, s) => sum + (s.totalVisitors ?? 0), 0);
   const monthlyVisitors = sites.reduce((sum, s) => sum + (s.monthVisitors ?? 0), 0);
-  const totalRealtime = sites.reduce((sum, s) => sum + (s.realtimeUsers ?? 0), 0);
 
   return (
     <div className="space-y-2">
@@ -230,12 +199,6 @@ export default function SiteGrid() {
           {monthlyVisitors > 0 && (
             <span className="text-[13px] text-[var(--text-secondary)]">
               {monthlyVisitors.toLocaleString()} month
-            </span>
-          )}
-          {totalRealtime > 0 && (
-            <span className="text-[13px] text-[var(--green)] flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
-              {totalRealtime} live
             </span>
           )}
           {totalVisitors > 0 && (
@@ -267,16 +230,6 @@ export default function SiteGrid() {
             Most Viewed
           </button>
           <button
-            onClick={() => setSortMode('live-now')}
-            className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
-              sortMode === 'live-now'
-                ? 'bg-[var(--green)] text-white'
-                : 'bg-[var(--bg-elevated)] text-[var(--text-tertiary)] active:opacity-70'
-            }`}
-          >
-            Live Now
-          </button>
-          <button
             onClick={() => setSortMode('last-viewed')}
             className={`text-[11px] font-medium px-2.5 py-1 rounded-full transition-colors ${
               sortMode === 'last-viewed'
@@ -292,11 +245,6 @@ export default function SiteGrid() {
       {/* Compact list view (expanded) */}
       {!collapsed && (
         <div className="card overflow-hidden divide-y divide-[var(--border-light)] fade-in">
-          {sortMode === 'live-now' && filteredSites.length === 0 && (
-            <div className="px-3.5 py-6 text-center">
-              <p className="text-[13px] text-[var(--text-tertiary)]">No live visitors right now</p>
-            </div>
-          )}
           {visibleSites.map(site => (
             <SiteRow
               key={site.id}
@@ -479,12 +427,6 @@ function SiteRow({
               </div>
             )}
             <div className="text-right">
-              {site.realtimeUsers !== null && site.realtimeUsers > 0 && (
-                <div className="flex items-center justify-end gap-1 mb-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse" />
-                  <span className="text-[10px] font-medium text-[var(--green)]">{site.realtimeUsers} now</span>
-                </div>
-              )}
               {(() => {
                 const gaToday = site.visitors ?? 0;
                 const tracked = site.trackedToday ?? 0;
