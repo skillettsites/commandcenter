@@ -349,6 +349,7 @@ interface SiteResult {
   bingError?: string;
   indexNowStatus: number | null;
   indexNowOk: boolean;
+  indexNowCount: number;
   errors: string[];
 }
 
@@ -371,6 +372,7 @@ async function processSite(
     bingQuotaRemaining: null,
     indexNowStatus: null,
     indexNowOk: false,
+    indexNowCount: 0,
     errors: [],
   };
 
@@ -444,13 +446,20 @@ async function processSite(
     }
     result.newlyDiscoveredCount = newEntries.filter((e) => recentlyDiscovered.has(e.url)).length;
 
-    // IndexNow first — pings ALL sitemap URLs (cheap, deduped server-side)
-    const allUrls = entries.map((e) => e.url);
+    // IndexNow — ping ONLY newly-discovered URLs (first seen in the last 48h),
+    // never the full sitemap. Re-pinging unchanged pages every day is against
+    // IndexNow guidance (Bing flags it as batch-mode abuse, can delay indexing)
+    // and pointlessly fills the URL-submission report. Brand-new pages are the
+    // only ones a ping helps; everything else is already known to search engines.
     const host = (() => {
-      try { return new URL(allUrls[0]).host; } catch { return ''; }
+      try { return new URL(entries[0]?.url || '').host; } catch { return ''; }
     })();
-    if (opts.doSubmit && host) {
-      const inow = await pingIndexNow(host, allUrls);
+    const indexNowUrls = entries
+      .filter((e) => recentlyDiscovered.has(e.url))
+      .map((e) => e.url);
+    result.indexNowCount = indexNowUrls.length;
+    if (opts.doSubmit && host && indexNowUrls.length > 0) {
+      const inow = await pingIndexNow(host, indexNowUrls);
       result.indexNowStatus = inow.status;
       result.indexNowOk = inow.ok;
     }
@@ -509,6 +518,7 @@ function buildMessage(rows: SiteResult[], doSubmit: boolean): string {
   const totalFresh = rows.reduce((s, r) => s + r.freshCount, 0);
   const totalNew = rows.reduce((s, r) => s + r.newCount, 0);
   const totalNewlyDiscovered = rows.reduce((s, r) => s + r.newlyDiscoveredCount, 0);
+  const totalIndexNow = rows.reduce((s, r) => s + r.indexNowCount, 0);
 
   const parts: string[] = [];
   parts.push(`<b>🔍 Indexing health · ${escapeHtml(dateLabel)}</b>`);
@@ -522,6 +532,7 @@ function buildMessage(rows: SiteResult[], doSubmit: boolean): string {
     parts.push(
       `• Submitted to Bing today: <b>${totalSubmitted}</b> (of ${totalNew} new · 🆕 ${totalNewlyDiscovered} pages added in last 48h)`
     );
+    parts.push(`• IndexNow pinged today: <b>${totalIndexNow}</b> (new URLs only)`);
   }
   parts.push('');
 
