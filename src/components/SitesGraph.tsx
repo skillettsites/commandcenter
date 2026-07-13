@@ -28,6 +28,7 @@ const ACCOUNT_TO_SITE: Record<string, string> = {
   AppealAFine: 'appealafine',
   HomeBuyerCheck: 'homebuyercheck',
   BriefMyNews: 'briefmynews',
+  PRSCheck: 'prscheck',
 };
 
 interface DailyPoint { date: string; revenue: number; charges: number }
@@ -36,9 +37,12 @@ interface StripeData { accounts: Account[] }
 interface TrafficRow { dateHour: string; pageViews: number; users: number; sessions: number }
 interface MergedPoint { date: string; visitors: number; pageViews: number; revenue: number; sales: number }
 
-// Sites that have a GA property (so the graph has traffic data), CCC first.
+// Sites shown in the dropdown: any with a GA property (traffic data) OR a Stripe
+// revenue account (so revenue-only sites like PRSCheck, which has no GA4 property
+// yet, still appear and show their sales). CCC first.
+const REVENUE_SITE_IDS = new Set(Object.values(ACCOUNT_TO_SITE));
 const SITE_OPTIONS = projects
-  .filter((p) => p.gaPropertyId && p.id !== 'dashboard')
+  .filter((p) => p.id !== 'dashboard' && (p.gaPropertyId || REVENUE_SITE_IDS.has(p.id)))
   .sort((a, b) => (a.id === 'carcostcheck' ? -1 : b.id === 'carcostcheck' ? 1 : a.name.localeCompare(b.name)));
 
 const RANGE_DAYS: Record<Range, number> = { '7d': 7, '30d': 30, '90d': 90, 'all': 100000 };
