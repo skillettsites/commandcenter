@@ -57,6 +57,7 @@ const SITE_LABELS: Record<string, { name: string; color: string }> = {
   carcostcheck: { name: 'CarCostCheck', color: '#f59e0b' },
   postcodecheck: { name: 'PostcodeCheck', color: '#3b82f6' },
   homebuyercheck: { name: 'HomeBuyerCheck', color: '#16a34a' },
+  prscheck: { name: 'PRSCheck', color: '#7c3aed' },
 };
 
 const RANGE_LABELS: Record<TimeRange, string> = {

@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
   const monthStart = ukMonthStart();
 
   const allSiteIds = [
-    'carcostcheck', 'postcodecheck', 'homebuyercheck', 'tapwaterscore', 'medcostcheck',
+    'carcostcheck', 'postcodecheck', 'homebuyercheck', 'prscheck', 'tapwaterscore', 'medcostcheck',
     'findyourstay', 'helpafterloss', 'helpafterlife', 'aibetfinder',
     'bestlondontours', 'davidskillett', 'thebesttours', 'daveknowsai',
     'askyourstay', 'aicareerswap', 'briefmynews',
