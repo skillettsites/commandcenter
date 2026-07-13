@@ -9,11 +9,18 @@ interface AccountConfig {
   //   e.g. HomeBuyerCheck).
   source: "stripe" | "supabase";
   envVar?: string;
-  // HomeBuyerCheck sells on the same Stripe account as PostcodeCheck ("Postcode
-  // Check"). HBC sales are pulled authoritatively from the Supabase reports
-  // table, so a Stripe account flagged here has HBC's payment_intents excluded
-  // to avoid counting every HBC sale twice (once as PCC, once as HBC).
-  sharesAccountWithHbc?: boolean;
+  // For source: "supabase" — the reports.tier values that belong to this site.
+  // The shared `reports` table has no site_id column, so tier is the only
+  // discriminator: HomeBuyerCheck writes standard/standard_plus/bundle,
+  // PRSCheck writes licence_check. Without this, one supabase site would
+  // scoop up the other's rows.
+  supabaseTiers?: string[];
+  // HomeBuyerCheck AND PRSCheck both sell on the same Stripe account as
+  // PostcodeCheck ("Postcode Check") but are pulled authoritatively from the
+  // Supabase reports table. A Stripe account flagged here has those sites'
+  // payment_intents excluded to avoid counting each sale twice (once as PCC,
+  // once as the supabase-sourced site).
+  sharesAccountWithSupabaseSites?: boolean;
   // Legacy base64 fallback used only when the env-var key is unset/stale. SECURITY: these
   // live keys are already in this public repo's git history — they should be ROTATED, after
   // which both these literals and the matching env vars must be updated. Do NOT add new keys
@@ -44,7 +51,7 @@ const ACCOUNTS: AccountConfig[] = [
     envVar: "STRIPE_KEY_POSTCODECHECK",
     fallbackB64: "c2tfbGl2ZV9aTnFRM3ZhalFLRTRvdlFLWjJYN1gwV0owMFFhU1hTaDlm",
     sites: ["PostcodeCheck"],
-    sharesAccountWithHbc: true,
+    sharesAccountWithSupabaseSites: true,
   },
   {
     name: "MatchMySkillset",
@@ -59,7 +66,20 @@ const ACCOUNTS: AccountConfig[] = [
     envVar: "STRIPE_KEY_BRIEFMYNEWS",
     sites: ["BriefMyNews"],
   },
-  { name: "HomeBuyerCheck", source: "supabase", sites: ["HomeBuyerCheck"] },
+  {
+    name: "HomeBuyerCheck",
+    source: "supabase",
+    sites: ["HomeBuyerCheck"],
+    supabaseTiers: ["standard", "standard_plus", "bundle"],
+  },
+  {
+    // PRSCheck's £9.99 landlord licence check sells on the shared Postcode Check
+    // Stripe account and writes a reports row with tier "licence_check".
+    name: "PRSCheck",
+    source: "supabase",
+    sites: ["PRSCheck"],
+    supabaseTiers: ["licence_check"],
+  },
 ];
 
 // env values pulled from local .env files sometimes carry a trailing literal "\n".
@@ -98,6 +118,7 @@ function cccDataCost(amount: number): number {
 const SALE_DATA_COST: Record<string, number> = {
   HomeBuyerCheck: 20,  // Claude report generation (est.)
   PostcodeCheck: 10,   // mostly free gov data + light AI (est.)
+  PRSCheck: 0,         // free published council designations, no paid API
   AppealAFine: 15,     // AI appeal-letter generation (est.)
   MatchMySkillset: 20, // AI career analysis (est.)
   BriefMyNews: 10,     // AI digest (est.)
@@ -121,8 +142,11 @@ interface StripeCharge {
   created: number;
   billing_details?: { email?: string };
   // Stripe charges carry this natively; Supabase rows map it from
-  // stripe_payment_intent. Used to de-dupe the shared PCC/HBC account.
+  // stripe_payment_intent. Used to de-dupe the shared PCC/HBC/PRSCheck account.
   payment_intent?: string;
+  // Only set on Supabase-sourced rows: reports.tier, used to attribute a row to
+  // the right supabase site (HomeBuyerCheck vs PRSCheck).
+  tier?: string;
   // Expanded on the Stripe pull so we can read the exact processing fee Stripe took.
   // A string (unexpanded id) or null for Supabase-sourced rows.
   balance_transaction?: { fee?: number } | string | null;
@@ -137,14 +161,14 @@ async function fetchSupabaseCharges(): Promise<StripeCharge[]> {
   const key = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!base || !key) throw new Error("Supabase URL/service-role key not set");
   const q =
-    "reports?select=created_at,amount_paid,customer_email,stripe_session_id,stripe_payment_intent" +
+    "reports?select=created_at,amount_paid,customer_email,stripe_session_id,stripe_payment_intent,tier" +
     "&stripe_session_id=like.cs_live*&order=created_at.desc&limit=1000";
   const res = await fetch(`${base}/rest/v1/${q}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`Supabase HTTP ${res.status}`);
-  const rows: Array<{ created_at: string; amount_paid: number | null; customer_email: string | null; stripe_payment_intent: string | null }> =
+  const rows: Array<{ created_at: string; amount_paid: number | null; customer_email: string | null; stripe_payment_intent: string | null; tier: string | null }> =
     await res.json();
   return rows.map((r) => ({
     amount: r.amount_paid ?? 0,
@@ -153,6 +177,7 @@ async function fetchSupabaseCharges(): Promise<StripeCharge[]> {
     created: Math.floor(new Date(r.created_at).getTime() / 1000),
     billing_details: { email: r.customer_email || "Unknown" },
     payment_intent: r.stripe_payment_intent || undefined,
+    tier: r.tier || undefined,
   }));
 }
 
@@ -237,37 +262,41 @@ export async function GET() {
       buckets.set(new Date(d).toISOString().slice(0, 10), { revenue: 0, charges: 0, profit: 0 });
     }
 
-    // HomeBuyerCheck (Supabase reports) is the authoritative HBC source AND
-    // shares a Stripe account with PostcodeCheck. Fetch it once up front so we
-    // can both reuse it for the HBC account and exclude its payment_intents from
-    // the shared Stripe pull (otherwise every HBC sale counts twice).
-    let hbcCharges: StripeCharge[] = [];
-    let hbcPaymentIntents = new Set<string>();
+    // The Supabase `reports` table is the authoritative source for the sites
+    // whose Stripe key can't be read back (HomeBuyerCheck, PRSCheck), and those
+    // sites share the Postcode Check Stripe account. Fetch every reports row once
+    // up front so we can attribute each supabase site by tier AND exclude their
+    // payment_intents from the shared Stripe pull (otherwise each sale counts
+    // twice — once as PostcodeCheck, once as the supabase-sourced site).
+    let supabaseCharges: StripeCharge[] = [];
+    let supabasePaymentIntents = new Set<string>();
     try {
-      hbcCharges = await fetchSupabaseCharges();
-      hbcPaymentIntents = new Set(
-        hbcCharges.map((c) => c.payment_intent).filter((p): p is string => !!p)
+      supabaseCharges = await fetchSupabaseCharges();
+      supabasePaymentIntents = new Set(
+        supabaseCharges.map((c) => c.payment_intent).filter((p): p is string => !!p)
       );
     } catch (err) {
-      console.error("[stripe] HBC prefetch:", err instanceof Error ? err.message : String(err));
+      console.error("[stripe] supabase prefetch:", err instanceof Error ? err.message : String(err));
     }
 
     for (const account of ACCOUNTS) {
       try {
         let allCharges: StripeCharge[];
         if (account.source === "supabase") {
-          allCharges = hbcCharges;
+          // Attribute only this site's tiers (the reports table has no site_id).
+          const tiers = account.supabaseTiers ?? [];
+          allCharges = supabaseCharges.filter((c) => tiers.includes(c.tier ?? ""));
         } else {
           const key =
             cleanEnv(process.env[account.envVar!]) ||
             (account.fallbackB64 ? Buffer.from(account.fallbackB64, "base64").toString() : "");
           if (!key) continue;
           allCharges = await fetchCharges(key);
-          // Drop HBC sales that live on this shared Stripe account, they're
-          // already counted via the Supabase HBC source.
-          if (account.sharesAccountWithHbc && hbcPaymentIntents.size > 0) {
+          // Drop sales that live on this shared Stripe account but are counted
+          // via the Supabase source (HomeBuyerCheck, PRSCheck).
+          if (account.sharesAccountWithSupabaseSites && supabasePaymentIntents.size > 0) {
             allCharges = allCharges.filter(
-              (c) => !c.payment_intent || !hbcPaymentIntents.has(c.payment_intent)
+              (c) => !c.payment_intent || !supabasePaymentIntents.has(c.payment_intent)
             );
           }
         }
