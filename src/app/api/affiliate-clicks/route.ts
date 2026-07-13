@@ -25,24 +25,33 @@ interface SiteStats {
   total: number;
 }
 
+// PostgREST caps each request at 1000 rows, so page through all of them.
+// extraParams should carry only filters (e.g. &site=eq.x), NOT a limit.
 async function fetchClicks(extraParams = ""): Promise<ClickRow[]> {
-  const url = `${SUPABASE_URL}/rest/v1/affiliate_clicks?order=created_at.desc&select=id,type,city,section,site,created_at,geo_city,geo_region,geo_country${extraParams}`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) {
-    console.error(`[affiliate-clicks] Supabase fetch failed: ${res.status} ${res.statusText}`);
-    const body = await res.text();
-    console.error(`[affiliate-clicks] Response body: ${body.slice(0, 200)}`);
-    return [];
+  const all: ClickRow[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; offset < 200000; offset += pageSize) {
+    const url = `${SUPABASE_URL}/rest/v1/affiliate_clicks?order=created_at.desc&select=id,type,city,section,site,created_at,geo_city,geo_region,geo_country&offset=${offset}&limit=${pageSize}${extraParams}`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+      cache: 'no-store',
+    });
+    if (!res.ok) {
+      console.error(`[affiliate-clicks] Supabase fetch failed: ${res.status} ${res.statusText}`);
+      const body = await res.text();
+      console.error(`[affiliate-clicks] Response body: ${body.slice(0, 200)}`);
+      break;
+    }
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+    all.push(...data);
+    if (data.length < pageSize) break;
   }
-  const data = await res.json();
-  console.log(`[affiliate-clicks] Supabase returned ${Array.isArray(data) ? data.length : 'non-array'} rows`);
-  return data;
+  console.log(`[affiliate-clicks] Supabase returned ${all.length} rows (paginated)`);
+  return all;
 }
 
 export async function GET(req: NextRequest) {
@@ -62,7 +71,7 @@ export async function GET(req: NextRequest) {
   try {
     // Full mode returns everything the dashboard needs
     if (mode === "full") {
-      const clicks = await fetchClicks("&limit=10000");
+      const clicks = await fetchClicks();
       console.log(`[affiliate-clicks] full mode: fetched ${clicks.length} clicks, URL=${SUPABASE_URL?.slice(0,30)}, key=${SUPABASE_KEY?.slice(0,20)}...`);
       const now = new Date();
       const todayStr = ukTodayStr();
@@ -174,10 +183,7 @@ export async function GET(req: NextRequest) {
 
     // Default mode: backward compatible simple stats
     const siteFilter = req.nextUrl.searchParams.get("site");
-    let extraParams = "&limit=10000";
-    if (siteFilter) {
-      extraParams += `&site=eq.${siteFilter}`;
-    }
+    const extraParams = siteFilter ? `&site=eq.${siteFilter}` : "";
     const clicks = await fetchClicks(extraParams);
 
     const now = new Date();
