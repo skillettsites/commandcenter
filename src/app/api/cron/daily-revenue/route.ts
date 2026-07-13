@@ -279,6 +279,16 @@ async function handle(request: Request) {
     amazonInvite = { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
+  // Daily GetYourGuide affiliate earnings: scan the last ~2 days of booking/payout
+  // emails, update the pending/paid tables, and Telegram only if something new landed.
+  let gygEarnings: unknown = null;
+  try {
+    const { updateGygEarnings } = await import('@/lib/gyg-earnings');
+    gygEarnings = await updateGygEarnings({ notify: true });
+  } catch (err) {
+    gygEarnings = { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
   return NextResponse.json(
     {
       ok: tg.ok,
@@ -287,6 +297,7 @@ async function handle(request: Request) {
       accountResults,
       purchaseCount: purchases.length,
       amazonInvite,
+      gygEarnings,
     },
     { status: tg.ok ? 200 : 500 }
   );
