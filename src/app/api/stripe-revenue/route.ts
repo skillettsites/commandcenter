@@ -329,8 +329,8 @@ export async function GET() {
         // Subtract fixed monthly overheads (e.g. CCC's £100/mo OneAuto subscription),
         // accrued daily, so these profit figures are true net rather than per-sale margin.
         const monthlyFixed = MONTHLY_FIXED_COST[account.name] ?? 0;
+        const dailyFixed = (monthlyFixed * 12) / 365;
         if (monthlyFixed > 0) {
-          const dailyFixed = (monthlyFixed * 12) / 365;
           const nowSec = now.getTime() / 1000;
           totalProfit -= Math.round(dailyFixed * Math.max(1, (nowSec - REVENUE_START_DATE) / 86400));
           monthProfit -= Math.round(dailyFixed * Math.max(1, (nowSec - monthStart) / 86400));
@@ -353,6 +353,14 @@ export async function GET() {
           ab.profit += profit;
           acctBuckets.set(key, ab);
         }
+        // Spread the daily fixed overhead across the global trend series so any range
+        // (week / month / all) summed from it is net of fixed costs too. Applied to every
+        // calendar-day bucket (fixed cost accrues daily regardless of sales).
+        if (monthlyFixed > 0) {
+          const df = Math.round(dailyFixed);
+          for (const b of buckets.values()) b.profit -= df;
+        }
+
         const acctDailySeries = Array.from(acctBuckets.entries())
           .sort((a, b) => (a[0] < b[0] ? -1 : 1))
           .map(([date, v]) => ({ date, revenue: v.revenue, charges: v.charges, profit: v.profit }));
