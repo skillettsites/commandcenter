@@ -98,19 +98,18 @@ const STRIPE_FIXED = 20;
 
 // CarCostCheck data cost varies by report. metadata.product is on the checkout SESSION,
 // not the charge, so we classify by amount (prices are distinct enough that the ~10%
-// promo/early-bird variance can't cross a band). Costs from the CCC codebase:
-//   valuation £2.99 → AutoPredict £1.50 + Marketcheck £0.20      = 170p (no AutoCheck)
-//   premium   £4.99 → AutoCheck £1.10                            = 110p
-//   bundle    £6.99 → AutoCheck £1.10 + AutoPredict £1.50 + MC £0.20 = 280p
+// promo/early-bird variance can't cross a band). Per-sale API costs (via OneAuto + Marketcheck),
+// which sit ON TOP of the £100/mo OneAuto subscription (see MONTHLY_FIXED_COST):
+//   valuation £2.99 → Marketcheck £0.20                     = 20p
+//   premium   £4.99 → AutoCheck (Experian provenance) £1.10 = 110p
+//   bundle    £6.99 → AutoCheck £1.10 + Marketcheck £0.20   = 130p
 //   trade credit packs (≥ £30) → 0 at sale; the AutoCheck cost lands later when a credit is spent.
-// Conservative: AutoCheck by-reg cache hits and skipped-Marketcheck (no mileage) make the
-// real average slightly lower, so profit shown is a floor. Insurance-API cost is undocumented
-// and not included.
+// AutoPredict / insurance calls are covered by the monthly subscription, not billed per sale.
 function cccDataCost(amount: number): number {
   if (amount >= 3000) return 0;   // trade credit pack
-  if (amount >= 600) return 280;  // bundle
-  if (amount >= 350) return 110;  // premium
-  return 170;                     // valuation
+  if (amount >= 600) return 130;  // bundle: AutoCheck £1.10 + Marketcheck £0.20
+  if (amount >= 350) return 110;  // premium: AutoCheck £1.10
+  return 20;                      // valuation: Marketcheck £0.20
 }
 
 // Per-sale data/API cost for the non-CCC sites, in pence. These are ESTIMATES — replace
@@ -122,6 +121,12 @@ const SALE_DATA_COST: Record<string, number> = {
   AppealAFine: 15,     // AI appeal-letter generation (est.)
   MatchMySkillset: 20, // AI career analysis (est.)
   BriefMyNews: 10,     // AI digest (est.)
+};
+
+// Fixed monthly overheads (pence), not tied to any single sale. Accrued daily and
+// subtracted from profit so the figures are true net, not just per-sale margin.
+const MONTHLY_FIXED_COST: Record<string, number> = {
+  CarCostCheck: 10000, // OneAuto API subscription £100/mo — this is what buys the £1.10/£0.20 per-call rates
 };
 
 function realFee(c: StripeCharge): number | undefined {
@@ -311,15 +316,26 @@ export async function GET() {
         });
 
         const totalRevenue = priced.reduce((s, p) => s + p.c.amount, 0);
-        const totalProfit = priced.reduce((s, p) => s + p.profit, 0);
+        let totalProfit = priced.reduce((s, p) => s + p.profit, 0);
         const monthPriced = priced.filter((p) => p.c.created >= monthStart);
         const monthRevenue = monthPriced.reduce((s, p) => s + p.c.amount, 0);
-        const monthProfit = monthPriced.reduce((s, p) => s + p.profit, 0);
+        let monthProfit = monthPriced.reduce((s, p) => s + p.profit, 0);
         const todayPriced = priced.filter((p) => p.c.created >= todayStart);
         const todayRevenue = todayPriced.reduce((s, p) => s + p.c.amount, 0);
-        const todayProfit = todayPriced.reduce((s, p) => s + p.profit, 0);
+        let todayProfit = todayPriced.reduce((s, p) => s + p.profit, 0);
         const monthCharges = monthPriced;
         const todayChargesList = todayPriced;
+
+        // Subtract fixed monthly overheads (e.g. CCC's £100/mo OneAuto subscription),
+        // accrued daily, so these profit figures are true net rather than per-sale margin.
+        const monthlyFixed = MONTHLY_FIXED_COST[account.name] ?? 0;
+        if (monthlyFixed > 0) {
+          const dailyFixed = (monthlyFixed * 12) / 365;
+          const nowSec = now.getTime() / 1000;
+          totalProfit -= Math.round(dailyFixed * Math.max(1, (nowSec - REVENUE_START_DATE) / 86400));
+          monthProfit -= Math.round(dailyFixed * Math.max(1, (nowSec - monthStart) / 86400));
+          todayProfit -= Math.round(dailyFixed);
+        }
 
         // Per-account daily series (for the per-site graph) plus the global buckets.
         const acctBuckets = new Map<string, { revenue: number; charges: number; profit: number }>();
