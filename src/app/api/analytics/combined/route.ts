@@ -3,6 +3,7 @@ import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
 import { getServiceClient } from '@/lib/supabase';
 import { ukTodayStr, ukMonthStr } from '@/lib/uk-time';
+import { isExcludedDate } from '@/lib/analytics-filter';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,12 +72,15 @@ export async function GET(request: NextRequest) {
           orderBys: [{ dimension: { dimensionName: timeDimension, orderType: 'ALPHANUMERIC' } }],
         });
 
-        return (response.rows ?? []).map(row => ({
-          dateHour: row.dimensionValues?.[0]?.value ?? '',
-          pageViews: parseInt(row.metricValues?.[0]?.value ?? '0'),
-          users: parseInt(row.metricValues?.[1]?.value ?? '0'),
-          sessions: parseInt(row.metricValues?.[2]?.value ?? '0'),
-        }));
+        return (response.rows ?? [])
+          .map(row => ({
+            dateHour: row.dimensionValues?.[0]?.value ?? '',
+            pageViews: parseInt(row.metricValues?.[0]?.value ?? '0'),
+            users: parseInt(row.metricValues?.[1]?.value ?? '0'),
+            sessions: parseInt(row.metricValues?.[2]?.value ?? '0'),
+          }))
+          // Drop bot-flood anomaly days so they don't skew charts or totals
+          .filter(row => !isExcludedDate(row.dateHour));
       } catch {
         return [];
       }
@@ -263,6 +267,7 @@ export async function GET(request: NextRequest) {
       const d = new Date(r.created_at as string);
       const ymd = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
       const key = timeDimension === 'dateHour' ? `${ymd}${String(d.getUTCHours()).padStart(2, '0')}` : ymd;
+      if (isExcludedDate(key)) continue;
       if (range === '1h' && allowedKeys && !allowedKeys.has(key)) continue;
       const existing = merged.get(key);
       if (existing) existing.pageViews += 1;

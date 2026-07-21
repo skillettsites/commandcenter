@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { projects } from '@/lib/projects';
 import { getServiceClient } from '@/lib/supabase';
+import { isExcludedDate } from '@/lib/analytics-filter';
 
 export const dynamic = 'force-dynamic';
 
@@ -153,13 +154,15 @@ export async function GET(
       }),
     ]);
 
-    // Parse hourly data
-    const hourly = (hourlyResponse[0].rows ?? []).map(row => ({
-      dateHour: row.dimensionValues?.[0]?.value ?? '',
-      pageViews: parseInt(row.metricValues?.[0]?.value ?? '0'),
-      users: parseInt(row.metricValues?.[1]?.value ?? '0'),
-      sessions: parseInt(row.metricValues?.[2]?.value ?? '0'),
-    }));
+    // Parse hourly data (dropping bot-flood anomaly days that skew the chart)
+    const hourly = (hourlyResponse[0].rows ?? [])
+      .map(row => ({
+        dateHour: row.dimensionValues?.[0]?.value ?? '',
+        pageViews: parseInt(row.metricValues?.[0]?.value ?? '0'),
+        users: parseInt(row.metricValues?.[1]?.value ?? '0'),
+        sessions: parseInt(row.metricValues?.[2]?.value ?? '0'),
+      }))
+      .filter(row => !isExcludedDate(row.dateHour));
 
     // Parse referral sources
     const sources = (referralResponse[0].rows ?? []).map(row => ({
